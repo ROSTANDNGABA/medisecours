@@ -1,0 +1,2 @@
+nom,type,region,ville,quartier,adresse,telephone,email,siteWeb,latitude,longitude,horaires,description,statut,estActif,specialites
+"Hôpital Central de Yaoundé",Hôpital,Centre,Yaoundé,Mvog-Mbi,"Avenue Charles de Gaulle","+237 690000001",contact@hcy.cm,www.hcy.cm,3.863,11.516,"Lun-Ven 8h-18h, Sam 8h-13h","Hôpital de référence",public,true,"Cardiologie, Pédiatrie, Orthopédie"

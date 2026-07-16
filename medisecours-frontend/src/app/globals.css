@@ -1,0 +1,64 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600&display=swap');
+@import "tailwindcss";
+@import 'leaflet/dist/leaflet.css';
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --color-primary-50: #EAF0F7;
+  --color-primary-100: #CBDBEA;
+  --color-primary-300: #6F94B8;
+  --color-primary-500: #1E3A5F;
+  --color-primary-700: #152A45;
+  --color-primary-900: #0C1A2C;
+  --color-primary: #1E3A5F;
+
+  --color-mint-100: #D1FAE5;
+  --color-mint-500: #10B981;
+  --color-mint-700: #047857;
+  --color-mint: #10B981;
+
+  --color-urgence-100: #FEE2E2;
+  --color-urgence-500: #EF4444;
+  --color-urgence-700: #B91C1C;
+  --color-urgence: #EF4444;
+
+  --color-sable: #F6F3EC;
+
+  --font-display: "Plus Jakarta Sans", sans-serif;
+  --font-sans: "Inter", sans-serif;
+
+  --shadow-glass: 0 8px 32px 0 rgba(30, 58, 95, 0.15);
+
+  --animate-pulse-urgence: pulseUrgence 1.6s ease-in-out infinite;
+
+  @keyframes pulseUrgence {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.6; }
+  }
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: var(--font-sans);
+  @apply bg-sable text-primary-900 dark:bg-primary-900 dark:text-sable transition-colors duration-300;
+}
+
+h1, h2, h3, h4 {
+  font-family: var(--font-display);
+}
+
+::selection {
+  @apply bg-mint-100 text-primary-900;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

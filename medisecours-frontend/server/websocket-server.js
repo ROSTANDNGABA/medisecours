@@ -1,0 +1,89 @@
+const { WebSocketServer } = require('ws')
+const http = require('http')
+
+const WS_PORT = process.env.WS_PORT || 8081
+const HTTP_PORT = process.env.WS_HTTP_PORT || 8082
+
+const clients = new Map()
+const convClients = new Map()
+
+const wss = new WebSocketServer({ port: WS_PORT })
+console.log(`WebSocket server running on ws://127.0.0.1:${WS_PORT}`)
+
+wss.on('connection', (ws, req) => {
+  const url = new URL(req.url, 'http://localhost')
+  const userId = url.searchParams.get('userId')
+  const token = url.searchParams.get('token')
+
+  if (!userId || !token) {
+    ws.close(4001, 'userId and token required')
+    return
+  }
+
+  ws.userId = userId
+  ws.token = token
+  ws.subscriptions = new Set()
+
+  console.log(`[WS] Client connected: ${userId}`)
+  clients.set(userId, ws)
+
+  ws.on('message', (raw) => {
+    try {
+      const msg = JSON.parse(raw.toString())
+      if (msg.type === 'subscribe' && msg.conversationId) {
+        ws.subscriptions.add(msg.conversationId)
+        if (!convClients.has(msg.conversationId)) convClients.set(msg.conversationId, new Set())
+        convClients.get(msg.conversationId).add(ws)
+      }
+      if (msg.type === 'unsubscribe' && msg.conversationId) {
+        ws.subscriptions.delete(msg.conversationId)
+        convClients.get(msg.conversationId)?.delete(ws)
+      }
+    } catch { /* ignore malformed */ }
+  })
+
+  ws.on('close', () => {
+    clients.delete(userId)
+    for (const convId of ws.subscriptions) {
+      convClients.get(convId)?.delete(ws)
+    }
+  })
+})
+
+const httpServer = http.createServer((req, res) => {
+  if (req.method === 'POST' && req.url === '/publish') {
+    let body = ''
+    req.on('data', (chunk) => body += chunk)
+    req.on('end', () => {
+      try {
+        const data = JSON.parse(body)
+        const { conversationId, event, payload } = data
+        if (!conversationId || !event) {
+          res.writeHead(400)
+          res.end('Missing conversationId or event')
+          return
+        }
+        const message = JSON.stringify({ event, payload })
+        const subscribers = convClients.get(String(conversationId))
+        console.log(`[WS] Publish: event=${event} conv=${conversationId} subscribers=${subscribers?.size || 0}`)
+        if (subscribers) {
+          for (const ws of subscribers) {
+            if (ws.readyState === 1) ws.send(message)
+          }
+        }
+        res.writeHead(200, { 'Content-Type': 'application/json' })
+        res.end(JSON.stringify({ sent: subscribers?.size || 0 }))
+      } catch (e) {
+        res.writeHead(400)
+        res.end('Invalid JSON')
+      }
+    })
+  } else {
+    res.writeHead(404)
+    res.end('Not found')
+  }
+})
+
+httpServer.listen(HTTP_PORT, () => {
+  console.log(`HTTP publish endpoint on http://127.0.0.1:${HTTP_PORT}/publish`)
+})
