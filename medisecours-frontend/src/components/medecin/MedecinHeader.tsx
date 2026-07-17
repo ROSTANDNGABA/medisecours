@@ -2,10 +2,11 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { Search, ChevronDown, MessageSquare, User, Settings, LogOut, Loader2, Stethoscope, Building2, Activity, MessageCircle } from 'lucide-react'
+import { Search, ChevronDown, MessageSquare, User, Settings, LogOut, Loader2, Stethoscope, Building2, Activity, MessageCircle, ClipboardList } from 'lucide-react'
 import Avatar from '../ui/Avatar'
 import NotificationBell from '../ui/NotificationBell'
 import { useAuth } from '../../hooks/useAuth'
+import { useWebSocket } from '../../hooks/useWebSocket'
 import api from '../../api/axios'
 import { API_BASE } from '../../lib/config'
 

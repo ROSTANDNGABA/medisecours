@@ -53,7 +53,7 @@ class Consultation
     private ?Patient $patient = null;
 
     #[ORM\ManyToOne(targetEntity: Medecin::class)]
-    #[ORM\JoinColumn(nullable: false)]
+    #[ORM\JoinColumn(nullable: true)]
     #[Groups(['consultation:read', 'consultation:write', 'message:read'])]
     private ?Medecin $medecin = null;
 
@@ -104,10 +104,18 @@ class Consultation
     #[ORM\OneToMany(targetEntity: Message::class, mappedBy: 'consultation')]
     private Collection $messages;
 
+    /**
+     * @var Collection<int, Prescription>
+     */
+    #[ORM\OneToMany(targetEntity: Prescription::class, mappedBy: 'consultation')]
+    #[Groups(['consultation:read'])]
+    private Collection $prescriptions;
+
     public function __construct()
     {
         $this->createdAt = new \DateTimeImmutable();
         $this->messages = new ArrayCollection();
+        $this->prescriptions = new ArrayCollection();
     }
 
     public function getId(): ?int
@@ -234,6 +242,33 @@ class Consultation
     {
         if ($this->messages->removeElement($message) && $message->getConsultation() === $this) {
             $message->setConsultation(null);
+        }
+
+        return $this;
+    }
+
+    /**
+     * @return Collection<int, Prescription>
+     */
+    public function getPrescriptions(): Collection
+    {
+        return $this->prescriptions;
+    }
+
+    public function addPrescription(Prescription $prescription): static
+    {
+        if (!$this->prescriptions->contains($prescription)) {
+            $this->prescriptions->add($prescription);
+            $prescription->setConsultation($this);
+        }
+
+        return $this;
+    }
+
+    public function removePrescription(Prescription $prescription): static
+    {
+        if ($this->prescriptions->removeElement($prescription) && $prescription->getConsultation() === $this) {
+            $prescription->setConsultation(null);
         }
 
         return $this;

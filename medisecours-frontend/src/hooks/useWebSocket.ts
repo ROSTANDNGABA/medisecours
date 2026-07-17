@@ -10,6 +10,9 @@ export function useWebSocket(userId: string, token: string, handlers: {
   onMessageRead?: (msg: any) => void
   onUserOnline?: (data: any) => void
   onUserOffline?: (data: any) => void
+  onConsultationCreated?: (data: any) => void
+  onConsultationAccepted?: (data: any) => void
+  onConsultationClosed?: (data: any) => void
 }) {
   const wsRef = useRef<WebSocket | null>(null)
   const attemptRef = useRef(0)
@@ -51,7 +54,8 @@ export function useWebSocket(userId: string, token: string, handlers: {
     pendingRef.current = []
 
     const connect = () => {
-      const url = `${WS_URL}?userId=${encodeURIComponent(userId)}&token=${encodeURIComponent(token)}`
+      const role = ''
+      const url = `${WS_URL}?userId=${encodeURIComponent(userId)}&token=${encodeURIComponent(token)}&role=${role}`
       const ws = new WebSocket(url)
       wsRef.current = ws
 
@@ -65,6 +69,9 @@ export function useWebSocket(userId: string, token: string, handlers: {
           if (evt === 'message_read' && h.onMessageRead) h.onMessageRead(payload)
           if (evt === 'user_online' && h.onUserOnline) h.onUserOnline(payload)
           if (evt === 'user_offline' && h.onUserOffline) h.onUserOffline(payload)
+          if (evt === 'consultation_created' && h.onConsultationCreated) h.onConsultationCreated(payload)
+          if (evt === 'consultation_accepted' && h.onConsultationAccepted) h.onConsultationAccepted(payload)
+          if (evt === 'consultation_closed' && h.onConsultationClosed) h.onConsultationClosed(payload)
         } catch { /* ignore */ }
       }
 

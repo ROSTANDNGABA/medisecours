@@ -14,6 +14,7 @@ wss.on('connection', (ws, req) => {
   const url = new URL(req.url, 'http://localhost')
   const userId = url.searchParams.get('userId')
   const token = url.searchParams.get('token')
+  const role = url.searchParams.get('role') || ''
 
   if (!userId || !token) {
     ws.close(4001, 'userId and token required')
@@ -22,9 +23,10 @@ wss.on('connection', (ws, req) => {
 
   ws.userId = userId
   ws.token = token
+  ws.role = role
   ws.subscriptions = new Set()
 
-  console.log(`[WS] Client connected: ${userId}`)
+  console.log(`[WS] Client connected: ${userId} (role=${role})`)
   clients.set(userId, ws)
 
   ws.on('message', (raw) => {
@@ -57,12 +59,31 @@ const httpServer = http.createServer((req, res) => {
     req.on('end', () => {
       try {
         const data = JSON.parse(body)
-        const { conversationId, event, payload } = data
-        if (!conversationId || !event) {
-          res.writeHead(400)
-          res.end('Missing conversationId or event')
+        const { conversationId, event, payload, broadcast } = data
+
+        if (broadcast) {
+          // System-wide event — send to ALL connected clients
+          const message = JSON.stringify({ event, payload })
+          let sent = 0
+          for (const [uid, ws] of clients) {
+            if (ws.readyState === 1) {
+              ws.send(message)
+              sent++
+            }
+          }
+          console.log(`[WS] Broadcast: event=${event} sent=${sent}`)
+          res.writeHead(200, { 'Content-Type': 'application/json' })
+          res.end(JSON.stringify({ sent }))
           return
         }
+
+        if (!conversationId || !event) {
+          res.writeHead(400)
+          res.end('Missing conversationId, event, or broadcast')
+          return
+        }
+
+        // Per-conversation notification
         const message = JSON.stringify({ event, payload })
         const subscribers = convClients.get(String(conversationId))
         console.log(`[WS] Publish: event=${event} conv=${conversationId} subscribers=${subscribers?.size || 0}`)

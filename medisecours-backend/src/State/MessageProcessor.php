@@ -12,13 +12,12 @@ use App\Entity\Medecin;
 use App\Entity\Message;
 use App\Entity\Patient;
 use App\Entity\User;
+use App\Service\WebSocketNotifier;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
-use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
-use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 class MessageProcessor implements ProcessorInterface
 {
@@ -27,7 +26,7 @@ class MessageProcessor implements ProcessorInterface
         private readonly ProcessorInterface $persistProcessor,
         private readonly Security $security,
         private readonly EntityManagerInterface $em,
-        private readonly HttpClientInterface $httpClient,
+        private readonly WebSocketNotifier $wsNotifier,
         private readonly LoggerInterface $logger,
     ) {
     }
@@ -80,39 +79,31 @@ class MessageProcessor implements ProcessorInterface
         $conv = $message->getConversation();
         if (!$conv) return;
 
-        try {
-            $this->logger->info('WS notify', ['msgId' => $message->getId(), 'convId' => $conv->getId()]);
-            $this->httpClient->request('POST', 'http://127.0.0.1:8082/publish', [
-                'json' => [
-                    'conversationId' => (string) $conv->getId(),
-                    'event' => 'new_message',
-                    'payload' => [
-                        'id' => $message->getId(),
-                        'contenu' => $message->getContenu(),
-                        'typeMessage' => $message->getTypeMessage(),
-                        'statut' => $message->getStatut(),
-                        'createdAt' => $message->getCreatedAt()?->format('c'),
-                        'expediteur' => [
-                            'id' => $message->getExpediteur()?->getId(),
-                            'nom' => $message->getExpediteur()?->getNom(),
-                            'prenom' => $message->getExpediteur()?->getPrenom(),
-                        ],
-                        'conversation' => '/api/conversations/' . $conv->getId(),
-                        'media' => $message->getMedia() ? [
-                            '@id' => '/api/media_objects/' . $message->getMedia()->getId(),
-                            'contentUrl' => '/uploads/media/' . $message->getMedia()->getFilePath(),
-                            'originalName' => $message->getMedia()->getOriginalName(),
-                            'mimeType' => $message->getMedia()->getMimeType(),
-                            'size' => $message->getMedia()->getSize(),
-                        ] : null,
-                        'dureeVoix' => $message->getDureeVoix(),
-                    ],
+        $this->wsNotifier->notifyConversation(
+            (string) $conv->getId(),
+            'new_message',
+            [
+                'id' => $message->getId(),
+                'contenu' => $message->getContenu(),
+                'typeMessage' => $message->getTypeMessage(),
+                'statut' => $message->getStatut(),
+                'createdAt' => $message->getCreatedAt()?->format('c'),
+                'expediteur' => [
+                    'id' => $message->getExpediteur()?->getId(),
+                    'nom' => $message->getExpediteur()?->getNom(),
+                    'prenom' => $message->getExpediteur()?->getPrenom(),
                 ],
-                'timeout' => 2,
-            ]);
-        } catch (\Throwable $e) {
-            // WS notification is best-effort
-        }
+                'conversation' => '/api/conversations/' . $conv->getId(),
+                'media' => $message->getMedia() ? [
+                    '@id' => '/api/media_objects/' . $message->getMedia()->getId(),
+                    'contentUrl' => '/uploads/media/' . $message->getMedia()->getFilePath(),
+                    'originalName' => $message->getMedia()->getOriginalName(),
+                    'mimeType' => $message->getMedia()->getMimeType(),
+                    'size' => $message->getMedia()->getSize(),
+                ] : null,
+                'dureeVoix' => $message->getDureeVoix(),
+            ]
+        );
     }
 
     private function prepareFromConsultation(Message $message, Consultation $consultation, User $user): ?Conversation
