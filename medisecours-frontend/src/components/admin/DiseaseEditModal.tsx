@@ -4,6 +4,7 @@ import { useState, useRef, useEffect, useCallback } from 'react'
 import { Save, X, Upload } from 'lucide-react'
 import { createPortal } from 'react-dom'
 import api from '../../api/axios'
+import { API_BASE } from '../../lib/config'
 import { CategoryIcon } from '../ui/CategoryIcon'
 import { useToast } from '../ui/Toast'
 
@@ -55,9 +56,9 @@ export default function DiseaseEditModal({
   const existingImages = Array.isArray(editing.images) ? editing.images : []
 
   const resolveImgSrc = (img) => {
-    if (typeof img === 'string') return img.startsWith('http') ? img : `http://127.0.0.1:8000${img}`
-    if (img.url) return img.url.startsWith('http') ? img.url : `http://127.0.0.1:8000${img.url}`
-    if (img.filePath) return `http://127.0.0.1:8000/uploads/media/${img.filePath}`
+    if (typeof img === 'string') return img.startsWith('http') ? img : `${API_BASE}${img}`
+    if (img.url) return img.url.startsWith('http') ? img.url : `${API_BASE}${img.url}`
+    if (img.filePath) return `${API_BASE}/uploads/media/${img.filePath}`
     return null
   }
 
@@ -246,6 +247,27 @@ export default function DiseaseEditModal({
                   placeholder="Précautions à prendre..."
                   className="w-full rounded-2xl border border-[#dfe5db] bg-[#f8faf6] px-4 py-3 text-sm text-[#223023] outline-none transition focus:border-[#bfd0bd] focus:bg-white"
                 />
+              </div>
+
+              <div>
+                <label className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.18em] text-[#7a8578]">Image URL (externe)</label>
+                <div className="flex items-center gap-3">
+                  {editing.imageUrl && (
+                    <img
+                      src={editing.imageUrl}
+                      alt=""
+                      className="h-16 w-16 shrink-0 rounded-xl border border-[#dfe5db] bg-[#f8faf6] object-cover"
+                      onError={(e) => { e.target.style.display = 'none' }}
+                    />
+                  )}
+                  <input
+                    type="url"
+                    value={editing.imageUrl || ''}
+                    onChange={(e) => onFieldChange('imageUrl', e.target.value)}
+                    placeholder="https://exemple.com/image.jpg"
+                    className="flex-1 rounded-2xl border border-[#dfe5db] bg-[#f8faf6] px-4 py-3 text-sm text-[#223023] outline-none transition focus:border-[#bfd0bd] focus:bg-white"
+                  />
+                </div>
               </div>
 
               <div className="border-t border-[#dfe5db] pt-4">

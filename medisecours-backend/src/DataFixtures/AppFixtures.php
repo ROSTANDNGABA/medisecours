@@ -7,6 +7,7 @@ use App\Entity\CentreDeSante;
 use App\Entity\Maladie;
 use App\Entity\Medecin;
 use App\Entity\Message;
+use App\Entity\Admin;
 use App\Entity\Patient;
 use App\Entity\PremierSoin;
 use Doctrine\Bundle\FixturesBundle\Fixture;
@@ -26,7 +27,7 @@ class AppFixtures extends Fixture
         $faker = Factory::create('fr_CM');
 
         // 1. UTILISATEURS
-        $admin = new Patient();
+        $admin = new Admin();
         $admin->setEmail('admin@medisecours.com');
         $admin->setPassword($this->passwordHasher->hashPassword($admin, 'Admin@2026!'));
         $admin->setNom('Admin');

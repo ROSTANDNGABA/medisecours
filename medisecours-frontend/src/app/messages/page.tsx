@@ -2,6 +2,7 @@
 'use client'
 
 import { useEffect, useCallback, useMemo, useRef, useState } from 'react'
+import { API_BASE } from '../../lib/config'
 
 const msgAnim = { animation: 'msgIn .25s ease-out both' }
 if (typeof document !== 'undefined') {
@@ -31,7 +32,7 @@ function extractArray(res) {
 }
 function mediaUrl(path) {
   if (!path || path.startsWith('http') || path.startsWith('blob:')) return path
-  return 'http://127.0.0.1:8000' + path
+  return API_BASE + path
 }
 function msgMediaUrl(m) {
   const media = m.media

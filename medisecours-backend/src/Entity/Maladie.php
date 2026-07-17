@@ -133,6 +133,10 @@ class Maladie
     #[Groups(['maladie:read', 'maladie:write'])]
     private ?string $typeAccident = null;
 
+    #[ORM\Column(length: 500, nullable: true)]
+    #[Groups(['maladie:read', 'maladie:write'])]
+    private ?string $imageUrl = null;
+
     /**
      * @var Collection<int, PremierSoin>
      */
@@ -323,6 +327,18 @@ class Maladie
     public function setTypeAccident(?string $typeAccident): static
     {
         $this->typeAccident = $typeAccident;
+
+        return $this;
+    }
+
+    public function getImageUrl(): ?string
+    {
+        return $this->imageUrl;
+    }
+
+    public function setImageUrl(?string $imageUrl): static
+    {
+        $this->imageUrl = $imageUrl;
 
         return $this;
     }

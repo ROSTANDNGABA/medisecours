@@ -26,8 +26,6 @@ class HealthController extends AbstractController
             $dbOk = false;
         }
 
-        $mercureConfigured = !empty($_ENV['MERCURE_URL'] ?? null) || !empty($_ENV['MERCURE_PUBLIC_URL'] ?? null);
-
         $status = $dbOk ? 'ok' : 'degraded';
         $httpCode = $dbOk ? Response::HTTP_OK : Response::HTTP_SERVICE_UNAVAILABLE;
 
@@ -36,7 +34,7 @@ class HealthController extends AbstractController
             'services' => [
                 'api' => 'ok',
                 'database' => $dbOk ? 'ok' : 'error',
-                'mercure' => $mercureConfigured ? 'configured' : 'not_configured',
+                'websocket' => 'configured',
             ],
             'timestamp' => (new \DateTimeImmutable())->format(\DateTimeInterface::ATOM),
         ], $httpCode);

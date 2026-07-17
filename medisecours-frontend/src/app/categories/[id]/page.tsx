@@ -9,9 +9,9 @@ import LoadingSpinner from '../../../components/ui/LoadingSpinner'
 import EmptyState from '../../../components/ui/EmptyState'
 import { useToast } from '../../../components/ui/Toast'
 import { CategoryIcon } from '../../../components/ui/CategoryIcon'
+import { API_BASE } from '../../../lib/config'
 
 const GRAVITES = ['LÉGÈRE', 'MODÉRÉE', 'SÉVÈRE', 'CRITIQUE', 'VARIABLE']
-const API_BASE = 'http://127.0.0.1:8000'
 
 function imageUrl(path: string) {
   if (!path) return null

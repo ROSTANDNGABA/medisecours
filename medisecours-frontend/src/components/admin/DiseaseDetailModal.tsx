@@ -12,8 +12,7 @@ import api from '../../api/axios'
 import { CategoryIcon } from '../ui/CategoryIcon'
 import { useToast } from '../ui/Toast'
 import PremierSoinEditModal from './PremierSoinEditModal'
-
-const API_BASE = 'http://127.0.0.1:8000'
+import { API_BASE } from '../../lib/config'
 
 const GRAVITY_STYLES = {
   LÉGÈRE: 'bg-emerald-100 text-emerald-700',
@@ -37,7 +36,9 @@ function imgUrl(img) {
 }
 
 export default function DiseaseDetailModal({ maladie, onClose, onMutate }) {
-  const [images, setImages] = useState(maladie.images || [])
+  const allImages = maladie.imageUrl ? [{ url: maladie.imageUrl, filePath: null, originalName: maladie.nom }] : []
+  if (maladie.images?.length) allImages.push(...maladie.images)
+  const [images, setImages] = useState(allImages)
   const [carouselIndex, setCarouselIndex] = useState(0)
   const [previewIndex, setPreviewIndex] = useState(null)
   const [isUploading, setIsUploading] = useState(false)
@@ -111,13 +112,14 @@ export default function DiseaseDetailModal({ maladie, onClose, onMutate }) {
           className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden"
         >
           {/* Image carousel */}
-          <div className="relative shrink-0 w-full h-56 sm:h-64 bg-[#f3f6f1] overflow-hidden">
+          <div className="relative shrink-0 w-full h-72 sm:h-80 bg-[#e8eee4] overflow-hidden">
             {images.length > 0 ? (
               <>
+                <div className="absolute inset-0 bg-gradient-to-br from-[#f0f5ed] via-[#e4ece0] to-[#dae3d5]" />
                 <img
                   src={imgUrl(images[carouselIndex])}
                   alt={images[carouselIndex].originalName || ''}
-                  className="w-full h-full object-cover cursor-pointer"
+                  className="relative w-full h-full object-contain cursor-pointer"
                   onClick={() => setPreviewIndex(carouselIndex)}
                 />
                 {images.length > 1 && (
@@ -145,13 +147,15 @@ export default function DiseaseDetailModal({ maladie, onClose, onMutate }) {
                     </div>
                   </>
                 )}
-                <button
-                  onClick={(e) => { e.stopPropagation(); handleDeleteImage(images[carouselIndex].id) }}
-                  className="absolute top-3 right-3 p-2 rounded-full bg-black/40 text-white hover:bg-red-500 transition"
-                  title="Supprimer cette image"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
+                {images[carouselIndex].id && (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); handleDeleteImage(images[carouselIndex].id) }}
+                    className="absolute top-3 right-3 p-2 rounded-full bg-black/40 text-white hover:bg-red-500 transition"
+                    title="Supprimer cette image"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                )}
               </>
             ) : (
               <div className="w-full h-full flex items-center justify-center">

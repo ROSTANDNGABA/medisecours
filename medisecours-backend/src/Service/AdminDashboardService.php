@@ -614,16 +614,10 @@ class AdminDashboardService
             $dbOk = false;
         }
 
-        $mercureUrl = $_ENV['MERCURE_PUBLIC_URL'] ?? $_ENV['MERCURE_URL'] ?? null;
-        $mercureStatus = 'unknown';
-        if ($mercureUrl) {
-            $mercureStatus = 'configured';
-        }
-
         return [
             'api' => 'ok',
             'database' => $dbOk ? 'ok' : 'error',
-            'mercure' => $mercureStatus,
+            'websocket' => 'configured',
             'timestamp' => (new \DateTimeImmutable())->format(\DateTimeInterface::ATOM),
         ];
     }

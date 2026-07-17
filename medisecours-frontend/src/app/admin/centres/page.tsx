@@ -14,8 +14,7 @@ import { uploadCentreImages, deleteCentreImage, updateCentre, deleteCentre } fro
 import LoadingSpinner from '../../../components/ui/LoadingSpinner'
 import EmptyState from '../../../components/ui/EmptyState'
 import { useToast } from '../../../components/ui/Toast'
-
-const API_BASE = 'http://127.0.0.1:8000'
+import { API_BASE } from '../../../lib/config'
 
 function imgUrl(img: any) {
   const path = img?.url || `/uploads/media/${img?.filePath || ''}`

@@ -15,6 +15,7 @@ import ConfirmModal from '../ui/ConfirmModal'
 import { useToast } from '../ui/Toast'
 import { availableIcons, getIconNameForCategory } from '../../lib/iconMapping'
 import { CategoryIcon } from '../ui/CategoryIcon'
+import { API_BASE } from '../../lib/config'
 
 function MetricCard({ label, value, tone = 'neutral' }: { label: string; value: any; tone?: string }) {
   const tones: Record<string, string> = {
@@ -224,8 +225,6 @@ function IconButton({ children, onClick, tone = 'neutral' }: { children: ReactNo
     </button>
   )
 }
-
-const API_BASE = 'http://127.0.0.1:8000'
 
 function imgUrl(path: string | null | undefined) {
   if (!path) return undefined

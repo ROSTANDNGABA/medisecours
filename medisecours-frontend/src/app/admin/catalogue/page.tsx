@@ -95,11 +95,12 @@ export default function AdminCataloguePage() {
             title="Maladies"
             description="Base de connaissances medicales avec gravite, symptomes et traitements."
             createLabel="Ajouter une maladie"
-            previewKeys={['nom', 'niveauGravite', 'categorie']}
+            previewKeys={['imageUrl', 'nom', 'niveauGravite', 'categorie']}
             searchEndpoint="/api/maladies/search"
             fields={[
               { key: 'nom', label: 'Nom', type: 'text' },
               { key: 'niveauGravite', label: 'Gravité', type: 'select', options: GRAVITES },
+              { key: 'imageUrl', label: 'Image URL', type: 'image' },
               { key: 'categorie', label: 'Catégorie', type: 'select-api', endpoint: '/api/categories', displayKey: 'nom' },
               { key: 'urgence', label: 'Urgence', type: 'checkbox' },
               { key: 'contagieux', label: 'Contagieux', type: 'checkbox' },

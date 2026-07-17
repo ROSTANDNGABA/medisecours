@@ -25,7 +25,6 @@ use Gedmo\Mapping\Annotation as Gedmo;
         new Patch(security: "is_granted('ROLE_ADMIN') or object.getExpediteur() == user or object.getConversation().getParticipants().contains(user)"),
         new Delete(security: "is_granted('ROLE_ADMIN') or object.getExpediteur() == user")
     ],
-    mercure: false,
     normalizationContext: ['groups' => ['message:read']],
     denormalizationContext: ['groups' => ['message:write']],
     paginationEnabled: true,

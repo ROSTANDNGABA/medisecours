@@ -7,8 +7,7 @@ import Avatar from '../ui/Avatar'
 import NotificationBell from '../ui/NotificationBell'
 import { useAuth } from '../../hooks/useAuth'
 import api from '../../api/axios'
-
-const API_BASE = 'http://127.0.0.1:8000'
+import { API_BASE } from '../../lib/config'
 
 function imgUrl(path: string) {
   return path.startsWith('http') ? path : `${API_BASE}${path}`
