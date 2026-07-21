@@ -1,18 +1,22 @@
 'use client'
 
+import { useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import {
   HeartPulse, LayoutDashboard, Users, CalendarClock, FileText, Pill, MessageCircle,
   BarChart3, Bell, Settings, Plus, LogOut,
 } from 'lucide-react'
+import { mutate as globalMutate } from 'swr'
+import api from '../../api/axios'
 import { useAuth } from '../../hooks/useAuth'
 import Avatar from '../ui/Avatar'
+import { useNotification } from '../../contexts/NotificationContext'
 
 const NAV = [
   { href: '/medecin', label: 'Overview', icon: LayoutDashboard, exact: true },
   { href: '/medecin/patients', label: 'Mes Patients', icon: Users },
-  { href: '/medecin/consultations', label: 'Consultations', icon: CalendarClock },
+  { href: '/medecin/consultations', label: 'Consultations', icon: CalendarClock, badge: 'consultations' },
   { href: '/medecin/prescriptions', label: 'Prescriptions', icon: FileText },
   { href: '/medecin/pharmacy', label: 'Pharmacie', icon: Pill },
   { href: '/medecin/avis', label: 'Avis', icon: MessageCircle },
@@ -26,12 +30,52 @@ const NAV_BOTTOM = [
   { href: '/medecin/parametres', label: 'Paramètres', icon: Settings },
 ]
 
-export default function MedecinSidebar({ setMobileOpen, unreadCount = 0 }: { setMobileOpen: (open: boolean) => void; unreadCount?: number }) {
+export default function MedecinSidebar({ setMobileOpen }: { setMobileOpen: (open: boolean) => void }) {
   const pathname = usePathname()
   const router = useRouter()
   const { user, logout } = useAuth()
+  const { unreadCount, pendingConsultationCount } = useNotification()
+
+  const estSurLaPageMessages = pathname.startsWith('/medecin/messages')
+
+  // Effacement automatique en BDD dès qu'on est sur la page messages
+  useEffect(() => {
+    if (!estSurLaPageMessages) return
+    globalMutate('/api/messages/unread-count', { unreadCount: 0 }, { revalidate: false })
+    api.get('/api/messages?itemsPerPage=50&order[createdAt]=desc')
+      .then((res) => {
+        const raw = res.data?.['hydra:member'] ?? res.data?.member ?? (Array.isArray(res.data) ? res.data : [])
+        const unreadIds = raw.filter((m: any) => m.statut !== 'LU').map((m: any) => m.id)
+        if (unreadIds.length === 0) return
+        return Promise.allSettled(
+          unreadIds.map((id: number) =>
+            api.patch(`/api/messages/${id}`, { statut: 'LU' }, { headers: { 'Content-Type': 'application/merge-patch+json' } })
+          )
+        )
+      })
+      .then(() => globalMutate('/api/messages/unread-count'))
+      .catch(() => {})
+  }, [estSurLaPageMessages])
 
   const isActive = (href: string, exact: boolean) => (exact ? pathname === href : pathname.startsWith(href))
+
+  const renderBadge = (badgeType: string | undefined) => {
+    if (badgeType === 'unread' && unreadCount > 0 && !estSurLaPageMessages) {
+      return (
+        <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-red-500 px-1.5 text-[10px] font-bold text-white">
+          {unreadCount > 99 ? '99+' : unreadCount}
+        </span>
+      )
+    }
+    if (badgeType === 'consultations' && pendingConsultationCount > 0) {
+      return (
+        <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-amber-500 px-1.5 text-[10px] font-bold text-white shadow-sm">
+          {pendingConsultationCount > 99 ? '99+' : pendingConsultationCount}
+        </span>
+      )
+    }
+    return null
+  }
 
   return (
     <div className="flex h-full flex-col bg-white">
@@ -60,11 +104,7 @@ export default function MedecinSidebar({ setMobileOpen, unreadCount = 0 }: { set
                 <Icon className={`h-4 w-4 ${active ? 'text-white' : ''}`} />
                 {label}
               </span>
-              {badge === 'unread' && unreadCount > 0 && (
-                <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-red-500 px-1.5 text-[10px] font-bold text-white">
-                  {unreadCount}
-                </span>
-              )}
+              {renderBadge(badge)}
             </Link>
           )
         })}

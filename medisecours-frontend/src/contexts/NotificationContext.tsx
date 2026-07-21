@@ -41,6 +41,7 @@ interface NotificationContextValue {
   msgOpen: boolean
   openMsg: () => Promise<void>
   dismissMsg: (id: string, href?: string) => Promise<void>
+  markConversationAsRead: (convId: string) => void
   closeMsg: () => void
   msgDisplayCount: number
   activeConversationId: string | null
@@ -98,6 +99,10 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   const [dismissedNotifIds, setDismissedNotifIds] = useState<Set<string>>(new Set(loadSet('notifDismissed')))
   useEffect(() => { saveSet('notifDismissed', dismissedNotifIds) }, [dismissedNotifIds])
 
+  // Conversations whose messages have been read (immune to SWR overwrite)
+  const [readConversationIds, setReadConversationIds] = useState<Set<string>>(new Set(loadSet('readConvs')))
+  useEffect(() => { saveSet('readConvs', readConversationIds) }, [readConversationIds])
+
   // Dropdown open state
   const [notifOpen, setNotifOpen] = useState(false)
   const [notifLoading, setNotifLoading] = useState(false)
@@ -139,11 +144,13 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     for (const m of raw) {
       if (rawId(m.expediteur) === user?.id) continue
       if (m.statut === 'LU') continue
+      const convId = rawId(m.conversation)
+      if (convId && readConversationIds.has(convId)) continue
       items.push(msgToItem(m, rawId))
     }
     items.sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime())
     setMsgItems(items)
-  }, [msgsData, user?.id, rawId])
+  }, [msgsData, user?.id, rawId, readConversationIds])
 
   // WebSocket: central connection for the whole app
   useWebSocket(user?.id || '', token || '', {
@@ -283,6 +290,43 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     if (href) router.push(href)
   }, [router])
 
+  const markConversationAsRead = useCallback((convId: string) => {
+    setReadConversationIds((prev) => {
+      if (prev.has(convId)) return prev
+      const next = new Set(prev)
+      next.add(convId)
+      return next
+    })
+
+    setMsgItems((prev) => {
+      const toRemove = prev.filter((m) => {
+        const id = m.href.split('id=')[1]?.split('&')[0]
+        return id === convId
+      })
+      if (toRemove.length === 0) return prev
+
+      const removeIds = new Set(toRemove.map((m) => m.id))
+
+      globalMutate('/api/messages/unread-count', (data: any) => {
+        if (!data) return { unreadCount: 0 }
+        return { unreadCount: Math.max(0, data.unreadCount - toRemove.length) }
+      }, { revalidate: false })
+
+      for (const item of toRemove) {
+        const entityId = item.id.replace('msg-', '')
+        api.patch(`/api/messages/${entityId}`, { statut: 'LU' }, { headers: { 'Content-Type': 'application/merge-patch+json' } }).catch(() => {})
+      }
+
+      return prev.filter((m) => !removeIds.has(m.id))
+    })
+
+    setNotifications((prev) => prev.filter((m) => {
+      if (!m.id.startsWith('msg-')) return true
+      const id = m.href.split('id=')[1]?.split('&')[0]
+      return id !== convId
+    }))
+  }, [])
+
   // Open message dropdown — fetch unread messages only
   const openMsg = useCallback(async () => {
     if (msgOpen) { setMsgOpen(false); return }
@@ -343,13 +387,13 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     notifications, notifLoading, unreadCount,
     consultationCount: openConsultationCount, pendingConsultationCount, notificationCount,
     openNotif, dismissNotif, closeNotif, notifOpen,
-    msgNotifications: msgItems, msgLoading, msgOpen, openMsg, dismissMsg, closeMsg, msgDisplayCount,
+    msgNotifications: msgItems, msgLoading, msgOpen, openMsg, dismissMsg, markConversationAsRead, closeMsg, msgDisplayCount,
     activeConversationId, setActiveConversationId, subscribeToMessages, onlineUsers,
   }), [
     notifications, notifLoading, unreadCount,
     openConsultationCount, pendingConsultationCount, notificationCount,
     openNotif, dismissNotif, closeNotif, notifOpen,
-    msgItems, msgLoading, msgOpen, openMsg, dismissMsg, closeMsg, msgDisplayCount,
+    msgItems, msgLoading, msgOpen, openMsg, dismissMsg, markConversationAsRead, closeMsg, msgDisplayCount,
     activeConversationId, setActiveConversationId, subscribeToMessages, onlineUsers,
   ])
 
