@@ -2,13 +2,12 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { Search, ChevronDown, MessageSquare, User, Settings, LogOut, Loader2, Stethoscope, Building2, Activity, MessageCircle, ClipboardList } from 'lucide-react'
+import { Search, ChevronDown, User, Loader2, Stethoscope, Building2, Activity, MessageCircle, Bell, MessageSquare, Clock, Settings, LogOut } from 'lucide-react'
 import Avatar from '../ui/Avatar'
-import NotificationBell from '../ui/NotificationBell'
 import { useAuth } from '../../hooks/useAuth'
-import { useWebSocket } from '../../hooks/useWebSocket'
 import api from '../../api/axios'
 import { API_BASE } from '../../lib/config'
+import { useNotification } from '../../contexts/NotificationContext'
 
 function imgUrl(path: string) {
   return path.startsWith('http') ? path : `${API_BASE}${path}`
@@ -77,25 +76,47 @@ const CATEGORY_CONFIG: Record<SearchCategory, { label: string; icon: React.Eleme
   },
 }
 
-export default function MedecinHeader({ unreadCount = 0 }: { user?: any; unreadCount?: number }) {
+function timeAgo(dateString: string) {
+  if (!dateString) return ''
+  const diff = Date.now() - new Date(dateString).getTime()
+  const minutes = Math.floor(diff / 60000)
+  if (minutes < 1) return "À l'instant"
+  if (minutes < 60) return `Il y a ${minutes} min`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return `Il y a ${hours}h`
+  const days = Math.floor(hours / 24)
+  if (days < 30) return `Il y a ${days}j`
+  return `Il y a ${Math.floor(days / 30)}mois`
+}
+
+export default function MedecinHeader() {
   const { user, logout } = useAuth()
   const router = useRouter()
+  const {
+    notifications, notifLoading, notifOpen, notificationCount, msgDisplayCount,
+    msgNotifications, msgLoading, msgOpen,
+    openNotif, dismissNotif, closeNotif,
+    openMsg, dismissMsg, closeMsg,
+  } = useNotification()
+
   const [searchQuery, setSearchQuery] = useState('')
   const [debouncedQuery, setDebouncedQuery] = useState('')
   const [showResults, setShowResults] = useState(false)
   const [results, setResults] = useState<SearchResults | null>(null)
   const [loading, setLoading] = useState(false)
   const [profileOpen, setProfileOpen] = useState(false)
+
   const searchRef = useRef<HTMLDivElement>(null)
   const profileRef = useRef<HTMLDivElement>(null)
+  const notifRef = useRef<HTMLDivElement>(null)
+  const msgRef = useRef<HTMLDivElement>(null)
+
   const inputRef = useRef<HTMLInputElement>(null)
   const debounceRef = useRef<NodeJS.Timeout>(undefined as any)
 
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current)
-    debounceRef.current = setTimeout(() => {
-      setDebouncedQuery(searchQuery)
-    }, 300)
+    debounceRef.current = setTimeout(() => setDebouncedQuery(searchQuery), 300)
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current) }
   }, [searchQuery])
 
@@ -103,18 +124,16 @@ export default function MedecinHeader({ unreadCount = 0 }: { user?: any; unreadC
     const handler = (e: MouseEvent) => {
       if (searchRef.current && !searchRef.current.contains(e.target as Node)) setShowResults(false)
       if (profileRef.current && !profileRef.current.contains(e.target as Node)) setProfileOpen(false)
+      if (notifRef.current && !notifRef.current.contains(e.target as Node)) closeNotif()
+      if (msgRef.current && !msgRef.current.contains(e.target as Node)) closeMsg()
     }
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
-  }, [])
+  }, [closeNotif, closeMsg])
 
   useEffect(() => {
     const q = debouncedQuery.trim()
-    if (q.length < 2) {
-      setResults(null)
-      setLoading(false)
-      return
-    }
+    if (q.length < 2) { setResults(null); setLoading(false); return }
     let cancelled = false
     setLoading(true)
     api.get<SearchResults>('/api/search', { params: { q } })
@@ -126,8 +145,7 @@ export default function MedecinHeader({ unreadCount = 0 }: { user?: any; unreadC
   const hasResults = results && Object.values(results).some((arr) => arr && arr.length > 0)
 
   const handleSelect = useCallback((category: SearchCategory, item: SearchItem) => {
-    const href = CATEGORY_CONFIG[category].href(item)
-    router.push(href)
+    router.push(CATEGORY_CONFIG[category].href(item))
     setShowResults(false)
     setSearchQuery('')
   }, [router])
@@ -225,11 +243,70 @@ export default function MedecinHeader({ unreadCount = 0 }: { user?: any; unreadC
         )}
       </div>
 
-      {/* Message icon */}
-      <NotificationBell icon={MessageSquare} count={unreadCount} href="/medecin/messages" badgeColor="#3B6EF8" dotColor="#3B6EF8" />
-
-      {/* Notification icon */}
-      <NotificationBell count={0} href="/medecin/notifications" />
+      {/* Notification icon + dropdown */}
+      <div ref={notifRef} className="relative">
+        <button
+          onClick={openNotif}
+          className={`relative flex h-10 w-10 items-center justify-center rounded-xl transition ${notifOpen ? 'bg-[#F0F4FF]' : 'hover:bg-[#F3F4F6]'}`}
+          aria-label="Notifications"
+        >
+          <Bell className={`h-5 w-5 ${notifOpen ? 'text-[#3B6EF8]' : 'text-[#6B7280]'}`} />
+          {notificationCount > 0 && (
+            <span className="absolute right-1.5 top-1.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-[#EF4444] px-1 text-[10px] font-bold leading-none text-white">
+              {notificationCount > 99 ? '99+' : notificationCount}
+            </span>
+          )}
+        </button>
+        {notifOpen && (
+          <div className="absolute right-0 top-full mt-2 w-[380px] origin-top-right rounded-xl border border-[#E5E7EB] bg-white shadow-xl">
+            <div className="flex items-center justify-between border-b border-[#E5E7EB] px-4 py-3">
+              <h3 className="text-sm font-bold text-[#0F2C52]">Notifications</h3>
+              <button
+                onClick={() => { closeNotif(); router.push('/medecin/notifications') }}
+                className="text-xs font-semibold text-[#3B6EF8] hover:underline"
+              >
+                Voir tout
+              </button>
+            </div>
+            <div className="max-h-[360px] overflow-y-auto">
+              {notifLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-5 w-5 animate-spin text-[#3B6EF8]" />
+                </div>
+              ) : notifications.length === 0 ? (
+                <div className="px-4 py-8 text-center">
+                  <Bell className="mx-auto mb-2 h-8 w-8 text-[#D1D5DB]" />
+                  <p className="text-sm text-[#9CA3AF]">Aucune notification</p>
+                </div>
+              ) : (
+                <div className="py-1">
+                  {notifications.slice(0, 10).map((n) => (
+                    <button
+                      key={n.id}
+                      onClick={() => dismissNotif(n.id, n.href)}
+                      className={`flex w-full items-start gap-3 px-4 py-3 text-left transition hover:bg-[#F9FAFB] ${n.unread ? 'bg-[#F0F4FF]/50' : ''}`}
+                    >
+                      <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${n.type === 'message' ? 'bg-[rgba(59,110,248,0.12)]' : 'bg-[rgba(245,158,11,0.12)]'}`}>
+                        <MessageSquare className={`h-4 w-4 ${n.type === 'message' ? 'text-[#3B6EF8]' : 'text-[#D97706]'}`} />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className={`truncate text-sm ${n.unread ? 'font-bold text-[#0F2C52]' : 'font-medium text-[#374151]'}`}>{n.title}</p>
+                          <span className="flex shrink-0 items-center gap-1 text-[10px] text-[#9CA3AF]">
+                            <Clock className="h-3 w-3" />
+                            {timeAgo(n.time)}
+                          </span>
+                        </div>
+                        <p className="mt-0.5 truncate text-xs text-[#9CA3AF]">{n.description}</p>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* Profile */}
       <div ref={profileRef} className="relative">

@@ -18,6 +18,7 @@ class ConsultationEmailService
         private readonly string $appUrl,
         private readonly string $senderEmail,
         private readonly string $senderName,
+        private readonly PdfGeneratorService $pdfGenerator,
     ) {
     }
 
@@ -51,7 +52,7 @@ class ConsultationEmailService
     </div>
     <p>Bonjour <strong>{$prenom} {$nom}</strong>,</p>
     <p>Votre consultation avec le <strong>Dr {$medPrenom} {$medNom}</strong> est terminée.</p>
-    <p>Un récapitulatif de votre ordonnance est disponible dans votre espace patient.</p>
+    <p>Votre ordonnance est jointe à cet email.</p>
     <a href="{$appUrl}/patient/consultations" style="display:inline-block; margin: 20px 0; padding: 14px 28px; background: #1E3A5F; color: #fff; text-decoration: none; border-radius: 8px; font-weight: bold;">
       Voir mes consultations
     </a>
@@ -65,7 +66,7 @@ class ConsultationEmailService
 </html>
 HTML;
 
-        $text = "Bonjour {$prenom} {$nom},\n\nVotre consultation avec le Dr {$medPrenom} {$medNom} est terminée.\n\nConsultez votre ordonnance sur {$appUrl}/patient/consultations\n\nMediSecours+ — Cameroun";
+        $text = "Bonjour {$prenom} {$nom},\n\nVotre consultation avec le Dr {$medPrenom} {$medNom} est terminée.\n\nVotre ordonnance est jointe à cet email.\n\nMediSecours+ — Cameroun";
 
         try {
             $email = (new Email())
@@ -77,7 +78,7 @@ HTML;
                 ->priority(Email::PRIORITY_HIGH);
 
             if ($prescription) {
-                $this->attachPrescriptionAsText($email, $prescription);
+                $this->attachPrescriptionPdf($email, $prescription);
             }
 
             $this->mailer->send($email);
@@ -90,28 +91,41 @@ HTML;
         }
     }
 
-    private function attachPrescriptionAsText(Email $email, Prescription $prescription): void
+    private function attachPrescriptionPdf(Email $email, Prescription $prescription): void
     {
-        $lines = [];
-        $lines[] = 'ORDONNANCE MEDICALE';
-        $lines[] = str_repeat('=', 50);
-        $lines[] = '';
-        $lines[] = "Diagnostic : {$prescription->getDiagnostic()}";
-        $lines[] = '';
-        $lines[] = 'Médicaments prescrits :';
-        foreach ($prescription->getMedicaments() as $med) {
-            $nom = $med['nom'] ?? 'Médicament';
-            $posologie = $med['posologie'] ?? '';
-            $duree = $med['duree'] ?? '';
-            $lines[] = "  - {$nom}" . ($posologie ? " : {$posologie}" : '') . ($duree ? " ({$duree})" : '');
-        }
-        if ($prescription->getRecommandations()) {
-            $lines[] = '';
-            $lines[] = "Recommandations : {$prescription->getRecommandations()}";
-        }
-        $lines[] = '';
-        $lines[] = 'MediSecours+ — Plateforme médicale d\'urgence';
+        $consultation = $prescription->getConsultation();
+        $patient = $prescription->getPatient();
+        $medecin = $prescription->getMedecin();
 
-        $email->attach(implode("\n", $lines), 'ordonnance.txt', 'text/plain');
+        $medicaments = array_map(function (array $med) {
+            return [
+                'nom' => $med['nom'] ?? '',
+                'posologie' => $med['posologie'] ?? '',
+                'duree' => $med['duree'] ?? '',
+            ];
+        }, $prescription->getMedicaments());
+
+        $data = [
+            'patientPrenom' => $patient?->getPrenom() ?? '',
+            'patientNom' => $patient?->getNom() ?? '',
+            'patientAge' => null,
+            'patientAdresse' => $patient?->getQuartier() ?? '—',
+            'medecinPrenom' => $medecin?->getPrenom() ?? '',
+            'medecinNom' => $medecin?->getNom() ?? '',
+            'medecinId' => $medecin?->getId() ?? 0,
+            'specialite' => $medecin?->getSpecialite() ?? 'Spécialiste en Médecine',
+            'telephone' => $medecin?->getTelephone() ?? '—',
+            'telephoneUrgences' => $medecin?->getTelephone() ?? '—',
+            'email' => $medecin?->getEmail() ?? 'doctor@medisecours.com',
+            'hopital' => 'MediSecours Clinic',
+            'quartier' => $medecin?->getQuartier() ?? 'Cameroun',
+            'diagnostic' => $prescription->getDiagnostic() ?? '',
+            'medicaments' => $medicaments,
+            'recommandations' => $prescription->getRecommandations() ?? '',
+            'date' => (new \DateTimeImmutable())->format('d/m/Y'),
+        ];
+
+        $pdfContent = $this->pdfGenerator->generatePrescriptionPdf($data);
+        $email->attach($pdfContent, 'ordonnance.pdf', 'application/pdf');
     }
 }

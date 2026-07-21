@@ -163,7 +163,7 @@ export default function MedecinMessagesPage() {
 
 function MedecinMessagesContent() {
   const { user } = useAuth()
-  const { activeConversationId, setActiveConversationId, subscribeToMessages, onlineUsers } = useNotification()
+  const { activeConversationId, setActiveConversationId, subscribeToMessages, onlineUsers, markConversationAsRead, msgNotifications } = useNotification()
   const toast = useToast()
   const searchParams = useSearchParams()
   const preselectConv = searchParams.get('conversation')
@@ -216,6 +216,15 @@ function MedecinMessagesContent() {
   useEffect(() => { loadingMoreRef.current = loadingMore }, [loadingMore])
   useEffect(() => { hasMoreRef.current = hasMore }, [hasMore])
   useEffect(() => { msgLoadingRef.current = msgLoading }, [msgLoading])
+
+  // Automatically clear unread badge when entering messages or switching conversation
+  useEffect(() => {
+    if (!activeId) return
+    markConversationAsRead(activeId)
+    if (activeConversationId !== activeId) {
+      setActiveConversationId(activeId)
+    }
+  }, [activeId])
 
   // Reset pagination when switching conversations
   useEffect(() => {

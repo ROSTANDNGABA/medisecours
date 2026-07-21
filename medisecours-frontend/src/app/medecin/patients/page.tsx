@@ -48,7 +48,7 @@ export default function MedecinPatientsPage() {
         if (Array.isArray(d)) return d
         return d?.['hydra:member'] ?? d?.member ?? []
       }
-      setPatients(extractPat(patRes.data).filter((p: any) => p.type === 'patient'))
+      setPatients(extractPat(patRes.data))
       setConsultations(extractCons(consRes.data))
       setLoading(false)
     }).catch(() => setLoading(false))

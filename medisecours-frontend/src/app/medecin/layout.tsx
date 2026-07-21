@@ -5,10 +5,10 @@ import { usePathname, useRouter } from 'next/navigation'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Menu } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
-import api from '../../api/axios'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import MedecinSidebar from '../../components/medecin/MedecinSidebar'
 import MedecinHeader from '../../components/medecin/MedecinHeader'
+import { NotificationProvider } from '../../contexts/NotificationContext'
 
 const PAGE_TITLES = {
   '/medecin': "Vue d'ensemble",
@@ -22,17 +22,17 @@ const PAGE_TITLES = {
   '/medecin/parametres': 'Paramètres',
 }
 
-function SidebarWrapper({ setMobileOpen, unreadCount }: { setMobileOpen: (open: boolean) => void; unreadCount: number }) {
+function SidebarWrapper({ setMobileOpen }: { setMobileOpen: (open: boolean) => void }) {
   return (
     <div className="hidden md:block">
       <div className="sticky top-0 h-screen w-[220px] shrink-0 overflow-y-auto">
-        <MedecinSidebar setMobileOpen={setMobileOpen} unreadCount={unreadCount} />
+        <MedecinSidebar setMobileOpen={setMobileOpen} />
       </div>
     </div>
   )
 }
 
-function MobileDrawer({ open, onClose, unreadCount }: { open: boolean; onClose: () => void; unreadCount: number }) {
+function MobileDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
   return (
     <AnimatePresence>
       {open && (
@@ -51,7 +51,7 @@ function MobileDrawer({ open, onClose, unreadCount }: { open: boolean; onClose: 
             transition={{ type: 'tween', duration: 0.2 }}
             className="fixed inset-y-0 left-0 z-50 w-[220px] md:hidden"
           >
-            <MedecinSidebar setMobileOpen={onClose} unreadCount={unreadCount} />
+            <MedecinSidebar setMobileOpen={onClose} />
           </motion.aside>
         </>
       )}
@@ -64,24 +64,12 @@ export default function MedecinLayout({ children }: { children: React.ReactNode 
   const pathname = usePathname()
   const router = useRouter()
   const [mobileOpen, setMobileOpen] = useState(false)
-  const [unreadCount, setUnreadCount] = useState(0)
 
   useEffect(() => {
     if (mounted && !isMedecin) {
       router.replace('/login')
     }
   }, [mounted, isMedecin, router])
-
-  useEffect(() => {
-    if (!user?.id) return
-    api.get('/api/messages')
-      .then((res) => {
-        const msgs = res.data?.['hydra:member'] ?? (Array.isArray(res.data) ? res.data : [])
-        const unread = msgs.filter((m: any) => m.statut !== 'LU' && m.expediteur?.id !== user.id).length
-        setUnreadCount(unread)
-      })
-      .catch(() => {})
-  }, [user?.id])
 
   const prevPathname = useRef(pathname)
   useEffect(() => {
@@ -103,25 +91,27 @@ export default function MedecinLayout({ children }: { children: React.ReactNode 
 
   return (
     <div className="flex min-h-screen bg-[#F8F9FD]">
-      <SidebarWrapper setMobileOpen={setMobileOpen} unreadCount={unreadCount} />
-      <MobileDrawer open={mobileOpen} onClose={() => setMobileOpen(false)} unreadCount={unreadCount} />
+      <NotificationProvider>
+        <SidebarWrapper setMobileOpen={setMobileOpen} />
+        <MobileDrawer open={mobileOpen} onClose={() => setMobileOpen(false)} />
 
-      <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-[#E5E7EB] bg-white px-4 sm:px-6">
-          <div className="flex items-center gap-4">
-            <button
-              className="flex items-center justify-center rounded-xl p-2 text-[#6B7280] hover:bg-[#F3F4F6] md:hidden"
-              onClick={() => setMobileOpen(true)}
-              aria-label="Ouvrir le menu"
-            >
-              <Menu className="h-5 w-5" />
-            </button>
-            <h1 className="font-display text-lg font-bold text-[#0F2C52]">{pageTitle}</h1>
-          </div>
-          <MedecinHeader unreadCount={unreadCount} />
-        </header>
-        <main className="flex-1 overflow-y-auto">{children}</main>
-      </div>
+        <div className="flex min-w-0 flex-1 flex-col">
+          <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-[#E5E7EB] bg-white px-4 sm:px-6">
+            <div className="flex items-center gap-4">
+              <button
+                className="flex items-center justify-center rounded-xl p-2 text-[#6B7280] hover:bg-[#F3F4F6] md:hidden"
+                onClick={() => setMobileOpen(true)}
+                aria-label="Ouvrir le menu"
+              >
+                <Menu className="h-5 w-5" />
+              </button>
+              <h1 className="font-display text-lg font-bold text-[#0F2C52]">{pageTitle}</h1>
+            </div>
+            <MedecinHeader />
+          </header>
+          <main className="flex-1 overflow-y-auto">{children}</main>
+        </div>
+      </NotificationProvider>
     </div>
   )
 }

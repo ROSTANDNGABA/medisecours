@@ -2,6 +2,8 @@
 
 namespace App\Entity;
 
+use ApiPlatform\Doctrine\Orm\Filter\SearchFilter;
+use ApiPlatform\Metadata\ApiFilter;
 use ApiPlatform\Metadata\ApiResource;
 use ApiPlatform\Metadata\Get;
 use ApiPlatform\Metadata\GetCollection;
@@ -17,6 +19,7 @@ use Gedmo\Mapping\Annotation as Gedmo;
 
 #[ORM\Entity(repositoryClass: MessageRepository::class)]
 #[Gedmo\SoftDeleteable(fieldName: 'deletedAt', timeAware: false)]
+#[ApiFilter(SearchFilter::class, properties: ['conversation' => 'exact'])]
 #[ApiResource(
     operations: [
         new GetCollection(),
@@ -50,30 +53,30 @@ class Message
     private ?int $id = null;
 
     #[ORM\Column(type: Types::TEXT)]
-    #[Groups(['message:read', 'message:write'])]
+    #[Groups(['message:read', 'message:write', 'conversation:read'])]
     private ?string $contenu = null;
 
     #[ORM\Column(length: 20)]
     #[Assert\Choice(choices: [self::STATUT_ENVOYE, self::STATUT_LIVRE, self::STATUT_LU])]
-    #[Groups(['message:read'])]
+    #[Groups(['message:read', 'conversation:read'])]
     private string $statut = self::STATUT_ENVOYE;
 
     #[ORM\Column(length: 20)]
     #[Assert\Choice(choices: [self::TYPE_TEXTE, self::TYPE_VOIX, self::TYPE_IMAGE, self::TYPE_FICHIER])]
-    #[Groups(['message:read', 'message:write'])]
+    #[Groups(['message:read', 'message:write', 'conversation:read'])]
     private string $typeMessage = self::TYPE_TEXTE;
 
     #[ORM\Column(nullable: true)]
-    #[Groups(['message:read', 'message:write'])]
+    #[Groups(['message:read', 'message:write', 'conversation:read'])]
     private ?int $dureeVoix = null;
 
     #[ORM\Column]
-    #[Groups(['message:read'])]
+    #[Groups(['message:read', 'conversation:read'])]
     private ?\DateTimeImmutable $createdAt = null;
 
     #[ORM\ManyToOne(targetEntity: User::class, inversedBy: 'messages')]
     #[ORM\JoinColumn(nullable: false)]
-    #[Groups(['message:read'])]
+    #[Groups(['message:read', 'conversation:read'])]
     private ?User $expediteur = null;
 
     #[ORM\ManyToOne(targetEntity: Conversation::class, inversedBy: 'messages')]
@@ -87,7 +90,7 @@ class Message
 
     #[ORM\ManyToOne(targetEntity: MediaObject::class)]
     #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
-    #[Groups(['message:read', 'message:write'])]
+    #[Groups(['message:read', 'message:write', 'conversation:read'])]
     private ?MediaObject $media = null;
 
     #[ORM\ManyToOne(targetEntity: Message::class)]

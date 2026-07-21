@@ -2,10 +2,13 @@
 
 namespace App\Entity;
 
+use ApiPlatform\Doctrine\Orm\Filter\SearchFilter;
+use ApiPlatform\Metadata\ApiFilter;
 use ApiPlatform\Metadata\ApiResource;
 use ApiPlatform\Metadata\Get;
 use ApiPlatform\Metadata\GetCollection;
 use ApiPlatform\Metadata\Post;
+use ApiPlatform\Metadata\Delete;
 use App\Repository\ConversationRepository;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
@@ -18,6 +21,7 @@ use Symfony\Component\Serializer\Annotation\Groups;
         new GetCollection(security: "is_granted('ROLE_USER')"),
         new Get(security: "is_granted('ROLE_ADMIN') or object.getParticipants().contains(user)"),
         new Post(security: "is_granted('ROLE_USER')"),
+        new Delete(security: "is_granted('ROLE_ADMIN') or object.getParticipants().contains(user)"),
     ],
     normalizationContext: ['groups' => ['conversation:read']],
     denormalizationContext: ['groups' => ['conversation:write']],
@@ -51,12 +55,13 @@ class Conversation
     #[Groups(['conversation:read', 'conversation:write'])]
     private Collection $participants;
 
-    #[ORM\OneToMany(targetEntity: Message::class, mappedBy: 'conversation')]
+    #[ORM\OneToMany(targetEntity: Message::class, mappedBy: 'conversation', cascade: ['remove'])]
     #[ORM\OrderBy(['createdAt' => 'ASC'])]
     private Collection $messages;
 
     #[ORM\ManyToOne(targetEntity: Message::class)]
     #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
+    #[Groups(['conversation:read'])]
     private ?Message $dernierMessage = null;
 
     public function __construct()

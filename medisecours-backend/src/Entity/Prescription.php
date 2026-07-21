@@ -51,16 +51,16 @@ class Prescription
 
     #[ORM\Column(type: Types::TEXT)]
     #[Assert\NotBlank]
-    #[Groups(['prescription:read', 'prescription:write'])]
+    #[Groups(['prescription:read', 'prescription:write', 'consultation:read'])]
     private ?string $diagnostic = null;
 
     #[ORM\Column(type: Types::JSON)]
     #[Assert\NotBlank]
-    #[Groups(['prescription:read', 'prescription:write'])]
+    #[Groups(['prescription:read', 'prescription:write', 'consultation:read'])]
     private array $medicaments = [];
 
     #[ORM\Column(type: Types::TEXT, nullable: true)]
-    #[Groups(['prescription:read', 'prescription:write'])]
+    #[Groups(['prescription:read', 'prescription:write', 'consultation:read'])]
     private ?string $recommandations = null;
 
     #[ORM\Column]

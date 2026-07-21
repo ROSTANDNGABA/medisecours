@@ -51,11 +51,11 @@ class MediaObject
     private ?File $file = null;
 
     #[ORM\Column(length: 255, nullable: true)]
-    #[Groups(['media:read', 'centre_sante:read', 'categorie:read', 'maladie:read', 'message:read'])]
+    #[Groups(['media:read', 'centre_sante:read', 'categorie:read', 'maladie:read', 'message:read', 'conversation:read'])]
     private ?string $filePath = null;
 
     #[ORM\Column(length: 255, nullable: true)]
-    #[Groups(['media:read', 'centre_sante:read', 'categorie:read', 'maladie:read', 'message:read'])]
+    #[Groups(['media:read', 'centre_sante:read', 'categorie:read', 'maladie:read', 'message:read', 'conversation:read'])]
     private ?string $originalName = null;
 
     #[ORM\Column(length: 100, nullable: true)]
@@ -161,7 +161,7 @@ class MediaObject
         return $this->size;
     }
 
-    #[Groups(['media:read', 'centre_sante:read', 'categorie:read', 'maladie:read', 'message:read'])]
+    #[Groups(['media:read', 'centre_sante:read', 'categorie:read', 'maladie:read', 'message:read', 'conversation:read'])]
     public function getContentUrl(): ?string
     {
         return $this->filePath ? '/uploads/media/' . $this->filePath : null;

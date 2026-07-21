@@ -29,6 +29,15 @@ use Gedmo\Mapping\Annotation as Gedmo;
     operations: [
         // GET /api/users — réservé ADMIN uniquement (contient emails, téléphones, données personnelles)
         new GetCollection(security: "is_granted('ROLE_ADMIN')"),
+        // GET /api/users/search — accessible à tout utilisateur connecté (id, nom, prénom, photo)
+        new GetCollection(
+            uriTemplate: '/users/search',
+            security: "is_granted('ROLE_USER')",
+            normalizationContext: ['groups' => ['user:search']],
+            paginationEnabled: true,
+            paginationItemsPerPage: 50,
+            paginationMaximumItemsPerPage: 100,
+        ),
         // GET /api/users/{id} — l'utilisateur peut voir son propre profil, admin voit tout
         new Get(security: "is_granted('ROLE_ADMIN') or object == user"),
         // POST /api/users — inscription publique via API Platform (route legacy, préférer /api/auth/register)
@@ -51,7 +60,7 @@ abstract class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[ORM\Column(type: 'uuid', unique: true)]
     #[ORM\GeneratedValue(strategy: 'CUSTOM')]
     #[ORM\CustomIdGenerator(class: 'doctrine.uuid_generator')]
-    #[Groups(['user:read'])]
+    #[Groups(['user:read', 'user:search', 'consultation:read', 'message:read', 'conversation:read'])]
     private ?Uuid $id = null;
 
     #[ORM\Column(length: 180)]
@@ -109,13 +118,13 @@ abstract class User implements UserInterface, PasswordAuthenticatedUserInterface
 
     #[ORM\Column(length: 255, nullable: true)]
     #[Assert\Length(min: 2, max: 255, minMessage: 'Le nom doit contenir au moins {{ limit }} caractères', maxMessage: 'Le nom ne peut pas dépasser {{ limit }} caractères')]
-    #[Groups(['user:read', 'user:write'])]
+    #[Groups(['user:read', 'user:search', 'user:write', 'consultation:read', 'message:read', 'conversation:read'])]
     #[Gedmo\Versioned]
     private ?string $nom = null;
 
     #[ORM\Column(length: 255, nullable: true)]
     #[Assert\Length(min: 2, max: 255, minMessage: 'Le prénom doit contenir au moins {{ limit }} caractères', maxMessage: 'Le prénom ne peut pas dépasser {{ limit }} caractères')]
-    #[Groups(['user:read', 'user:write'])]
+    #[Groups(['user:read', 'user:search', 'user:write', 'consultation:read', 'message:read', 'conversation:read'])]
     #[Gedmo\Versioned]
     private ?string $prenom = null;
 
@@ -124,7 +133,7 @@ abstract class User implements UserInterface, PasswordAuthenticatedUserInterface
         pattern: '/^\+237\s?[26]\d{8}$/',
         message: 'Format camerounais attendu : +237 6XXXXXXXX ou +237 2XXXXXXXX'
     )]
-    #[Groups(['user:read', 'user:write'])]
+    #[Groups(['user:read', 'user:write', 'consultation:read', 'message:read', 'conversation:read'])]
     private ?string $telephone = null;
 
     #[ORM\Column(length: 255, nullable: true)]
@@ -134,7 +143,7 @@ abstract class User implements UserInterface, PasswordAuthenticatedUserInterface
 
     #[ORM\Column(length: 255, nullable: true)]
     #[Assert\Url(requireTld: false, message: 'L\'URL de la photo de profil n\'est pas valide')]
-    #[Groups(['user:read', 'user:write'])]
+    #[Groups(['user:read', 'user:search', 'user:write', 'consultation:read', 'conversation:read'])]
     private ?string $photoProfil = null;
 
     #[ORM\Column]
@@ -151,11 +160,11 @@ abstract class User implements UserInterface, PasswordAuthenticatedUserInterface
     private bool $banni = false;
 
     #[ORM\Column(type: 'boolean', options: ['default' => false])]
-    #[Groups(['user:read'])]
+    #[Groups(['user:read', 'user:search', 'conversation:read'])]
     private bool $estEnLigne = false;
 
     #[ORM\Column(nullable: true)]
-    #[Groups(['user:read'])]
+    #[Groups(['user:read', 'user:search', 'conversation:read'])]
     private ?\DateTimeImmutable $dernierePresence = null;
 
     /**
@@ -471,5 +480,11 @@ abstract class User implements UserInterface, PasswordAuthenticatedUserInterface
         $this->banni = $banni;
 
         return $this;
+    }
+
+    #[Groups(['user:search', 'conversation:read'])]
+    public function getDiscriminatorType(): string
+    {
+        return (new \ReflectionClass($this))->getShortName();
     }
 }

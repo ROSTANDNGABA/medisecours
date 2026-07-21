@@ -43,15 +43,26 @@ class CurrentUserExtension implements QueryCollectionExtensionInterface
 
         if (Conversation::class === $resourceClass) {
             $queryBuilder
-                ->innerJoin(sprintf('%s.participants', $rootAlias), 'p')
-                ->andWhere('p = :current_user')
+                ->andWhere(sprintf(':current_user MEMBER OF %s.participants', $rootAlias))
                 ->setParameter('current_user', $user);
 
             return;
         }
 
-        $queryBuilder
-            ->andWhere(sprintf('%s.patient = :current_user OR %s.medecin = :current_user', $rootAlias, $rootAlias))
-            ->setParameter('current_user', $user);
+        if ($this->security->isGranted('ROLE_MEDECIN')) {
+            $queryBuilder
+                ->andWhere(sprintf(
+                    '(%s.patient = :current_user OR %s.medecin = :current_user OR %s.medecin IS NULL)',
+                    $rootAlias, $rootAlias, $rootAlias
+                ))
+                ->setParameter('current_user', $user);
+        } else {
+            $queryBuilder
+                ->andWhere(sprintf(
+                    '%s.patient = :current_user OR %s.medecin = :current_user',
+                    $rootAlias, $rootAlias
+                ))
+                ->setParameter('current_user', $user);
+        }
     }
 }

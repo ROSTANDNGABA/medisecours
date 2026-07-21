@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace App\Entity;
 
+use ApiPlatform\Metadata\ApiResource;
+use ApiPlatform\Metadata\Get;
+use ApiPlatform\Metadata\GetCollection;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Serializer\Annotation\Groups;
 use Symfony\Component\Validator\Constraints as Assert;
@@ -19,6 +22,19 @@ use Symfony\Component\Validator\Constraints as Assert;
  *                   Données critiques en situation d'urgence médicale.
  */
 #[ORM\Entity]
+#[ApiResource(
+    operations: [
+        // GET /api/patients — accessible aux médecins et admins pour recherche/creation conversation
+        new GetCollection(
+            security: "is_granted('ROLE_MEDECIN') or is_granted('ROLE_ADMIN')",
+        ),
+        // GET /api/patients/{id} — le patient lui-même, son médecin, ou admin
+        new Get(
+            security: "is_granted('ROLE_ADMIN') or object == user",
+        ),
+    ],
+    normalizationContext: ['groups' => ['user:search']],
+)]
 class Patient extends User
 {
     #[ORM\Column(length: 10, nullable: true)]

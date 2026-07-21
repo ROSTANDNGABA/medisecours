@@ -19,10 +19,10 @@ use Symfony\Component\Validator\Constraints as Assert;
 #[ApiResource(
     operations: [
         new GetCollection(),
-        new Get(security: "is_granted('ROLE_ADMIN') or object.getPatient() == user or object.getMedecin() == user"),
+        new Get(security: "is_granted('ROLE_ADMIN') or object.getPatient() == user or object.getMedecin() == user or (is_granted('ROLE_MEDECIN') and object.getMedecin() == null)"),
         new Post(security: "is_granted('ROLE_PATIENT')", processor: \App\State\ConsultationProcessor::class),
-        new Patch(security: "is_granted('ROLE_ADMIN') or object.getPatient() == user or object.getMedecin() == user"),
-        new Delete(security: "is_granted('ROLE_ADMIN')")
+        new Patch(security: "is_granted('ROLE_ADMIN') or object.getPatient() == user or object.getMedecin() == user or (is_granted('ROLE_MEDECIN') and object.getMedecin() == null)", processor: \App\State\ConsultationProcessor::class),
+        new Delete(security: "is_granted('ROLE_ADMIN') or object.getPatient() == user or object.getMedecin() == user")
     ],
     normalizationContext: ['groups' => ['consultation:read']],
     denormalizationContext: ['groups' => ['consultation:write']],
@@ -101,13 +101,13 @@ class Consultation
      *
      * @var Collection<int, Message>
      */
-    #[ORM\OneToMany(targetEntity: Message::class, mappedBy: 'consultation')]
+    #[ORM\OneToMany(targetEntity: Message::class, mappedBy: 'consultation', cascade: ['remove'])]
     private Collection $messages;
 
     /**
      * @var Collection<int, Prescription>
      */
-    #[ORM\OneToMany(targetEntity: Prescription::class, mappedBy: 'consultation')]
+    #[ORM\OneToMany(targetEntity: Prescription::class, mappedBy: 'consultation', cascade: ['remove'])]
     #[Groups(['consultation:read'])]
     private Collection $prescriptions;
 
