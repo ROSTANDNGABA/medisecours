@@ -27,11 +27,18 @@ wss.on('connection', (ws, req) => {
   ws.subscriptions = new Set()
 
   console.log(`[WS] Client connected: ${userId} (role=${role})`)
-  clients.set(userId, ws)
+  if (!clients.has(userId)) clients.set(userId, new Set())
+  clients.get(userId).add(ws)
+
+  let alive = true
 
   ws.on('message', (raw) => {
     try {
       const msg = JSON.parse(raw.toString())
+      if (msg.type === 'ping') {
+        ws.send(JSON.stringify({ type: 'pong' }))
+        return
+      }
       if (msg.type === 'subscribe' && msg.conversationId) {
         ws.subscriptions.add(msg.conversationId)
         if (!convClients.has(msg.conversationId)) convClients.set(msg.conversationId, new Set())
@@ -45,7 +52,8 @@ wss.on('connection', (ws, req) => {
   })
 
   ws.on('close', () => {
-    clients.delete(userId)
+    clients.get(userId)?.delete(ws)
+    if (clients.get(userId)?.size === 0) clients.delete(userId)
     for (const convId of ws.subscriptions) {
       convClients.get(convId)?.delete(ws)
     }
@@ -59,19 +67,42 @@ const httpServer = http.createServer((req, res) => {
     req.on('end', () => {
       try {
         const data = JSON.parse(body)
-        const { conversationId, event, payload, broadcast } = data
+        const { conversationId, event, payload, broadcast, targetUserIds } = data
 
         if (broadcast) {
           // System-wide event — send to ALL connected clients
           const message = JSON.stringify({ event, payload })
           let sent = 0
-          for (const [uid, ws] of clients) {
-            if (ws.readyState === 1) {
-              ws.send(message)
-              sent++
+          for (const [uid, wsSet] of clients) {
+            for (const ws of wsSet) {
+              if (ws.readyState === 1) {
+                ws.send(message)
+                sent++
+              }
             }
           }
           console.log(`[WS] Broadcast: event=${event} sent=${sent}`)
+          res.writeHead(200, { 'Content-Type': 'application/json' })
+          res.end(JSON.stringify({ sent }))
+          return
+        }
+
+        if (targetUserIds && Array.isArray(targetUserIds)) {
+          // Targeted user delivery (e.g. for new messages in a conversation)
+          const message = JSON.stringify({ event, payload })
+          let sent = 0
+          for (const uid of targetUserIds) {
+            const wsSet = clients.get(String(uid))
+            if (wsSet) {
+              for (const ws of wsSet) {
+                if (ws.readyState === 1) {
+                  ws.send(message)
+                  sent++
+                }
+              }
+            }
+          }
+          console.log(`[WS] Publish: event=${event} conv=${conversationId} targeted_users=${targetUserIds.length} sent=${sent}`)
           res.writeHead(200, { 'Content-Type': 'application/json' })
           res.end(JSON.stringify({ sent }))
           return
@@ -83,7 +114,7 @@ const httpServer = http.createServer((req, res) => {
           return
         }
 
-        // Per-conversation notification
+        // Fallback: Per-conversation notification (legacy)
         const message = JSON.stringify({ event, payload })
         const subscribers = convClients.get(String(conversationId))
         console.log(`[WS] Publish: event=${event} conv=${conversationId} subscribers=${subscribers?.size || 0}`)

@@ -14,6 +14,9 @@ import { ArrowLeft, Send, Stethoscope, CheckCheck, Check, Plus, X, Loader2, Pape
 import api from '../../api/axios'
 import { useAuth } from '../../hooks/useAuth'
 import { useWebSocket } from '../../hooks/useWebSocket'
+import useSWR, { mutate as globalMutate } from 'swr'
+import { fetcher } from '../../lib/fetcher'
+import { useSearchParams } from 'next/navigation'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import EmptyState from '../../components/ui/EmptyState'
 import { useToast } from '../../components/ui/Toast'
@@ -71,10 +74,10 @@ export default function MessagesPage() {
   const { user, mounted } = useAuth()
   const toast = useToast()
 
-  const [conversations, setConversations] = useState([])
-  const [messages, setMessages] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [activeId, setActiveId] = useState(null)
+  const searchParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null
+  const [conversationsLocal, setConversationsLocal] = useState([])
+  const [activeId, setActiveId] = useState(searchParams?.get('conversation') || null)
+  const [unreadCounts, setUnreadCounts] = useState(new Map())
   const [draft, setDraft] = useState('')
   const [sending, setSending] = useState(false)
   const [showNew, setShowNew] = useState(false)
@@ -95,66 +98,211 @@ export default function MessagesPage() {
   const recorderRef = useRef(null)
   const recordTimerRef = useRef(null)
   const streamRef = useRef(null)
+  const msgContainerRef = useRef(null)
+  const topSentinelRef = useRef(null)
 
-  const loadData = useCallback(() => {
-    Promise.all([
-      api.get('/api/conversations'),
-      api.get('/api/messages'),
-    ])
-      .then(async ([convRes, msgRes]) => {
-        const msgs = extractArray(msgRes)
-        const iriMedias = [...new Set(msgs.filter(m => m.media && typeof m.media === 'string' && /\/(media_objects|media)\//.test(m.media)).map(m => m.media))]
-        if (iriMedias.length > 0) {
-          const results = await Promise.allSettled(iriMedias.map(i => api.get(i).then(r => ({ i, d: r.data }))))
-          const mediaMap = new Map()
-          results.forEach(r => { if (r.status === 'fulfilled') mediaMap.set(r.value.i, r.value.d) })
-          setMessages(msgs.map(m => typeof m.media === 'string' && mediaMap.has(m.media) ? { ...m, media: mediaMap.get(m.media) } : m))
-        } else {
-          setMessages(msgs)
+  const [msgPage, setMsgPage] = useState(1)
+  const [allLoadedMsgs, setAllLoadedMsgs] = useState([])
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [hasMore, setHasMore] = useState(true)
+
+  const activeIdRef = useRef(activeId)
+  const loadingMoreRef = useRef(false)
+  const hasMoreRef = useRef(true)
+  const msgLoadingRef = useRef(false)
+
+  const { data: convData, isLoading: convLoading, error: convError, mutate: mutateConvs } = useSWR('/api/conversations', fetcher, { revalidateOnFocus: false })
+
+  const preselectConsultation = searchParams?.get('consultation')
+  const preselectStarted = useRef(false)
+  useEffect(() => {
+    if (!preselectConsultation || convLoading || !user || preselectStarted.current) return
+    preselectStarted.current = true
+    const consultationId = Number(preselectConsultation)
+    if (!consultationId) return
+    ;(async () => {
+      try {
+        const { data: consultation } = await api.get(`/api/consultations/${consultationId}`)
+        const medecinId = consultation.medecin?.id
+        if (!medecinId) {
+          toast.error('Aucun médecin assigné à cette consultation.')
+          return
         }
-        setConversations(extractArray(convRes))
-      })
-      .catch(() => toast.error('Impossible de charger la messagerie.'))
-      .finally(() => setLoading(false))
-  }, [toast])
+        const convs = Array.isArray(convData) ? convData : convData?.['hydra:member'] || []
+        const existing = convs.find((c) =>
+          c.participants?.some((p) => {
+            const pId = typeof p === 'object' ? String(p.id) : String(idFromIri(p))
+            return pId === String(medecinId)
+          })
+        )
+        if (existing) {
+          setActiveId(String(existing.id))
+          return
+        }
+        const { data: conv } = await api.post('/api/conversations', {
+          participants: [iri('users', user?.id), iri('users', medecinId)]
+        }, { headers: { 'Content-Type': 'application/ld+json' } })
+
+        await mutateConvs((prev) => {
+          const arr = Array.isArray(prev) ? prev : prev?.['hydra:member'] || []
+          return [conv, ...arr]
+        }, { revalidate: true })
+        setActiveId(String(conv.id))
+      } catch {
+        toast.error('Impossible de charger la conversation.')
+      }
+    })()
+  }, [preselectConsultation, convLoading, convData, user, toast, mutateConvs])
+
+  const activeIdNum = activeId ? Number(activeId) : null
+  const MSGS_PER_PAGE = 30
+  const { data: msgData, isLoading: msgLoading, error: msgError, mutate: mutateMsgs } = useSWR(
+    activeIdNum ? `/api/messages?conversation=/api/conversations/${activeIdNum}&order[createdAt]=DESC&itemsPerPage=${MSGS_PER_PAGE}&page=${msgPage}` : null,
+    fetcher,
+    { revalidateOnFocus: false }
+  )
+
+  useEffect(() => { activeIdRef.current = activeId }, [activeId])
+  useEffect(() => { loadingMoreRef.current = loadingMore }, [loadingMore])
+  useEffect(() => { hasMoreRef.current = hasMore }, [hasMore])
+  useEffect(() => { msgLoadingRef.current = msgLoading }, [msgLoading])
 
   useEffect(() => {
-    if (!mounted) return
-    loadData()
-  }, [loadData, mounted])
+    setMsgPage(1)
+    setAllLoadedMsgs([])
+    setHasMore(true)
+    setLoadingMore(false)
+  }, [activeId])
+
+  useEffect(() => {
+    if (!msgData) return
+    const arr = Array.isArray(msgData) ? msgData : msgData['hydra:member'] || []
+    if (arr.length < MSGS_PER_PAGE) setHasMore(false)
+
+    const container = msgContainerRef.current
+    const prevScrollHeight = container ? container.scrollHeight : 0
+
+    if (msgPage === 1) {
+      setAllLoadedMsgs(arr)
+    } else {
+      setAllLoadedMsgs(prev => {
+        const existingIds = new Set(prev.map(m => String(m.id ?? m['@id'])))
+        const newMsgs = arr.filter(m => !existingIds.has(String(m.id ?? m['@id'])))
+        return newMsgs.length > 0 ? [...prev, ...newMsgs] : prev
+      })
+    }
+    setLoadingMore(false)
+
+    if (msgPage > 1 && container) {
+      requestAnimationFrame(() => {
+        const newScrollHeight = container.scrollHeight
+        container.scrollTop += newScrollHeight - prevScrollHeight
+      })
+    }
+  }, [msgData, msgPage])
 
   const token = typeof window !== 'undefined' ? localStorage.getItem('medisecours_token') : null
+
   function sameMsg(a, b) {
-    const idA = a.id ?? a['@id']
-    const idB = b.id ?? b['@id']
-    return idA !== undefined && idB !== undefined && idA == idB
+    const idA = String(a.id ?? a['@id'] ?? '')
+    const idB = String(b.id ?? b['@id'] ?? '')
+    return idA !== '' && idB !== '' && idA === idB
   }
   const { subscribe } = useWebSocket(user?.id, token, {
     onNewMessage: (msg) => {
-      if (idFromIri(msg.expediteur) === user?.id) return
-      setMessages((prev) => {
-        const arr = [...prev]
-        // Real message replaces optimistic (matched by _tempId)
-        if (msg._tempId && msg['@id']) {
-          const idx = arr.findIndex(m => m._tempId === msg._tempId)
-          if (idx !== -1) { arr[idx] = msg; return arr }
+      const currentActiveId = activeIdRef.current
+      if (String(idFromIri(msg.expediteur)) === String(user?.id)) {
+        if (msg._tempId) {
+          setPendingMsgs(prev => prev.filter(m => m.id !== msg._tempId))
+          setAllLoadedMsgs(prev => {
+            const idx = prev.findIndex(m => m.id === msg._tempId)
+            if (idx !== -1) {
+              const updated = [...prev]
+              updated[idx] = { ...msg, _sending: false }
+              return updated
+            }
+            if (prev.some(m => sameMsg(m, msg))) return prev
+            return [msg, ...prev]
+          })
         }
-        // Optimistic: skip if real already present (race: real arrived first)
-        if (msg._tempId && arr.some(m => m._tempId === msg._tempId && m['@id'])) return prev
-        return arr.some((m) => sameMsg(m, msg)) ? arr : [...arr, msg]
-      })
+        return
+      }
+      const convId = String(idFromIri(msg.conversation) || '')
+      if (convId && convId !== currentActiveId) {
+        setUnreadCounts(prev => {
+          const next = new Map(prev)
+          next.set(convId, (next.get(convId) || 0) + 1)
+          return next
+        })
+        mutateConvs()
+        return
+      }
+      if (convId && convId === currentActiveId) {
+        setAllLoadedMsgs(prev => {
+          if (prev.some(m => sameMsg(m, msg))) return prev
+          return [msg, ...prev]
+        })
+        mutateConvs()
+      }
     },
     onMessageRead: (msg) => {
-      setMessages((prev) => prev.map((m) => sameMsg(m, msg) ? { ...m, statut: 'LU' } : m))
+      setAllLoadedMsgs((prev) => prev.map((m) => sameMsg(m, msg) ? { ...m, statut: 'LU' } : m))
     },
   })
 
   useEffect(() => {
-    if (activeId) subscribe(activeId)
+    if (activeId) {
+      subscribe(activeId)
+      const t = setTimeout(() => {
+        setUnreadCounts(prev => {
+          const next = new Map(prev)
+          next.set(activeId, 0)
+          return next
+        })
+      }, 0)
+      return () => clearTimeout(t)
+    }
   }, [activeId, subscribe])
 
+  const prevMsgCountRef = useRef(0)
   useEffect(() => {
-    const iris = [...new Set(messages.filter(m => m.media && typeof m.media === 'string' && /\/(media_objects|media)\//.test(m.media)).map(m => m.media))]
+    const el = msgContainerRef.current
+    if (!el) return
+    const currentCount = allLoadedMsgs.length
+    if (currentCount <= prevMsgCountRef.current) {
+      prevMsgCountRef.current = currentCount
+      return
+    }
+    prevMsgCountRef.current = currentCount
+    const threshold = 150
+    const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < threshold
+    if (nearBottom) {
+      requestAnimationFrame(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }))
+    }
+  }, [allLoadedMsgs.length])
+
+  useEffect(() => {
+    if (activeId) {
+      requestAnimationFrame(() => bottomRef.current?.scrollIntoView())
+    }
+  }, [activeId])
+
+  useEffect(() => {
+    const sentinel = topSentinelRef.current
+    if (!sentinel) return
+    const obs = new IntersectionObserver(([entry]) => {
+      if (entry.isIntersecting && hasMoreRef.current && !loadingMoreRef.current && !msgLoadingRef.current) {
+        loadingMoreRef.current = true
+        setLoadingMore(true)
+        setMsgPage(p => p + 1)
+      }
+    }, { threshold: 0.1 })
+    obs.observe(sentinel)
+    return () => obs.disconnect()
+  }, [activeId])
+
+  useEffect(() => {
+    const iris = [...new Set(allLoadedMsgs.filter(m => m.media && typeof m.media === 'string' && /\/(media_objects|media)\//.test(m.media)).map(m => m.media))]
     const pending = iris.filter(i => !mediaCache.current.has(i))
     if (pending.length === 0) return
     let dead = false
@@ -162,10 +310,12 @@ export default function MessagesPage() {
       if (dead) return
       let changed = false
       rr.forEach(r => { if (r.status === 'fulfilled') { mediaCache.current.set(r.value.i, r.value.d); changed = true } })
-      if (changed) setMessages(prev => prev.map(m => typeof m.media === 'string' && mediaCache.current.has(m.media) ? { ...m, media: mediaCache.current.get(m.media) } : m))
+      if (changed) setAllLoadedMsgs(prev => prev.map(m => typeof m.media === 'string' && mediaCache.current.has(m.media) ? { ...m, media: mediaCache.current.get(m.media) } : m))
     })
     return () => { dead = true }
-  }, [messages])
+  }, [allLoadedMsgs])
+
+  const conversations = Array.isArray(convData) ? convData : convData?.['hydra:member'] || []
 
   function matchConv(msg, convId) {
     const conv = msg.conversation
@@ -175,60 +325,110 @@ export default function MessagesPage() {
     return conv['@id'] === iri || conv.id == convId
   }
 
+  // Auto-fetch missing participant user info if API returns string IRIs or shallow objects
+  useEffect(() => {
+    if (!conversations.length) return
+    const missingIris = new Set()
+    for (const c of conversations) {
+      c.participants?.forEach(p => {
+        if (typeof p === 'string') {
+          if (!medecins.some(u => String(u.id) === String(idFromIri(p)))) missingIris.add(p)
+        } else if (p && typeof p === 'object') {
+          if (!p.nom && !p.prenom && p['@id']) {
+            if (!medecins.some(u => String(u.id) === String(p.id))) missingIris.add(p['@id'])
+          }
+        }
+      })
+    }
+    if (missingIris.size > 0) {
+      let dead = false
+      Promise.allSettled(Array.from(missingIris).map(iriStr => api.get(iriStr).then(r => r.data)))
+        .then(results => {
+          if (dead) return
+          const newUsers = results.filter(r => r.status === 'fulfilled' && r.value).map(r => r.value)
+          if (newUsers.length > 0) {
+            setMedecins(prev => {
+               const map = new Map(prev.map(u => [String(u.id), u]))
+               newUsers.forEach(u => map.set(String(u.id), u))
+               return Array.from(map.values())
+            })
+          }
+        })
+      return () => { dead = true }
+    }
+  }, [conversations, medecins])
+
   const convMap = useMemo(() => {
     const map = new Map()
     for (const c of conversations) {
-      const other = c.participants?.find((p) => p.id !== user?.id)
-      const msgs = messages.filter((m) => matchConv(m, c.id))
-      const unread = msgs.filter((m) => m.statut !== 'LU' && idFromIri(m.expediteur) !== user?.id).length
-      msgs.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt))
-      map.set(String(c.id), { id: String(c.id), info: other || null, messages: msgs, unread })
+      const other = c.participants?.find((p) => {
+        const pId = typeof p === 'object' ? p.id : idFromIri(p)
+        return String(pId) !== String(user?.id)
+      })
+      
+      let info = null
+      if (typeof other === 'object') {
+        if (other.nom || other.prenom) {
+          info = other
+        } else {
+          info = medecins.find(u => String(u.id) === String(other.id)) || other
+        }
+      } else if (typeof other === 'string') {
+        info = medecins.find(u => String(u.id) === String(idFromIri(other))) || null
+      }
+
+      const lastMsg = c.dernierMessage || null
+      const unread = unreadCounts.get(String(c.id)) || 0
+      map.set(String(c.id), { id: String(c.id), info: info, messages: [], unread, dernierMessage: lastMsg })
     }
     for (const p of pendingMsgs) {
       const convId = idFromIri(p.conversation) || p.conversation
       const existing = map.get(String(convId))
-      if (existing) {
+      if (existing && String(convId) === activeId) {
         existing.messages = [...existing.messages, p]
-        existing.messages.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt))
       }
     }
     return map
-  }, [conversations, messages, user, pendingMsgs])
+  }, [conversations, user, pendingMsgs, activeId, unreadCounts, medecins])
 
   const sortedConvs = useMemo(() =>
     Array.from(convMap.values()).sort((a, b) => {
-      const la = a.messages.at(-1)?.createdAt ?? ''
-      const lb = b.messages.at(-1)?.createdAt ?? ''
-      return lb.localeCompare(la)
+      const la = a.dernierMessage?.createdAt ?? ''
+      const lb = b.dernierMessage?.createdAt ?? ''
+      return String(lb).localeCompare(String(la))
     }), [convMap])
 
   const active = convMap.get(activeId)
 
   const dedupedMessages = useMemo(() => {
-    if (!active) return []
+    const msgs = [...allLoadedMsgs]
+    if (active) {
+      for (const p of active.messages) {
+        if (!msgs.some(m => sameMsg(m, p))) msgs.push(p)
+      }
+    }
+    msgs.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt))
     const seen = new Set()
-    return active.messages.filter(m => {
+    return msgs.filter(m => {
       const key = m.id ?? m['@id']
       if (!key || seen.has(key)) return false
       seen.add(key)
       return true
     })
-  }, [active])
+  }, [allLoadedMsgs, active])
 
-  useEffect(() => {
-    if (!activeId && sortedConvs.length > 0) queueMicrotask(() => setActiveId(sortedConvs[0].id))
-  }, [sortedConvs, activeId])
+
 
   useEffect(() => {
     const el = bottomRef.current?.parentElement
     if (!el) return
-    const threshold = 120
+    const threshold = 150
     const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < threshold
-    if (nearBottom) bottomRef.current.scrollIntoView({ behavior: 'smooth' })
+    if (nearBottom) requestAnimationFrame(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }))
   }, [active?.messages?.length])
 
   useEffect(() => {
-    queueMicrotask(() => bottomRef.current?.scrollIntoView())
+    requestAnimationFrame(() => bottomRef.current?.scrollIntoView())
   }, [activeId])
 
   const readAttempted = useRef(new Set())
@@ -240,7 +440,9 @@ export default function MessagesPage() {
     if (readAttempted.current.has(msgId)) return
     readAttempted.current.add(msgId)
     setMessages((all) => all.map((m) => (m.id === msg.id ? { ...m, statut: 'LU' } : m)))
-    api.patch(msg['@id'], { statut: 'LU' }, { headers: { 'Content-Type': 'application/merge-patch+json' } }).catch(() => {})
+    api.patch(msg['@id'], { statut: 'LU' }, { headers: { 'Content-Type': 'application/merge-patch+json' } })
+      .then(() => globalMutate('/api/messages/unread-count'))
+      .catch(() => {})
   }, [user?.id])
 
   useEffect(() => {
@@ -249,15 +451,35 @@ export default function MessagesPage() {
 
   const findOrCreateConv = async (medecinId) => {
     const existing = conversations.find((c) =>
-      c.participants?.some((p) => p.id === medecinId)
+      c.participants?.some((p) => {
+        const pId = typeof p === 'object' ? p.id : idFromIri(p)
+        return String(pId) === String(medecinId)
+      })
     )
     if (existing) return String(existing.id)
 
     const { data: conv } = await api.post('/api/conversations', {
       participants: [iri('users', user?.id), iri('users', medecinId)]
     }, { headers: { 'Content-Type': 'application/ld+json' } })
-    await loadData()
+    await mutateConvs((prev) => {
+      const arr = Array.isArray(prev) ? prev : prev?.['hydra:member'] || []
+      return [conv, ...arr]
+    }, { revalidate: true })
     return String(conv.id)
+  }
+
+  const deleteConversation = async (idToDelete) => {
+    if (!confirm('Êtes-vous sûr de vouloir supprimer cette discussion ? Toutes les données seront perdues.')) return
+    try {
+      await api.delete(`/api/conversations/${idToDelete}`)
+      toast.success('Discussion supprimée.')
+      mutateConvs()
+      if (String(activeId) === String(idToDelete)) {
+        setActiveId(null)
+      }
+    } catch {
+      toast.error('Erreur lors de la suppression de la discussion.')
+    }
   }
 
   const openNewConversation = () => {
@@ -338,6 +560,20 @@ export default function MessagesPage() {
     if (!hasText && !hasFiles) return
 
     const convIri = `/api/conversations/${activeId}`
+    const currentActiveId = activeId
+
+    // Optimistic sidebar update: inject mock dernierMessage instantly
+    const optimisticConvMutate = (content: string) => {
+      mutateConvs((prev: any) => {
+        const arr = Array.isArray(prev) ? prev : []
+        return arr.map((c: any) => {
+          if (String(c.id) === String(currentActiveId)) {
+            return { ...c, dernierMessage: { contenu: content.slice(0, 80), createdAt: new Date().toISOString(), expediteur: { id: user?.id } } }
+          }
+          return c
+        })
+      }, { revalidate: false })
+    }
 
     if (hasFiles) {
       setSending(true)
@@ -348,6 +584,7 @@ export default function MessagesPage() {
         ...att,
         tempId: 'temp-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6),
       }))
+      // Add optimistic messages to local state only (no WS publish yet)
       for (const att of pending) {
         const optimistic = {
           id: att.tempId, contenu: caption || '',
@@ -357,9 +594,10 @@ export default function MessagesPage() {
           typeMessage: msgTypeFromMime(att.mime),
           _sending: true, media: { contentUrl: att.preview || '', originalName: att.name, size: att.size, mimeType: att.mime },
         }
-        setPendingMsgs((prev) => [...prev, optimistic])
-        fetch('/api/ws/publish', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ conversationId: activeId, event: 'new_message', payload: { ...optimistic, _tempId: att.tempId } }) }).catch(() => {})
+        setAllLoadedMsgs(prev => [...prev, optimistic])
       }
+      // Optimistic sidebar: show file preview instantly
+      optimisticConvMutate(caption || '📎 Fichier')
       setAttachments([])
       try {
         const uploads = await Promise.all(pending.map((att) => uploadFile(att.file)))
@@ -379,19 +617,21 @@ export default function MessagesPage() {
           const d = r.data
           return d.media && typeof d.media === 'string' && uploads[i] ? { ...d, media: uploads[i] } : d
         })
-        const tempIds = new Set(pending.map((a) => a.tempId))
-        setPendingMsgs((prev) => prev.filter((m) => !tempIds.has(m.id)))
-        setMessages((prev) => {
-          const next = [...prev]
-          for (const m of created) { if (!next.some((x) => sameMsg(x, m))) next.push(m) }
-          return next
+        // Replace optimistic entries with real ones
+        setAllLoadedMsgs(prev => {
+          let updated = [...prev]
+          for (let i = 0; i < pending.length; i++) {
+            const idx = updated.findIndex(m => m.id === pending[i].tempId)
+            if (idx !== -1) updated[idx] = { ...created[i], _sending: false }
+            else if (!updated.some(m => sameMsg(m, created[i]))) updated.push(created[i])
+          }
+          return updated
         })
-        for (let i = 0; i < created.length; i++) {
-          fetch('/api/ws/publish', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ conversationId: activeId, event: 'new_message', payload: { ...created[i], _tempId: pending[i].tempId } }) }).catch(() => {})
-        }
+        mutateConvs()
       } catch {
         toast.error("Échec de l'envoi du message.")
-        setPendingMsgs((prev) => prev.filter((m) => pending.some((p) => p.tempId === m.id)))
+        const tempIds = new Set(pending.map(a => a.tempId))
+        setAllLoadedMsgs(prev => prev.filter(m => !tempIds.has(m.id)))
       } finally {
         setSending(false)
         setUploadingMedia(false)
@@ -400,6 +640,7 @@ export default function MessagesPage() {
       return
     }
 
+    // Text-only message
     const content = draft.trim()
     const tempId = 'temp-' + Date.now()
     const temp = {
@@ -407,23 +648,29 @@ export default function MessagesPage() {
       expediteur: { id: user?.id },
       conversation: convIri,
       statut: 'ENVOYE', createdAt: new Date().toISOString(),
+      _sending: true,
     }
-    setPendingMsgs((prev) => [...prev, temp])
+    // Add optimistic message to local state (no WS publish yet)
+    setAllLoadedMsgs(prev => [...prev, temp])
+    // Optimistic sidebar update: show message preview instantly
+    optimisticConvMutate(content)
     setDraft('')
     setSending(true)
-    fetch('/api/ws/publish', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ conversationId: activeId, event: 'new_message', payload: { ...temp, _tempId: tempId } }) }).catch(() => {})
     try {
       const { data } = await api.post('/api/messages', { contenu: content, conversation: convIri }, { headers: { 'Content-Type': 'application/ld+json' } })
-      setPendingMsgs((prev) => prev.filter((m) => m.id !== tempId))
-      setMessages((prev) => {
-        const arr = [...prev]
-        const idx = arr.findIndex(m => m._tempId === tempId)
-        if (idx !== -1) { arr[idx] = data; return arr }
-        return arr.some((m) => sameMsg(m, data)) ? arr : [...arr, data]
+      // Replace optimistic with real
+      setAllLoadedMsgs(prev => {
+        const idx = prev.findIndex(m => m.id === tempId)
+        if (idx !== -1) {
+          const updated = [...prev]
+          updated[idx] = { ...data, _sending: false }
+          return updated
+        }
+        return prev.some(m => sameMsg(m, data)) ? prev : [...prev, data]
       })
-      fetch('/api/ws/publish', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ conversationId: activeId, event: 'new_message', payload: { ...data, _tempId: tempId } }) }).catch(() => {})
+      mutateConvs()
     } catch {
-      setPendingMsgs((prev) => prev.filter((m) => m.id !== tempId))
+      setAllLoadedMsgs(prev => prev.filter(m => m.id !== tempId))
       toast.error("Échec de l'envoi du message.")
     } finally {
       setSending(false)
@@ -431,13 +678,13 @@ export default function MessagesPage() {
   }
 
   if (!mounted) return <LoadingSpinner label="Chargement…" />
-  if (loading)   return <LoadingSpinner label="Chargement de la messagerie…" />
+  if (convLoading) return <LoadingSpinner label="Chargement de la messagerie…" />
 
   return (
-    <div className="max-w-6xl mx-auto px-0 sm:px-6 py-0 sm:py-10 h-full flex flex-col">
-      <div className="grid grid-cols-1 md:grid-cols-3 flex-1 sm:rounded-2xl overflow-hidden border border-primary-100 dark:border-white/10 shadow-xl">
+    <div className="max-w-6xl mx-auto p-0 lg:px-6 lg:py-10 h-[calc(100vh-4rem)] lg:h-full flex flex-col">
+      <div className="grid grid-cols-1 lg:grid-cols-3 flex-1 lg:rounded-2xl overflow-hidden border border-primary-100 dark:border-white/10 shadow-xl">
 
-        <div className={`md:col-span-1 border-r border-primary-100 dark:border-white/10 bg-white/70 dark:bg-primary-700/40 flex flex-col ${activeId ? 'hidden md:flex' : 'flex'}`}>
+        <div className={`lg:col-span-1 border-r border-primary-100 dark:border-white/10 bg-white/70 dark:bg-primary-700/40 flex flex-col ${activeId ? 'hidden lg:flex' : 'flex'}`}>
           <div className="flex items-center justify-between p-4 border-b border-primary-100 dark:border-white/10">
             <h2 className="font-display font-bold text-primary-900 dark:text-sable">Messages</h2>
             <button onClick={openNewConversation} className="p-2 rounded-xl bg-mint-500 text-white"><Plus className="w-4 h-4" /></button>
@@ -457,10 +704,10 @@ export default function MessagesPage() {
                 <div className="flex-1 min-w-0">
                   <p className="font-semibold text-sm text-primary-900 dark:text-sable truncate">{c.info?.prenom} {c.info?.nom}</p>
                   <p className="text-xs text-primary-300 truncate">
-                    {c.messages.at(-1)?.typeMessage === 'IMAGE' && <>📷 Image</>}
-                    {c.messages.at(-1)?.typeMessage === 'VOIX' && <>🎤 Message vocal</>}
-                    {c.messages.at(-1)?.typeMessage === 'FICHIER' && <>📎 {c.messages.at(-1)?.media?.originalName || 'Fichier'}</>}
-                    {(!c.messages.at(-1)?.typeMessage || c.messages.at(-1)?.typeMessage === 'TEXTE') && (c.messages.at(-1)?.contenu || '')}
+                    {c.dernierMessage?.typeMessage === 'IMAGE' && <>📷 Image</>}
+                    {c.dernierMessage?.typeMessage === 'VOIX' && <>🎤 Message vocal</>}
+                    {c.dernierMessage?.typeMessage === 'FICHIER' && <>📎 {c.dernierMessage?.media?.originalName || 'Fichier'}</>}
+                    {(!c.dernierMessage?.typeMessage || c.dernierMessage?.typeMessage === 'TEXTE') && (c.dernierMessage?.contenu || '')}
                   </p>
                 </div>
                 {c.unread > 0 && <span className="w-5 h-5 rounded-full bg-urgence-500 text-white text-[10px] font-bold flex items-center justify-center shrink-0">{c.unread}</span>}
@@ -469,18 +716,28 @@ export default function MessagesPage() {
           </div>
         </div>
 
-        <div className={`md:col-span-2 flex flex-col bg-sable dark:bg-primary-900 ${activeId ? 'flex' : 'hidden md:flex'}`}>
+        <div className={`lg:col-span-2 flex flex-col bg-sable dark:bg-primary-900 ${activeId ? 'flex' : 'hidden lg:flex'}`}>
           {active ? (
             <>
               <div className="flex items-center gap-3 p-4 border-b border-primary-100 dark:border-white/10 bg-white/70 dark:bg-primary-700/40">
-                <button className="md:hidden" onClick={() => setActiveId(null)} aria-label="Retour"><ArrowLeft className="w-5 h-5 text-primary-500" /></button>
+                <button className="lg:hidden" onClick={() => setActiveId(null)} aria-label="Retour"><ArrowLeft className="w-5 h-5 text-primary-500" /></button>
                 <div className="w-9 h-9 rounded-full bg-primary-500 text-white flex items-center justify-center font-bold text-xs shrink-0">
                   {(active.info?.prenom?.[0] || '') + (active.info?.nom?.[0] || '')}
                 </div>
-                <p className="font-semibold text-sm text-primary-900 dark:text-sable">{active.info?.prenom} {active.info?.nom}</p>
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-sm text-primary-900 dark:text-sable truncate">{active.info?.prenom} {active.info?.nom}</p>
+                </div>
+                <button onClick={() => deleteConversation(active.id)} className="p-2 text-primary-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors" title="Supprimer la discussion">
+                  <Trash2 className="w-5 h-5" />
+                </button>
               </div>
 
-              <div className="flex-1 overflow-y-auto p-4 space-y-2 min-h-0">
+              <div ref={msgContainerRef} className="flex-1 overflow-y-auto p-4 space-y-2 min-h-0">
+                {hasMore && (
+                  <div ref={topSentinelRef} className="flex justify-center py-4">
+                    <Loader2 className="w-5 h-5 animate-spin text-primary-300" />
+                  </div>
+                )}
                 {dedupedMessages.map((m) => {
                   const mine = idFromIri(m.expediteur) === user?.id
                   return (
@@ -516,17 +773,20 @@ export default function MessagesPage() {
                         {!m.contenu && m.typeMessage === 'TEXTE' && (
                           <div className="px-4 py-2.5"><p>{m.contenu}</p></div>
                         )}
-                        {mine && (
-                          <div className={`flex justify-end ${m.typeMessage !== 'TEXTE' || m.contenu ? 'pb-2 px-3' : 'pb-2.5 px-4'}`}>
+                        {mine ? (
+                          <div className={`flex justify-end items-center gap-1.5 ${m.typeMessage !== 'TEXTE' || m.contenu ? 'pb-2 px-3' : 'pb-2.5 px-4'}`}>
+                            <p className="text-[10px] opacity-70">{new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
                             {m._sending ? (
                               <Loader2 className="w-3.5 h-3.5 animate-spin opacity-60" />
                             ) : m.statut === 'LU' ? (
-                              <CheckCheck className="w-3.5 h-3.5 text-blue-400" />
-                            ) : m.statut === 'LIVRE' ? (
-                              <CheckCheck className="w-3.5 h-3.5 opacity-60" />
+                              <CheckCheck className="w-3.5 h-3.5 text-[#4dd0e1]" />
                             ) : (
-                              <Check className="w-3.5 h-3.5 opacity-60" />
+                              <CheckCheck className="w-3.5 h-3.5 opacity-60" />
                             )}
+                          </div>
+                        ) : (
+                          <div className={`flex justify-start ${m.typeMessage !== 'TEXTE' || m.contenu ? 'pb-2 px-3' : 'pb-2.5 px-4'}`}>
+                            <p className="text-[10px] opacity-50">{new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
                           </div>
                         )}
                       </div>
@@ -597,7 +857,7 @@ export default function MessagesPage() {
                     aria-label="Zone de saisie du message"
                     className="flex-1 px-4 py-2.5 rounded-2xl border border-primary-100 dark:border-white/10 bg-white dark:bg-primary-900/60 focus:outline-none focus:ring-2 focus:ring-mint-500 disabled:opacity-40"
                   />
-                  <button onClick={handleSend} disabled={sending || (!draft.trim() && attachments.length === 0) || recording} aria-label="Envoyer" className="p-3 rounded-2xl bg-mint-500 hover:bg-mint-700 text-white disabled:opacity-50 transition">
+                  <button type="button" onClick={handleSend} disabled={sending || (!draft.trim() && attachments.length === 0) || recording} aria-label="Envoyer" className="p-3 rounded-2xl bg-mint-500 hover:bg-mint-700 text-white disabled:opacity-50 transition">
                     {uploadingMedia ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                   </button>
                 </div>

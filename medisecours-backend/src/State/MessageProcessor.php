@@ -12,12 +12,14 @@ use App\Entity\Medecin;
 use App\Entity\Message;
 use App\Entity\Patient;
 use App\Entity\User;
-use App\Service\WebSocketNotifier;
+use App\Message\WebSocketNotification;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
+use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
+use Symfony\Component\Messenger\MessageBusInterface;
 
 class MessageProcessor implements ProcessorInterface
 {
@@ -26,7 +28,7 @@ class MessageProcessor implements ProcessorInterface
         private readonly ProcessorInterface $persistProcessor,
         private readonly Security $security,
         private readonly EntityManagerInterface $em,
-        private readonly WebSocketNotifier $wsNotifier,
+        private readonly MessageBusInterface $messageBus,
         private readonly LoggerInterface $logger,
     ) {
     }
@@ -79,10 +81,11 @@ class MessageProcessor implements ProcessorInterface
         $conv = $message->getConversation();
         if (!$conv) return;
 
-        $this->wsNotifier->notifyConversation(
-            (string) $conv->getId(),
-            'new_message',
-            [
+        $targetUserIds = array_map(fn($p) => (string) $p->getId(), $conv->getParticipants()->toArray());
+
+        $this->messageBus->dispatch(new WebSocketNotification(
+            event: 'new_message',
+            payload: [
                 'id' => $message->getId(),
                 'contenu' => $message->getContenu(),
                 'typeMessage' => $message->getTypeMessage(),
@@ -94,6 +97,7 @@ class MessageProcessor implements ProcessorInterface
                     'prenom' => $message->getExpediteur()?->getPrenom(),
                 ],
                 'conversation' => '/api/conversations/' . $conv->getId(),
+                'conversationId' => (string) $conv->getId(),
                 'media' => $message->getMedia() ? [
                     '@id' => '/api/media_objects/' . $message->getMedia()->getId(),
                     'contentUrl' => '/uploads/media/' . $message->getMedia()->getFilePath(),
@@ -102,8 +106,9 @@ class MessageProcessor implements ProcessorInterface
                     'size' => $message->getMedia()->getSize(),
                 ] : null,
                 'dureeVoix' => $message->getDureeVoix(),
-            ]
-        );
+            ],
+            targetUserIds: $targetUserIds,
+        ));
     }
 
     private function prepareFromConsultation(Message $message, Consultation $consultation, User $user): ?Conversation

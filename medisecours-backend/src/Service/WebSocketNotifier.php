@@ -33,7 +33,7 @@ class WebSocketNotifier
         }
     }
 
-    public function notifyConversation(string $conversationId, string $event, array $payload): void
+    public function notifyConversation(string $conversationId, string $event, array $payload, array $targetUserIds = []): void
     {
         try {
             $this->httpClient->request('POST', $this->publishUrl, [
@@ -41,6 +41,7 @@ class WebSocketNotifier
                     'conversationId' => $conversationId,
                     'event' => $event,
                     'payload' => $payload,
+                    'targetUserIds' => $targetUserIds,
                 ],
                 'timeout' => 2,
             ]);

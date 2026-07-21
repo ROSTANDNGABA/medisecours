@@ -4,6 +4,8 @@ import { useEffect, useRef, useCallback } from 'react'
 
 const WS_URL = process.env.NEXT_PUBLIC_WS_URL || 'ws://127.0.0.1:8081'
 const MAX_BACKOFF = 30000
+const PING_INTERVAL = 30000
+const PONG_TIMEOUT = 10000
 
 export function useWebSocket(userId: string, token: string, handlers: {
   onNewMessage?: (msg: any) => void
@@ -19,10 +21,33 @@ export function useWebSocket(userId: string, token: string, handlers: {
   const closedRef = useRef(false)
   const handlersRef = useRef(handlers)
   const pendingRef = useRef<any[]>([])
+  const pingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const pongTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
     handlersRef.current = handlers
   }, [handlers])
+
+  const clearTimers = useCallback(() => {
+    if (pingIntervalRef.current) { clearInterval(pingIntervalRef.current); pingIntervalRef.current = null }
+    if (pongTimeoutRef.current) { clearTimeout(pongTimeoutRef.current); pongTimeoutRef.current = null }
+  }, [])
+
+  const startPing = useCallback((ws: WebSocket) => {
+    clearTimers()
+    pingIntervalRef.current = setInterval(() => {
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: 'ping' }))
+        pongTimeoutRef.current = setTimeout(() => {
+          ws.close()
+        }, PONG_TIMEOUT)
+      }
+    }, PING_INTERVAL)
+  }, [clearTimers])
+
+  const handlePong = useCallback(() => {
+    if (pongTimeoutRef.current) { clearTimeout(pongTimeoutRef.current); pongTimeoutRef.current = null }
+  }, [])
 
   const flush = useCallback(() => {
     const ws = wsRef.current
@@ -52,6 +77,7 @@ export function useWebSocket(userId: string, token: string, handlers: {
     closedRef.current = false
     attemptRef.current = 0
     pendingRef.current = []
+    clearTimers()
 
     const connect = () => {
       const role = ''
@@ -59,11 +85,13 @@ export function useWebSocket(userId: string, token: string, handlers: {
       const ws = new WebSocket(url)
       wsRef.current = ws
 
-      ws.onopen = () => { attemptRef.current = 0; flush() }
+      ws.onopen = () => { attemptRef.current = 0; startPing(ws); flush() }
 
       ws.onmessage = (event) => {
         try {
-          const { event: evt, payload } = JSON.parse(event.data)
+          const parsed = JSON.parse(event.data)
+          if (parsed.type === 'pong') { handlePong(); return }
+          const { event: evt, payload } = parsed
           const h = handlersRef.current
           if (evt === 'new_message' && h.onNewMessage) h.onNewMessage(payload)
           if (evt === 'message_read' && h.onMessageRead) h.onMessageRead(payload)
@@ -76,6 +104,7 @@ export function useWebSocket(userId: string, token: string, handlers: {
       }
 
       ws.onclose = () => {
+        clearTimers()
         if (closedRef.current) return
         const backoff = Math.min(1000 * Math.pow(2, attemptRef.current), MAX_BACKOFF)
         attemptRef.current++
@@ -87,10 +116,11 @@ export function useWebSocket(userId: string, token: string, handlers: {
 
     return () => {
       closedRef.current = true
+      clearTimers()
       wsRef.current?.close()
       wsRef.current = null
     }
-  }, [userId, token])
+  }, [userId, token, startPing, handlePong, clearTimers, flush])
 
   return { subscribe, unsubscribe }
 }
