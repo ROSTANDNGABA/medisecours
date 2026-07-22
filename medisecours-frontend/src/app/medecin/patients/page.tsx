@@ -1,13 +1,14 @@
 // @ts-nocheck
 'use client'
 
-import { useEffect, useMemo, useState, useRef } from 'react'
+import { useMemo, useState, useRef } from 'react'
 import { Search, Phone, Mail, MessageSquare, Stethoscope, Droplets, AlertTriangle, ChevronRight, Calendar, Clock, User, Shield, HeartPulse, FileText } from 'lucide-react'
-import api from '../../../api/axios'
+import useSWR from 'swr'
 import { useAuth } from '../../../hooks/useAuth'
 import LoadingSpinner from '../../../components/ui/LoadingSpinner'
 import Avatar from '../../../components/ui/Avatar'
 import { API_BASE } from '../../../lib/config'
+import { fetcher } from '../../../lib/fetcher'
 
 function imgUrl(path: string) {
   if (!path) return null
@@ -25,35 +26,11 @@ const STATUT_LABEL = { OUVERTE: 'Ouverte', EN_COURS: 'En cours', TERMINEE: 'Term
 
 export default function MedecinPatientsPage() {
   const { user } = useAuth()
-  const [patients, setPatients] = useState<any[]>([])
-  const [consultations, setConsultations] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
+  const { data: patients = [], isLoading } = useSWR('/api/patients', fetcher)
+  const { data: consultations = [] } = useSWR('/api/consultations', fetcher)
   const [search, setSearch] = useState('')
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const listRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    let active = true
-    Promise.all([
-      api.get('/api/patients'),
-      api.get('/api/consultations'),
-    ]).then(([patRes, consRes]) => {
-      if (!active) return
-      const extractPat = (d: any) => {
-        if (Array.isArray(d)) return d
-        if (typeof d === 'string') return JSON.parse(d)
-        return d?.['hydra:member'] ?? d?.member ?? []
-      }
-      const extractCons = (d: any) => {
-        if (Array.isArray(d)) return d
-        return d?.['hydra:member'] ?? d?.member ?? []
-      }
-      setPatients(extractPat(patRes.data))
-      setConsultations(extractCons(consRes.data))
-      setLoading(false)
-    }).catch(() => setLoading(false))
-    return () => { active = false }
-  }, [])
 
   const filteredPatients = useMemo(() => {
     if (!search.trim()) return patients
@@ -82,7 +59,7 @@ export default function MedecinPatientsPage() {
 
   const lastConsult = patientConsults[0] || null
 
-  if (loading) return <LoadingSpinner label="Chargement des patients…" />
+  if (isLoading && patients.length === 0) return <LoadingSpinner label="Chargement des patients…" />
 
   return (
     <div className="flex h-[calc(100vh-4rem)]">

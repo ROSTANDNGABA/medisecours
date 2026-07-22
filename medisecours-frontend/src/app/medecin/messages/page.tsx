@@ -847,7 +847,7 @@ function MedecinMessagesContent() {
     }
   }
 
-  if (convLoading) return <LoadingSpinner label="Chargement de la messagerie…" />
+  if (convLoading && !convData) return <LoadingSpinner label="Chargement de la messagerie…" />
 
   return (
     <div className="h-[calc(100vh-4rem)] bg-gradient-to-br from-blue-50 to-blue-100 flex p-0 lg:p-4">

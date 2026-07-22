@@ -4,11 +4,13 @@ import { useEffect, useRef, useState } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Menu } from 'lucide-react'
+import { SWRConfig } from 'swr'
 import { useAuth } from '../../hooks/useAuth'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import MedecinSidebar from '../../components/medecin/MedecinSidebar'
 import MedecinHeader from '../../components/medecin/MedecinHeader'
 import { NotificationProvider } from '../../contexts/NotificationContext'
+import { swrConfig } from '../../lib/fetcher'
 
 const PAGE_TITLES = {
   '/medecin': "Vue d'ensemble",
@@ -92,25 +94,27 @@ export default function MedecinLayout({ children }: { children: React.ReactNode 
   return (
     <div className="flex min-h-screen bg-[#F8F9FD]">
       <NotificationProvider>
-        <SidebarWrapper setMobileOpen={setMobileOpen} />
-        <MobileDrawer open={mobileOpen} onClose={() => setMobileOpen(false)} />
+        <SWRConfig value={swrConfig}>
+          <SidebarWrapper setMobileOpen={setMobileOpen} />
+          <MobileDrawer open={mobileOpen} onClose={() => setMobileOpen(false)} />
 
-        <div className="flex min-w-0 flex-1 flex-col">
-          <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-[#E5E7EB] bg-white px-4 sm:px-6">
-            <div className="flex items-center gap-4">
-              <button
-                className="flex items-center justify-center rounded-xl p-2 text-[#6B7280] hover:bg-[#F3F4F6] md:hidden"
-                onClick={() => setMobileOpen(true)}
-                aria-label="Ouvrir le menu"
-              >
-                <Menu className="h-5 w-5" />
-              </button>
-              <h1 className="font-display text-lg font-bold text-[#0F2C52]">{pageTitle}</h1>
-            </div>
-            <MedecinHeader />
-          </header>
-          <main className="flex-1 overflow-y-auto">{children}</main>
-        </div>
+          <div className="flex min-w-0 flex-1 flex-col">
+            <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-[#E5E7EB] bg-white px-4 sm:px-6">
+              <div className="flex items-center gap-4">
+                <button
+                  className="flex items-center justify-center rounded-xl p-2 text-[#6B7280] hover:bg-[#F3F4F6] md:hidden"
+                  onClick={() => setMobileOpen(true)}
+                  aria-label="Ouvrir le menu"
+                >
+                  <Menu className="h-5 w-5" />
+                </button>
+                <h1 className="font-display text-lg font-bold text-[#0F2C52]">{pageTitle}</h1>
+              </div>
+              <MedecinHeader />
+            </header>
+            <main className="flex-1 overflow-y-auto">{children}</main>
+          </div>
+        </SWRConfig>
       </NotificationProvider>
     </div>
   )

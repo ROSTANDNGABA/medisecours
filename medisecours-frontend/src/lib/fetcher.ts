@@ -18,6 +18,7 @@ export const swrConfig = {
   fetcher,
   dedupingInterval: 120_000,
   revalidateOnFocus: false,
+  keepPreviousData: true,
   shouldRetryOnError: true,
   errorRetryCount: 3,
   errorRetryInterval: 5_000,

@@ -52,7 +52,7 @@ export default function MedecinRapportsPage() {
     }
   }, [consultations, avis, messages, user?.id])
 
-  if (consLoading || avisLoading || msgLoading) return <LoadingSpinner label="Chargement des rapports…" />
+  if ((consLoading && !consData) || (avisLoading && !avisData) || (msgLoading && !msgData)) return <LoadingSpinner label="Chargement des rapports…" />
 
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 space-y-6">

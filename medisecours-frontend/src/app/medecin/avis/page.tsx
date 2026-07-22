@@ -1,31 +1,24 @@
 // @ts-nocheck
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Star, Flag } from 'lucide-react'
+import useSWR, { mutate as globalMutate } from 'swr'
 import api from '../../../api/axios'
 import { useAuth } from '../../../hooks/useAuth'
 import LoadingSpinner from '../../../components/ui/LoadingSpinner'
 import EmptyState from '../../../components/ui/EmptyState'
 import Avatar from '../../../components/ui/Avatar'
 import { useToast } from '../../../components/ui/Toast'
+import { fetcher } from '../../../lib/fetcher'
 
 export default function MedecinAvisPage() {
   const { user } = useAuth()
   const toast = useToast()
-  const [avis, setAvis] = useState([])
-  const [loading, setLoading] = useState(true)
+  const { data: avis = [], isLoading } = useSWR(user?.id ? `/api/avis?medecin=${user.id}` : null, fetcher)
   const [reportTarget, setReportTarget] = useState(null)
   const [reportReason, setReportReason] = useState('')
   const [submittingReport, setSubmittingReport] = useState(false)
-
-  useEffect(() => {
-    if (!user?.id) return
-    api.get(`/api/avis?medecin=${user.id}`)
-      .then((res) => setAvis((res.data?.['hydra:member'] ?? (Array.isArray(res.data) ? res.data : []))))
-      .catch(() => toast.error('Impossible de charger les avis.'))
-      .finally(() => setLoading(false))
-  }, [user?.id, toast])
 
   const sorted = useMemo(
     () => [...avis].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)),
@@ -47,7 +40,11 @@ export default function MedecinAvisPage() {
     setSubmittingReport(true)
     try {
       await api.patch(`/api/avis/${reportTarget.id}`, { signale: true, raisonSignalement: reportReason }, { headers: { 'Content-Type': 'application/merge-patch+json' } })
-      setAvis((a) => a.map((x) => (x.id === reportTarget.id ? { ...x, signale: true, raisonSignalement: reportReason } : x)))
+      const swrKey = `/api/avis?medecin=${user?.id}`
+      globalMutate(swrKey, (prev: any) => {
+        const arr = Array.isArray(prev) ? prev : []
+        return arr.map((x: any) => x.id === reportTarget.id ? { ...x, signale: true, raisonSignalement: reportReason } : x)
+      }, { revalidate: false })
       toast.success('Avis signalé pour modération.')
       setReportTarget(null)
       setReportReason('')
@@ -58,7 +55,7 @@ export default function MedecinAvisPage() {
     }
   }
 
-  if (loading) return <LoadingSpinner label="Chargement des avis…" />
+  if (isLoading && avis.length === 0) return <LoadingSpinner label="Chargement des avis…" />
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8 space-y-6">

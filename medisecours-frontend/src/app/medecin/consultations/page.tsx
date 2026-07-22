@@ -136,7 +136,7 @@ export default function MedecinConsultationsPage() {
     }
   }
 
-  if (isLoading) return <LoadingSpinner label="Chargement des consultations…" />
+  if (isLoading && !data) return <LoadingSpinner label="Chargement des consultations…" />
 
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8">
