@@ -20,7 +20,7 @@ de la plateforme depuis un dashboard admin dédié.
 - LexikJWTAuthenticationBundle (JWT TTL configurable via `JWT_TTL`, 3600s par défaut)
 - Google API Client + composer/ca-bundle (fix SSL Windows)
 - Nelmio CORS
-- Symfony Mercure (SSE temps réel — messages)
+- WebSocket temps réel (Node.js) — notifications consultations + messages
 - VichUploader (upload fichiers / photos profil)
 - Gedmo Doctrine Extensions (SoftDelete, Loggable)
 - PHPUnit / Symfony PHPUnit Bridge (34 tests)
@@ -37,7 +37,7 @@ de la plateforme depuis un dashboard admin dédié.
 
 ### Temps réel
 - WebSocket (Node.js) — notifications consultations, auth par message JWT
-- Mercure SSE — messagerie instantanée
+- WebSocket (Node.js) — notifications temps réel
 
 ---
 
@@ -67,7 +67,7 @@ MediSecours/
 │   │   │   ├── lexik_jwt_authentication.yaml
 │   │   │   ├── nelmio_cors.yaml
 │   │   │   ├── security.yaml
-│   │   │   ├── mercure.yaml
+│   │   │   ├── messenger.yaml
 │   │   │   ├── mailer.yaml
 │   │   │   ├── stof_doctrine_extensions.yaml
 │   │   │   └── vich_uploader.yaml
@@ -212,7 +212,7 @@ MediSecours/
 │   │       ├── CentreDeSanteProcheProvider.php   — géolocalisation Haversine
 │   │       ├── ConsultationProcessor.php         — logique métier consultations
 │   │       ├── MaladieSearchProvider.php
-│   │       ├── MessageProcessor.php              — publie sur Mercure après persistance
+│   │       ├── MessageProcessor.php              — dispatche vers WebSocket après persistance
 │   │       ├── PrescriptionProcessor.php
 │   │       └── UserPasswordHasherProcessor.php
 │   │
@@ -341,7 +341,7 @@ MediSecours/
 │           ├── maladies/page.tsx / [id]/page.tsx
 │           ├── centres/page.tsx            — carte + liste + GPS
 │           ├── medecins/page.tsx / [id]/page.tsx
-│           ├── messages/page.tsx           — messagerie Mercure SSE
+│           ├── messages/page.tsx           — messagerie WebSocket temps réel
 │           ├── notifications/page.tsx
 │           ├── profil/page.tsx
 │           ├── patient/consultations/page.tsx
@@ -425,10 +425,8 @@ MAILER_SENDER_EMAIL=noreply@medisecours.cm
 MAILER_SENDER_NAME="MediSecours+"
 FRONTEND_URL=http://localhost:3000
 
-# Mercure (SSE temps réel)
-MERCURE_URL=http://127.0.0.1:3001/.well-known/mercure
-MERCURE_PUBLIC_URL=http://127.0.0.1:3001/.well-known/mercure
-MERCURE_JWT_SECRET=un_secret_mercure_fort
+# WebSocket temps réel
+WS_PUBLISH_URL=http://127.0.0.1:8082/publish
 ```
 
 Créer la base et appliquer les migrations :
@@ -786,19 +784,20 @@ La formule **Haversine** est implémentée directement en SQL dans `CentreDeSant
 
 ---
 
-## Messagerie temps réel
+## Temps réel (WebSocket)
 
-### Mercure SSE (messages)
+Le système temps réel utilise **uniquement WebSocket** (Node.js) :
 
 1. Client → `POST /api/messages` (contenu + destinataire)
 2. `MessageProcessor.php` persiste le message en base
-3. `MessageProcessor.php` publie sur Mercure topic `user/{destinataire_id}`
-4. Le frontend souscrit via `useMercure` / SSE avec reconnexion exponentielle
-5. Le message apparaît instantanément sans polling
+3. `MessageProcessor.php` dispatche `WebSocketNotification` via Messenger
+4. `WebSocketNotificationHandler` appelle `WebSocketNotifier`
+5. `WebSocketNotifier` POST sur `http://127.0.0.1:8082/publish`
+6. Le serveur WebSocket notifie les clients connectés
+7. Le frontend reçoit via `useWebSocket` (backoff exponentiel, reconnexion auto)
 
-### WebSocket (notifications consultations)
+### Notifications consultations
 
-Le serveur WebSocket (`server/websocket-server.js`) gère les notifications temps réel :
 - Authentification par message JWT `{ "type": "auth", "token": "eyJ..." }`
 - Vérification RSA côté serveur avec `jsonwebtoken`
 - Événements : `consultation.created`, `consultation.accepted`, `consultation.closed`

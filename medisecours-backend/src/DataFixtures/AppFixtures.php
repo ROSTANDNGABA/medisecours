@@ -208,7 +208,7 @@ class AppFixtures extends Fixture
             }
         }
 
-        // 6. MESSAGES (désactivé pour éviter les erreurs Mercure lors du chargement des fixtures)
+        // 6. MESSAGES (désactivé pour éviter les erreurs WebSocket lors du chargement des fixtures)
         /*
         for ($i = 0; $i < 10; $i++) {
             $msg = new Message();

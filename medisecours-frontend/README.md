@@ -1,6 +1,6 @@
 # MediSecours+ — Frontend (Next.js)
 
-Plateforme médicale d'urgence pour le Cameroun (200 000+ utilisateurs). Next.js 16 (App Router) + React 19 + Tailwind CSS 4.
+Plateforme médicale d'urgence pour le Cameroun (200 000+ utilisateurs). Next.js 16 (App Router) + React 19 + Tailwind CSS 4 + TypeScript.
 
 ## Démarrage
 
@@ -9,7 +9,9 @@ npm install
 npm run dev
 ```
 
-Le backend Symfony doit tourner sur `http://127.0.0.1:8000`, avec Mercure sur `http://127.0.0.1:8000/.well-known/mercure`.
+Le backend Symfony doit tourner sur `http://127.0.0.1:8000`.
+
+Le WebSocket temps réel tourne sur `ws://127.0.0.1:8081` (serveur Node.js dans `server/`).
 
 ## Comptes de test
 
@@ -25,7 +27,7 @@ Le backend Symfony doit tourner sur `http://127.0.0.1:8000`, avec Mercure sur `h
 - **Espace Médecin** (`/medecin/*`) — sidebar dédiée, sans Navbar/Footer public
   - `/medecin` — tableau de bord (KPIs, consultations actives, avis, messages récents)
   - `/medecin/consultations` — gestion des consultations (filtres par statut)
-  - `/medecin/messages` — messagerie temps réel (Mercure SSE)
+  - `/medecin/messages` — messagerie temps réel (WebSocket)
   - `/medecin/profil` — profil + créateur de disponibilités hebdomadaires
   - `/medecin/avis` — avis reçus + signalement
 - **Admin** (`/admin/*`) — sidebar redessinée avec sections groupées + horloge
@@ -34,17 +36,12 @@ Le backend Symfony doit tourner sur `http://127.0.0.1:8000`, avec Mercure sur `h
 
 La redirection post-connexion est basée sur le rôle : `ROLE_ADMIN` → `/admin`, `ROLE_MEDECIN` → `/medecin`, sinon page d'origine ou accueil.
 
-## Nouveautés de cette itération
+## Architecture temps réel
 
-- `src/hooks/useMercure.js` — hook SSE avec reconnexion à backoff exponentiel (créé car absent du frontend précédent, requis par `prompt_medecin_dashboard.md`)
-- `src/contexts/AuthContext.jsx` — ajout de `mounted` pour la sécurité d'hydratation (toutes les pages `/medecin` et `/admin` attendent `mounted` avant de vérifier le rôle)
-- `src/components/ui/Avatar.jsx` — avatar basé sur les initiales, couleur dérivée du nom
-- `src/proxy.js` — protège désormais aussi `/medecin/*` (redirige vers `/` si le rôle n'est pas `ROLE_MEDECIN`)
-- `src/app/admin/layout.jsx` — refonte complète : sections groupées, indicateur actif animé, horloge temps réel, badge de validations en attente
-- Admin éclaté en sous-pages dédiées (`utilisateurs`, `medecins`, `centres`, `catalogue`, `avis`, `parametres`) au lieu d'un unique tableau à onglets
+Le projet utilise **exclusivement WebSocket** pour les notifications temps réel :
 
-## Limites connues / hypothèses
+- **Serveur WebSocket** (`server/websocket-server.js`) — Node.js, auth par message JWT `{ "type": "auth", "token": "..." }`
+- **Hook React** (`src/hooks/useWebSocket.ts`) — connexion avec backoff exponentiel, flush des messages en attente après `auth_ok`
+- **Notifications** — consultations (created/accepted/closed), messages (new_message/message_read), compteurs non lus
 
-- `useMercure` suppose un hub Mercure accessible sur `http://127.0.0.1:8000/.well-known/mercure` avec CORS/JWT publiés par le backend — à ajuster si l'URL diffère en prod.
-- Le format de retour de `PATCH /api/admin/medecins/{id}/validation` est supposé être `{ message, user: { estValide, ... } }` d'après `README-2.md` — vérifier que le champ est bien lu correctement dans `admin/medecins/page.jsx`.
-- Non testé contre le vrai backend (pas d'accès réseau à `127.0.0.1:8000` depuis cet environnement).
+Le backend Symfony notifie le WebSocket via un endpoint HTTP `/publish` sur le port 8082.

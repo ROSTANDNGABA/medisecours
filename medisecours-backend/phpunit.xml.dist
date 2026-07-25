@@ -14,9 +14,6 @@
         <server name="CORS_ALLOW_ORIGIN" value="^https?://(localhost|127\.0\.0\.1)(:[0-9]+)?$"/>
         <server name="GOOGLE_CLIENT_ID" value="test-google-client-id"/>
         <server name="GOOGLE_CLIENT_SECRET" value="test-google-client-secret"/>
-        <server name="MERCURE_URL" value="http://127.0.0.1:3000/.well-known/mercure"/>
-        <server name="MERCURE_PUBLIC_URL" value="http://127.0.0.1:3000/.well-known/mercure"/>
-        <server name="MERCURE_JWT_SECRET" value="test-mercure-secret"/>
         <server name="JWT_SECRET_KEY" value="%kernel.project_dir%/config/jwt/private.pem"/>
         <server name="JWT_PUBLIC_KEY" value="%kernel.project_dir%/config/jwt/public.pem"/>
         <server name="JWT_PASSPHRASE" value="916920f72e81bd2c31d27e20d394eacfb741daccfb4f27f79f5db74a3e589132"/>
