@@ -12,6 +12,7 @@ import LoadingSpinner from '../../../components/ui/LoadingSpinner'
 import EmptyState from '../../../components/ui/EmptyState'
 import Avatar from '../../../components/ui/Avatar'
 import { useToast } from '../../../components/ui/Toast'
+import { idStrFromRelation } from '../../../types/api'
 
 const easeOut = { type: 'spring', damping: 20, stiffness: 300 }
 const stagger = { animate: { transition: { staggerChildren: 0.05 } } }
@@ -20,11 +21,8 @@ const itemFade = {
   animate: { opacity: 1, y: 0, scale: 1, transition: { type: 'spring', damping: 22, stiffness: 320, mass: 0.9 } },
 }
 
-function idFromIri(value) {
-  if (!value) return null
-  if (typeof value === 'object') return value.id
-  return value.split('/').pop()
-}
+/** Clé SWR paginée : on ne charge QUE les 20 derniers messages (C2 corrigé). */
+const RECENT_MESSAGES_KEY = '/api/messages?itemsPerPage=20&order[createdAt]=desc'
 
 function timeAgo(dateString) {
   const diff = Date.now() - new Date(dateString).getTime()
@@ -47,7 +45,8 @@ const ICON_MAP = {
 export default function MedecinNotificationsPage() {
   const { user } = useAuth()
   const toast = useToast()
-  const { data: msgData, isLoading: msgLoading } = useSWR('/api/messages', fetcher, { revalidateOnFocus: false })
+  // C2 corrigé : pagination stricte (20 derniers) au lieu de charger tous les messages.
+  const { data: msgData, isLoading: msgLoading } = useSWR(RECENT_MESSAGES_KEY, fetcher, { revalidateOnFocus: false })
   const { data: avisData, isLoading: avisLoading } = useSWR(user?.id ? `/api/avis?medecin=${user.id}` : null, fetcher, { revalidateOnFocus: false })
   const prevCount = useRef(0)
 
@@ -61,7 +60,7 @@ export default function MedecinNotificationsPage() {
   const notifications = useMemo(() => {
     const items = []
     for (const m of messages) {
-      if (idFromIri(m.expediteur) === user?.id) continue
+      if (idStrFromRelation(m.expediteur) === user?.id) continue
       items.push({
         id: `msg-${m.id}`,
         type: 'message',

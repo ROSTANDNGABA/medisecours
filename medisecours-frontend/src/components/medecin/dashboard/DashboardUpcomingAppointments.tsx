@@ -1,25 +1,14 @@
 'use client'
 
-import { useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { Calendar, Clock, ChevronRight } from 'lucide-react'
 import Avatar from '../../ui/Avatar'
+import type { Consultation } from '../../../types/api'
 
-export default function DashboardUpcomingAppointments({ consultations }: { consultations: any[] }) {
+export default function DashboardUpcomingAppointments({ upcomingAppointments }: { upcomingAppointments: Consultation[] }) {
   const router = useRouter()
 
-  const upcoming = useMemo(() => {
-    const list = Array.isArray(consultations) ? consultations : []
-    const now = new Date()
-
-    return list
-      .filter((c) => {
-        if (!c.dateConsultation) return false
-        return new Date(c.dateConsultation) > now
-      })
-      .sort((a, b) => new Date(a.dateConsultation).getTime() - new Date(b.dateConsultation).getTime())
-      .slice(0, 5)
-  }, [consultations])
+  const upcoming = upcomingAppointments || []
 
   if (upcoming.length === 0) {
     return (
@@ -59,13 +48,13 @@ export default function DashboardUpcomingAppointments({ consultations }: { consu
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-semibold text-[#0F2C52] truncate">
-                  {c.patient?.prenom} {c.patient?.nom}
+                  {typeof c.patient === 'object' ? `${c.patient?.prenom ?? ''} ${c.patient?.nom ?? ''}` : 'Patient'}
                 </p>
                 <p className="text-xs text-[#9CA3AF] truncate">{c.motif || 'Consultation'}</p>
               </div>
               {isToday && (
                 <span className="px-2 py-0.5 rounded-full bg-[#3B6EF8]/10 text-[10px] font-semibold text-[#3B6EF8]">
-                  Aujourd'hui
+                  Aujourd&apos;hui
                 </span>
               )}
               <ChevronRight className="h-4 w-4 text-[#D1D5DB]" />

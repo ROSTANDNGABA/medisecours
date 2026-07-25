@@ -41,21 +41,26 @@ export default function MedecinProfilPage() {
 
   useEffect(() => {
     if (!user?.id) return
-    Promise.all([
+    // C2 corrigé : on ne charge PLUS /api/messages en bloc.
+    // - avis : nécessaire (liste réelle pour la note moyenne)
+    // - consultations : seul le compte nous intéresse → on récupère la collection
+    // - messages : remplacé par le compteur léger /api/messages/unread-count
+    Promise.allSettled([
       api.get(`/api/avis?medecin=${user.id}`),
       api.get('/api/consultations'),
-      api.get('/api/messages'),
+      api.get('/api/messages/unread-count'),
     ])
       .then(([avisRes, consRes, msgRes]) => {
         const extract = (res) => {
           const raw = res.data?.['hydra:member'] ?? res.data?.member ?? res.data
           return Array.isArray(raw) ? raw : []
         }
-        setAvis(extract(avisRes))
-        setConsultationsCount(extract(consRes).length)
-        setMessagesCount(extract(msgRes).length)
+        if (avisRes.status === 'fulfilled') setAvis(extract(avisRes.value))
+        if (consRes.status === 'fulfilled') setConsultationsCount(extract(consRes.value).length)
+        if (msgRes.status === 'fulfilled') {
+          setMessagesCount(msgRes.value.data?.unreadCount ?? 0)
+        }
       })
-      .catch(() => {})
       .finally(() => setLoadingStats(false))
   }, [user?.id])
 

@@ -16,23 +16,23 @@ import LoadingSpinner from '../../../components/ui/LoadingSpinner'
 import EmptyState from '../../../components/ui/EmptyState'
 import Avatar from '../../../components/ui/Avatar'
 import { useToast } from '../../../components/ui/Toast'
-import { API_BASE } from '../../../lib/config'
+import { imgUrl } from '../../../lib/config'
+import {
+  STATUT_CONSULTATION_PILL,
+  STATUT_BADGE_RING,
+  PRIORITE_BADGE,
+  daysSince,
+} from '../../../lib/consultations'
+import { CONSULTATIONS_KEY, CONSULTATIONS_PENDING_KEY } from '../../../lib/keys'
 import PrescriptionModal from '../../../components/admin/PrescriptionModal'
 import ConsultationDetailModal from '../../../components/consultations/ConsultationDetailModal'
 import ConfirmModal from '../../../components/ui/ConfirmModal'
+import type { StatutConsultation, PrioriteConsultation } from '../../../types/api'
 
-const STATUT_STYLES = {
-  OUVERTE:  { badge: 'bg-amber-50 text-amber-700 ring-1 ring-amber-200', pill: 'En attente' },
-  EN_COURS: { badge: 'bg-blue-50 text-blue-700 ring-1 ring-blue-200', pill: 'En cours' },
-  TERMINEE: { badge: 'bg-green-50 text-green-700 ring-1 ring-green-200', pill: 'Terminée' },
-  ANNULEE:  { badge: 'bg-gray-100 text-gray-500 ring-1 ring-gray-200', pill: 'Annulée' },
-}
-
-const PRIORITE_UI = {
-  NORMALE:  null,
-  URGENTE:  { label: 'Urgent', class: 'text-amber-600 bg-amber-50 ring-1 ring-amber-200' },
-  CRITIQUE: { label: 'Critique', class: 'text-red-600 bg-red-50 ring-1 ring-red-200' },
-}
+// M2 corrigé : styles centralisés dans lib/consultations.ts.
+// On ne redéfinit plus STATUT_STYLES / PRIORITE_UI localement.
+const STATUT_STYLES = STATUT_BADGE_RING
+const STATUT_PILLS = STATUT_CONSULTATION_PILL
 
 type TabKey = 'TOUTES' | 'OUVERTE' | 'EN_COURS' | 'TERMINEE'
 
@@ -43,15 +43,6 @@ const TABS: { key: TabKey; label: string }[] = [
   { key: 'TERMINEE', label: 'Terminées' },
 ]
 
-function daysSince(dateString: string) {
-  return Math.max(0, Math.floor((Date.now() - new Date(dateString).getTime()) / 86400000))
-}
-
-function imgUrl(path: string | null | undefined): string | null {
-  if (!path) return null
-  return path.startsWith('http') ? path : `${API_BASE}${path}`
-}
-
 export default function MedecinConsultationsPage() {
   const { user, token } = useAuth()
   const toast = useToast()
@@ -60,9 +51,12 @@ export default function MedecinConsultationsPage() {
   const [detailFor, setDetailFor] = useState<number | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<number | null>(null)
 
-  const { data, isLoading, error, mutate } = useSWR('/api/consultations', fetcher, {
+  const { data, isLoading, error, mutate } = useSWR(CONSULTATIONS_KEY, fetcher, {
     revalidateOnFocus: false,
-    refreshInterval: 15000,
+    // M1 corrigé : pas de refreshInterval. Le WebSocket (useWebSocket ci-dessous)
+    // pousse déjà les mises à jour temps réel. Le polling 15s était redondant et
+    // provoquait du flicker en écrasant les updates optimistes.
+    keepPreviousData: true,
   })
 
   useWebSocket(user?.id || '', token || '', {
@@ -115,7 +109,7 @@ export default function MedecinConsultationsPage() {
       const msg = statut === 'EN_COURS' ? 'Patient pris en charge avec succès.' : 'Consultation clôturée.'
       toast.success(msg)
       mutate()
-      globalMutate('/api/consultations?statut=OUVERTE&itemsPerPage=1')
+      globalMutate(CONSULTATIONS_PENDING_KEY)
     } catch {
       toast.error('Échec de la mise à jour.')
     }
@@ -130,13 +124,13 @@ export default function MedecinConsultationsPage() {
       }, { revalidate: false })
       toast.success('Consultation supprimée.')
       setDeleteTarget(null)
-      globalMutate('/api/consultations?statut=OUVERTE&itemsPerPage=1')
+      globalMutate(CONSULTATIONS_PENDING_KEY)
     } catch {
       toast.error('Échec de la suppression.')
     }
   }
 
-  if (isLoading && !data) return <LoadingSpinner label="Chargement des consultations…" />
+
 
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8">
@@ -209,8 +203,10 @@ export default function MedecinConsultationsPage() {
         <div className="space-y-3">
           <AnimatePresence mode="popLayout">
             {filtered.map((c: any) => {
-              const style = STATUT_STYLES[c.statut as keyof typeof STATUT_STYLES] || STATUT_STYLES.OUVERTE
-              const priorite = PRIORITE_UI[c.priorite as keyof typeof PRIORITE_UI]
+              const statut = c.statut as StatutConsultation
+              const badgeClass = STATUT_STYLES[statut] || STATUT_STYLES.OUVERTE
+              const pill = STATUT_PILLS[statut] || statut
+              const prioriteClass = PRIORITE_BADGE[c.priorite as PrioriteConsultation]
               return (
                 <motion.div
                   key={c.id}
@@ -247,15 +243,15 @@ export default function MedecinConsultationsPage() {
                         <p className="text-sm font-medium text-[#374151] line-clamp-2">
                           {c.motif || 'Motif non précisé'}
                         </p>
-                        {priorite && (
-                          <span className={`shrink-0 px-2 py-0.5 rounded-full text-xs font-semibold ${priorite.class}`}>
-                            {priorite.label}
+                        {prioriteClass && (
+                          <span className={`shrink-0 px-2 py-0.5 rounded-full text-xs font-semibold ${prioriteClass}`}>
+                            {c.priorite === 'URGENTE' ? 'Urgent' : 'Critique'}
                           </span>
                         )}
                       </div>
                       <div className="flex items-center gap-2 mt-2 flex-wrap">
-                        <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${style.badge}`}>
-                          {style.pill}
+                        <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${badgeClass}`}>
+                          {pill}
                         </span>
                         <span className="text-xs text-[#9CA3AF]">
                           {new Date(c.createdAt).toLocaleDateString('fr-FR', {

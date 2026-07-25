@@ -1,43 +1,15 @@
 'use client'
 
-import { useMemo } from 'react'
 import { useRouter } from 'next/navigation'
-import { MessageSquare, Stethoscope, Phone, Mail } from 'lucide-react'
+import { MessageSquare, Stethoscope, Phone } from 'lucide-react'
 import Avatar from '../../ui/Avatar'
+import { idStrFromRelation } from '../../../types/api'
+import type { Patient } from '../../../types/api'
 
-function idFromIri(value: any): string | null {
-  if (!value) return null
-  if (typeof value === 'object') return value.id || value['@id']?.split('/').pop() || null
-  return value.split('/').pop()
-}
-
-export default function DashboardRecentPatients({ consultations }: { consultations: any[] }) {
+export default function DashboardRecentPatients({ recentPatients }: { recentPatients: Patient[] }) {
   const router = useRouter()
 
-  const patients = useMemo(() => {
-    const list = Array.isArray(consultations) ? consultations : []
-    const map = new Map<string, any>()
-
-    list
-      .filter((c) => c.patient)
-      .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime())
-      .forEach((c) => {
-        const pid = idFromIri(c.patient)
-        if (pid && !map.has(pid)) {
-          map.set(pid, {
-            id: pid,
-            nom: c.patient?.prenom || '',
-            prenom: c.patient?.nom || '',
-            telephone: c.patient?.telephone || '',
-            email: c.patient?.email || '',
-            lastVisit: c.createdAt,
-            statut: c.statut,
-          })
-        }
-      })
-
-    return Array.from(map.values()).slice(0, 5)
-  }, [consultations])
+  const patients = recentPatients || []
 
   if (patients.length === 0) {
     return (
@@ -54,50 +26,50 @@ export default function DashboardRecentPatients({ consultations }: { consultatio
       <p className="text-xs text-[#6B7280] mb-4">Derniers patients consultés</p>
 
       <div className="space-y-1">
-        {patients.map((p, i) => (
-          <div
-            key={p.id}
-            className="flex items-center gap-3 rounded-xl p-2.5 transition hover:bg-[#F9FAFB]"
-          >
-            <Avatar name={`${p.prenom || ''} ${p.nom || ''}`.trim()} size="sm" />
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold text-[#0F2C52] truncate">
-                {p.prenom} {p.nom}
-              </p>
-              <p className="text-[11px] text-[#9CA3AF]">
-                {p.lastVisit
-                  ? new Date(p.lastVisit).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })
-                  : '—'}
-                {p.telephone ? ` · ${p.telephone}` : ''}
-              </p>
-            </div>
-            <div className="flex gap-1">
-              <button
-                onClick={() => router.push(`/medecin/consultations?patient=${p.id}`)}
-                className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#EFF6FF] text-[#3B6EF8] hover:bg-[#DBEAFE] transition"
-                title="Nouvelle consultation"
-              >
-                <Stethoscope className="h-3.5 w-3.5" />
-              </button>
-              <button
-                onClick={() => router.push(`/medecin/messages?patient=${p.id}`)}
-                className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#ECFDF5] text-[#10B981] hover:bg-[#D1FAE5] transition"
-                title="Envoyer un message"
-              >
-                <MessageSquare className="h-3.5 w-3.5" />
-              </button>
-              {p.telephone && (
-                <a
-                  href={`tel:${p.telephone}`}
-                  className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#FFFBEB] text-[#F59E0B] hover:bg-[#FEF3C7] transition"
-                  title="Appeler"
+        {patients.map((p) => {
+          const pid = idStrFromRelation(p) || p.id
+          return (
+            <div
+              key={pid}
+              className="flex items-center gap-3 rounded-xl p-2.5 transition hover:bg-[#F9FAFB]"
+            >
+              <Avatar name={`${p.prenom || ''} ${p.nom || ''}`.trim()} size="sm" />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-[#0F2C52] truncate">
+                  {p.prenom} {p.nom}
+                </p>
+                <p className="text-[11px] text-[#9CA3AF]">
+                  {p.telephone ? p.telephone : p.email || '—'}
+                </p>
+              </div>
+              <div className="flex gap-1">
+                <button
+                  onClick={() => router.push(`/medecin/consultations?patient=${pid}`)}
+                  className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#EFF6FF] text-[#3B6EF8] hover:bg-[#DBEAFE] transition"
+                  title="Nouvelle consultation"
                 >
-                  <Phone className="h-3.5 w-3.5" />
-                </a>
-              )}
+                  <Stethoscope className="h-3.5 w-3.5" />
+                </button>
+                <button
+                  onClick={() => router.push(`/medecin/messages?patient=${pid}`)}
+                  className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#ECFDF5] text-[#10B981] hover:bg-[#D1FAE5] transition"
+                  title="Envoyer un message"
+                >
+                  <MessageSquare className="h-3.5 w-3.5" />
+                </button>
+                {p.telephone && (
+                  <a
+                    href={`tel:${p.telephone}`}
+                    className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#FFFBEB] text-[#F59E0B] hover:bg-[#FEF3C7] transition"
+                    title="Appeler"
+                  >
+                    <Phone className="h-3.5 w-3.5" />
+                  </a>
+                )}
+              </div>
             </div>
-          </div>
-        ))}
+          )
+        })}
       </div>
     </div>
   )

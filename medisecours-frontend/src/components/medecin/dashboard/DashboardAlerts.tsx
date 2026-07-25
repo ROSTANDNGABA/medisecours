@@ -1,28 +1,10 @@
 'use client'
 
-import { useMemo } from 'react'
 import { AlertCircle, Clock, Ban, Activity } from 'lucide-react'
+import type { DashboardAlerts as Alerts } from '../../../types/api'
 
-export default function DashboardAlerts({ consultations }: { consultations: any[] }) {
-  const alerts = useMemo(() => {
-    const list = Array.isArray(consultations) ? consultations : []
-    const now = Date.now()
-    const THRESHOLD = 48 * 3600000
-
-    const enAttenteLongue = list.filter(
-      (c) => c.statut === 'OUVERTE' && c.createdAt && (now - new Date(c.createdAt).getTime()) > THRESHOLD
-    ).length
-
-    const enCoursLongue = list.filter(
-      (c) => c.statut === 'EN_COURS' && c.createdAt && (now - new Date(c.createdAt).getTime()) > THRESHOLD
-    ).length
-
-    const urgentes = list.filter(
-      (c) => c.statut !== 'TERMINEE' && c.statut !== 'ANNULEE'
-    ).length
-
-    return { enAttenteLongue, enCoursLongue, urgentes }
-  }, [consultations])
+export default function DashboardAlerts({ alerts: data }: { alerts?: Alerts }) {
+  const alerts = data ?? { enAttenteLongue: 0, enCoursLongue: 0, urgentes: 0 }
 
   const items = [
     {
@@ -58,7 +40,7 @@ export default function DashboardAlerts({ consultations }: { consultations: any[
       <div className="flex items-center justify-between mb-4">
         <div>
           <h3 className="text-sm font-bold text-[#0F2C52]">Alertes</h3>
-          <p className="text-xs text-[#6B7280]">Points d'attention</p>
+          <p className="text-xs text-[#6B7280]">Points d&apos;attention</p>
         </div>
         {totalAlerts > 0 && (
           <span className="flex h-6 w-6 items-center justify-center rounded-full bg-red-100 text-[10px] font-bold text-red-600">

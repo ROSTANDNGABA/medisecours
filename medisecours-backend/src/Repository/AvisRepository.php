@@ -36,6 +36,34 @@ class AvisRepository extends ServiceEntityRepository
     }
 
     /**
+     * Distribution des notes d'un médecin par étoile (1..5), indexée par note.
+     *
+     * @return array<int, int> [1 => n, 2 => n, ... 5 => n]
+     */
+    public function getNoteDistribution(Medecin $medecin): array
+    {
+        $rows = $this->createQueryBuilder('a')
+            ->select('a.note AS note, COUNT(a.id) AS total')
+            ->where('a.medecin = :medecin')
+            ->andWhere('a.signale = false')
+            ->andWhere('a.note BETWEEN 1 AND 5')
+            ->setParameter('medecin', $medecin)
+            ->groupBy('a.note')
+            ->getQuery()
+            ->getResult();
+
+        $distribution = [1 => 0, 2 => 0, 3 => 0, 4 => 0, 5 => 0];
+        foreach ($rows as $row) {
+            $note = (int) $row['note'];
+            if (isset($distribution[$note])) {
+                $distribution[$note] = (int) $row['total'];
+            }
+        }
+
+        return $distribution;
+    }
+
+    /**
      * Retourne les avis signalés en attente de modération.
      *
      * @return Avis[]

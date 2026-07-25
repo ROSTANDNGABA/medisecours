@@ -202,13 +202,13 @@ function MedecinMessagesContent() {
   const hasMoreRef = useRef(true)
   const msgLoadingRef = useRef(false)
 
-  const { data: convData, isLoading: convLoading, error: convError, mutate: mutateConvs } = useSWR('/api/conversations', fetcher, { revalidateOnFocus: false })
+  const { data: convData, isLoading: convLoading, error: convError, mutate: mutateConvs } = useSWR('/api/conversations', fetcher, { revalidateOnFocus: false, keepPreviousData: true })
 
   const activeIdNum = activeId ? Number(activeId) : null
   const { data: msgData, isLoading: msgLoading, error: msgError, mutate: mutateMsgs } = useSWR(
     activeIdNum ? `/api/messages?conversation=/api/conversations/${activeIdNum}&order[createdAt]=DESC&itemsPerPage=${MSGS_PER_PAGE}&page=${msgPage}` : null,
     fetcher,
-    { revalidateOnFocus: false }
+    { revalidateOnFocus: false, keepPreviousData: true }
   )
 
   // Keep refs in sync
@@ -847,7 +847,7 @@ function MedecinMessagesContent() {
     }
   }
 
-  if (convLoading && !convData) return <LoadingSpinner label="Chargement de la messagerie…" />
+
 
   return (
     <div className="h-[calc(100vh-4rem)] bg-gradient-to-br from-blue-50 to-blue-100 flex p-0 lg:p-4">

@@ -1,65 +1,117 @@
 const { WebSocketServer } = require('ws')
 const http = require('http')
+const jwt = require('jsonwebtoken')
+const fs = require('fs')
+const path = require('path')
 
 const WS_PORT = process.env.WS_PORT || 8081
 const HTTP_PORT = process.env.WS_HTTP_PORT || 8082
 
-const clients = new Map()
-const convClients = new Map()
+// ── JWT public key (RSA) ──────────────────────────────────────────
+const PUB_KEY_PATH = process.env.JWT_PUBLIC_KEY
+  || path.resolve(__dirname, '../../medisecours-backend/config/jwt/public.pem')
+const PUBLIC_KEY = fs.readFileSync(PUB_KEY_PATH, 'utf8')
 
+// ── In-memory client maps ─────────────────────────────────────────
+const clients = new Map()       // userId -> Set<ws>
+const convClients = new Map()   // conversationId -> Set<ws>
+
+// ── WebSocket server ──────────────────────────────────────────────
 const wss = new WebSocketServer({ port: WS_PORT })
-console.log(`WebSocket server running on ws://127.0.0.1:${WS_PORT}`)
+console.log(`[WS] WebSocket server on ws://127.0.0.1:${WS_PORT}`)
 
-wss.on('connection', (ws, req) => {
-  const url = new URL(req.url, 'http://localhost')
-  const userId = url.searchParams.get('userId')
-  const token = url.searchParams.get('token')
-  const role = url.searchParams.get('role') || ''
+const AUTH_TIMEOUT_MS = 10_000
 
-  if (!userId || !token) {
-    ws.close(4001, 'userId and token required')
-    return
-  }
-
-  ws.userId = userId
-  ws.token = token
-  ws.role = role
+wss.on('connection', (ws) => {
+  ws.authenticated = false
+  ws.userId = null
+  ws.role = null
   ws.subscriptions = new Set()
 
-  console.log(`[WS] Client connected: ${userId} (role=${role})`)
-  if (!clients.has(userId)) clients.set(userId, new Set())
-  clients.get(userId).add(ws)
-
-  let alive = true
+  // Close if not authenticated within timeout
+  const authTimer = setTimeout(() => {
+    if (!ws.authenticated) {
+      ws.close(4002, 'Auth timeout')
+    }
+  }, AUTH_TIMEOUT_MS)
 
   ws.on('message', (raw) => {
+    let msg
     try {
-      const msg = JSON.parse(raw.toString())
-      if (msg.type === 'ping') {
-        ws.send(JSON.stringify({ type: 'pong' }))
-        return
+      msg = JSON.parse(raw.toString())
+    } catch {
+      return // ignore malformed
+    }
+
+    // ── Auth handshake ────────────────────────────────────────────
+    if (msg.type === 'auth') {
+      if (ws.authenticated) return // already authed
+
+      try {
+        const decoded = jwt.verify(msg.token, PUBLIC_KEY, {
+          algorithms: ['RS256'],
+        })
+        const userId = decoded.username || decoded.sub
+        if (!userId) {
+          ws.close(4003, 'Invalid token: no subject')
+          return
+        }
+
+        clearTimeout(authTimer)
+        ws.authenticated = true
+        ws.userId = String(userId)
+        ws.role = Array.isArray(decoded.roles) && decoded.roles[0]
+          ? decoded.roles[0].replace('ROLE_', '').toLowerCase()
+          : ''
+
+        if (!clients.has(ws.userId)) clients.set(ws.userId, new Set())
+        clients.get(ws.userId).add(ws)
+
+        ws.send(JSON.stringify({ type: 'auth_ok', userId: ws.userId }))
+        console.log(`[WS] Authenticated: ${ws.userId} (role=${ws.role})`)
+      } catch (err) {
+        ws.close(4003, 'Invalid token')
       }
-      if (msg.type === 'subscribe' && msg.conversationId) {
-        ws.subscriptions.add(msg.conversationId)
-        if (!convClients.has(msg.conversationId)) convClients.set(msg.conversationId, new Set())
-        convClients.get(msg.conversationId).add(ws)
-      }
-      if (msg.type === 'unsubscribe' && msg.conversationId) {
-        ws.subscriptions.delete(msg.conversationId)
-        convClients.get(msg.conversationId)?.delete(ws)
-      }
-    } catch { /* ignore malformed */ }
+      return
+    }
+
+    // ── All other messages require authentication ─────────────────
+    if (!ws.authenticated) {
+      ws.send(JSON.stringify({ type: 'error', message: 'Not authenticated' }))
+      return
+    }
+
+    // ── ping / pong ───────────────────────────────────────────────
+    if (msg.type === 'ping') {
+      ws.send(JSON.stringify({ type: 'pong' }))
+      return
+    }
+
+    // ── subscribe / unsubscribe ───────────────────────────────────
+    if (msg.type === 'subscribe' && msg.conversationId) {
+      ws.subscriptions.add(msg.conversationId)
+      if (!convClients.has(msg.conversationId)) convClients.set(msg.conversationId, new Set())
+      convClients.get(msg.conversationId).add(ws)
+    }
+    if (msg.type === 'unsubscribe' && msg.conversationId) {
+      ws.subscriptions.delete(msg.conversationId)
+      convClients.get(msg.conversationId)?.delete(ws)
+    }
   })
 
   ws.on('close', () => {
-    clients.get(userId)?.delete(ws)
-    if (clients.get(userId)?.size === 0) clients.delete(userId)
+    clearTimeout(authTimer)
+    if (ws.userId) {
+      clients.get(ws.userId)?.delete(ws)
+      if (clients.get(ws.userId)?.size === 0) clients.delete(ws.userId)
+    }
     for (const convId of ws.subscriptions) {
       convClients.get(convId)?.delete(ws)
     }
   })
 })
 
+// ── HTTP /publish endpoint (used by Symfony backend) ─────────────
 const httpServer = http.createServer((req, res) => {
   if (req.method === 'POST' && req.url === '/publish') {
     let body = ''
@@ -70,12 +122,11 @@ const httpServer = http.createServer((req, res) => {
         const { conversationId, event, payload, broadcast, targetUserIds } = data
 
         if (broadcast) {
-          // System-wide event — send to ALL connected clients
           const message = JSON.stringify({ event, payload })
           let sent = 0
-          for (const [uid, wsSet] of clients) {
+          for (const [, wsSet] of clients) {
             for (const ws of wsSet) {
-              if (ws.readyState === 1) {
+              if (ws.readyState === 1 && ws.authenticated) {
                 ws.send(message)
                 sent++
               }
@@ -88,21 +139,20 @@ const httpServer = http.createServer((req, res) => {
         }
 
         if (targetUserIds && Array.isArray(targetUserIds)) {
-          // Targeted user delivery (e.g. for new messages in a conversation)
           const message = JSON.stringify({ event, payload })
           let sent = 0
           for (const uid of targetUserIds) {
             const wsSet = clients.get(String(uid))
             if (wsSet) {
               for (const ws of wsSet) {
-                if (ws.readyState === 1) {
+                if (ws.readyState === 1 && ws.authenticated) {
                   ws.send(message)
                   sent++
                 }
               }
             }
           }
-          console.log(`[WS] Publish: event=${event} conv=${conversationId} targeted_users=${targetUserIds.length} sent=${sent}`)
+          console.log(`[WS] Publish: event=${event} conv=${conversationId} targeted=${targetUserIds.length} sent=${sent}`)
           res.writeHead(200, { 'Content-Type': 'application/json' })
           res.end(JSON.stringify({ sent }))
           return
@@ -114,18 +164,17 @@ const httpServer = http.createServer((req, res) => {
           return
         }
 
-        // Fallback: Per-conversation notification (legacy)
         const message = JSON.stringify({ event, payload })
         const subscribers = convClients.get(String(conversationId))
         console.log(`[WS] Publish: event=${event} conv=${conversationId} subscribers=${subscribers?.size || 0}`)
         if (subscribers) {
           for (const ws of subscribers) {
-            if (ws.readyState === 1) ws.send(message)
+            if (ws.readyState === 1 && ws.authenticated) ws.send(message)
           }
         }
         res.writeHead(200, { 'Content-Type': 'application/json' })
         res.end(JSON.stringify({ sent: subscribers?.size || 0 }))
-      } catch (e) {
+      } catch {
         res.writeHead(400)
         res.end('Invalid JSON')
       }
@@ -137,5 +186,5 @@ const httpServer = http.createServer((req, res) => {
 })
 
 httpServer.listen(HTTP_PORT, () => {
-  console.log(`HTTP publish endpoint on http://127.0.0.1:${HTTP_PORT}/publish`)
+  console.log(`[WS] HTTP publish endpoint on http://127.0.0.1:${HTTP_PORT}/publish`)
 })

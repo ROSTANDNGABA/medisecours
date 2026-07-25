@@ -1,8 +1,8 @@
 'use client'
 
-import { useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { AlertTriangle, AlertOctagon, AlertCircle, ChevronRight } from 'lucide-react'
+import type { Consultation } from '../../../types/api'
 
 const PRIORITE_CONFIG = {
   CRITIQUE: { label: 'Critique', color: '#EF4444', bg: '#FEF2F2', icon: AlertOctagon },
@@ -10,27 +10,19 @@ const PRIORITE_CONFIG = {
   NORMALE: { label: 'Normale', color: '#3B6EF8', bg: '#EFF6FF', icon: AlertCircle },
 }
 
-export default function DashboardRiskPatients({ consultations }: { consultations: any[] }) {
+export default function DashboardRiskPatients({ riskConsultations }: { riskConsultations: Consultation[] }) {
   const router = useRouter()
 
-  const riskItems = useMemo(() => {
-    const list = Array.isArray(consultations) ? consultations : []
-    return list
-      .filter((c) => c.priorite === 'URGENTE' || c.priorite === 'CRITIQUE')
-      .sort((a, b) => {
-        const order = { CRITIQUE: 0, URGENTE: 1 }
-        return (order[a.priorite] ?? 2) - (order[b.priorite] ?? 2)
-      })
-      .slice(0, 5)
-  }, [consultations])
+  const riskItems = riskConsultations || []
 
-  const counts = useMemo(() => {
-    const list = Array.isArray(consultations) ? consultations : []
-    return {
-      critiques: list.filter((c) => c.priorite === 'CRITIQUE' && c.statut !== 'TERMINEE' && c.statut !== 'ANNULEE').length,
-      urgentes: list.filter((c) => c.priorite === 'URGENTE' && c.statut !== 'TERMINEE' && c.statut !== 'ANNULEE').length,
-    }
-  }, [consultations])
+  const counts = riskItems.reduce(
+    (acc, c) => {
+      if (c.priorite === 'CRITIQUE') acc.critiques++
+      if (c.priorite === 'URGENTE') acc.urgentes++
+      return acc
+    },
+    { critiques: 0, urgentes: 0 }
+  )
 
   const hasRisk = counts.critiques + counts.urgentes > 0
 
@@ -74,10 +66,10 @@ export default function DashboardRiskPatients({ consultations }: { consultations
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold text-[#374151] truncate">
-                    {c.patient?.prenom} {c.patient?.nom}
+                    {typeof c.patient === 'object' ? `${c.patient?.prenom ?? ''} ${c.patient?.nom ?? ''}` : 'Patient'}
                   </p>
                   <p className="text-[11px] text-[#6B7280] truncate">
-                    {c.motif || ' motifs non précisé'} · <span style={{ color: cfg.color }} className="font-semibold">{cfg.label}</span>
+                    {c.motif || 'Motif non précisé'} · <span style={{ color: cfg.color }} className="font-semibold">{cfg.label}</span>
                   </p>
                 </div>
                 <ChevronRight className="h-4 w-4 text-[#D1D5DB]" />

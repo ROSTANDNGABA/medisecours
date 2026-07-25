@@ -2,32 +2,27 @@
 'use client'
 
 import { useMemo, useState, useRef } from 'react'
+import { useRouter } from 'next/navigation'
 import { Search, Phone, Mail, MessageSquare, Stethoscope, Droplets, AlertTriangle, ChevronRight, Calendar, Clock, User, Shield, HeartPulse, FileText } from 'lucide-react'
 import useSWR from 'swr'
 import { useAuth } from '../../../hooks/useAuth'
 import LoadingSpinner from '../../../components/ui/LoadingSpinner'
 import Avatar from '../../../components/ui/Avatar'
-import { API_BASE } from '../../../lib/config'
+import { imgUrl } from '../../../lib/config'
 import { fetcher } from '../../../lib/fetcher'
-
-function imgUrl(path: string) {
-  if (!path) return null
-  return path.startsWith('http') ? path : `${API_BASE}${path}`
-}
-
-const STATUT_BADGE = {
-  OUVERTE: 'bg-blue-50 text-blue-700 border-blue-200',
-  EN_COURS: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-  TERMINEE: 'bg-gray-50 text-gray-500 border-gray-200',
-  ANNULEE: 'bg-red-50 text-red-600 border-red-200',
-}
-
-const STATUT_LABEL = { OUVERTE: 'Ouverte', EN_COURS: 'En cours', TERMINEE: 'Terminée', ANNULEE: 'Annulée' }
+import {
+  STATUT_BADGE_BORDER as STATUT_BADGE,
+  STATUT_CONSULTATION_LABEL as STATUT_LABEL,
+} from '../../../lib/consultations'
+import { CONSULTATIONS_KEY, PATIENTS_KEY } from '../../../lib/keys'
+import { idStrFromRelation } from '../../../types/api'
 
 export default function MedecinPatientsPage() {
   const { user } = useAuth()
-  const { data: patients = [], isLoading } = useSWR('/api/patients', fetcher)
-  const { data: consultations = [] } = useSWR('/api/consultations', fetcher)
+  const router = useRouter()
+  // M3 corrigé : clés SWR centralisées (cache mutualisé avec les autres pages).
+  const { data: patients = [], isLoading } = useSWR(PATIENTS_KEY, fetcher, { keepPreviousData: true })
+  const { data: consultations = [] } = useSWR(CONSULTATIONS_KEY, fetcher)
   const [search, setSearch] = useState('')
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const listRef = useRef<HTMLDivElement>(null)
@@ -50,16 +45,13 @@ export default function MedecinPatientsPage() {
   const patientConsults = useMemo(() => {
     if (!selectedPatient) return []
     return consultations
-      .filter((c) => {
-        const pid = typeof c.patient === 'object' ? c.patient?.id : c.patient?.split('/')?.pop()
-        return pid === selectedPatient.id
-      })
+      .filter((c) => idStrFromRelation(c.patient) === String(selectedPatient.id))
       .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime())
   }, [consultations, selectedPatient])
 
   const lastConsult = patientConsults[0] || null
 
-  if (isLoading && patients.length === 0) return <LoadingSpinner label="Chargement des patients…" />
+
 
   return (
     <div className="flex h-[calc(100vh-4rem)]">
@@ -90,10 +82,7 @@ export default function MedecinPatientsPage() {
             </div>
           ) : (
             filteredPatients.map((p) => {
-              const consCount = consultations.filter((c) => {
-                const pid = typeof c.patient === 'object' ? c.patient?.id : c.patient?.split('/')?.pop()
-                return pid === p.id
-              }).length
+              const consCount = consultations.filter((c) => idStrFromRelation(c.patient) === String(p.id)).length
               return (
                 <button
                   key={p.id}
@@ -235,13 +224,13 @@ export default function MedecinPatientsPage() {
               <h3 className="text-sm font-bold text-[#0F2C52] mb-3">Actions rapides</h3>
               <div className="flex flex-wrap gap-3">
                 <button
-                  onClick={() => window.location.href = `/medecin/messages?patient=${selectedPatient.id}`}
+                  onClick={() => router.push(`/medecin/messages?patient=${selectedPatient.id}`)}
                   className="flex items-center gap-2 rounded-xl bg-[#3B6EF8] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#2D5BD4] transition"
                 >
                   <MessageSquare className="h-4 w-4" /> Message
                 </button>
                 <button
-                  onClick={() => window.location.href = `/medecin/consultations?patient=${selectedPatient.id}`}
+                  onClick={() => router.push(`/medecin/consultations?patient=${selectedPatient.id}`)}
                   className="flex items-center gap-2 rounded-xl bg-[#10B981] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#059669] transition"
                 >
                   <Stethoscope className="h-4 w-4" /> Nouvelle consultation

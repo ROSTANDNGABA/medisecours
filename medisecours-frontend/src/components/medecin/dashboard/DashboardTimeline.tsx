@@ -2,50 +2,39 @@
 
 import { useMemo, useState } from 'react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts'
+import type { DashboardTimelinePoint } from '../../../types/api'
 
 type Range = 7 | 14 | 30
 
-export default function DashboardTimeline({ consultations, messages }: { consultations: any[]; messages: any[] }) {
+/**
+ * Activité des consultations sur 7/14/30 jours.
+ *
+ * Données : agrégat SQL backend (clé `timeline`), série complète sur 30j.
+ * L'utilisateur peut resserrer l'affichage à 7/14j localement (les données
+ * sont déjà chargées sur 30j, on filtre côté client — zéro appel réseau).
+ */
+export default function DashboardTimeline({ timeline }: { timeline?: DashboardTimelinePoint[] }) {
   const [range, setRange] = useState<Range>(7)
 
   const data = useMemo(() => {
-    const cons = Array.isArray(consultations) ? consultations : []
-    const msgs = Array.isArray(messages) ? messages : []
-    const now = Date.now()
-    const days: Record<string, { consultations: number; messages: number }> = {}
+    const full = Array.isArray(timeline) ? timeline : []
+    // On garde la fin de la série (jours les plus récents).
+    const sliced = full.slice(-range)
+    return sliced.map((p) => ({
+      date: new Date(p.date).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' }),
+      consultations: p.count,
+    }))
+  }, [timeline, range])
 
-    for (let i = range - 1; i >= 0; i--) {
-      const d = new Date(now - i * 86400000)
-      const key = d.toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' })
-      days[key] = { consultations: 0, messages: 0 }
-    }
+  const isEmpty = data.length === 0 || data.every((d) => d.consultations === 0)
 
-    cons.forEach((c) => {
-      if (!c.createdAt) return
-      const diff = Math.floor((now - new Date(c.createdAt).getTime()) / 86400000)
-      if (diff >= 0 && diff < range) {
-        const key = new Date(c.createdAt).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' })
-        if (days[key]) days[key].consultations++
-      }
-    })
-
-    msgs.forEach((m) => {
-      if (!m.createdAt) return
-      const diff = Math.floor((now - new Date(m.createdAt).getTime()) / 86400000)
-      if (diff >= 0 && diff < range) {
-        const key = new Date(m.createdAt).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' })
-        if (days[key]) days[key].messages++
-      }
-    })
-
-    return Object.entries(days).map(([date, vals]) => ({ date, ...vals }))
-  }, [consultations, messages, range])
-
-  if (data.length === 0) {
+  if (isEmpty) {
     return (
       <div className="rounded-2xl bg-white p-5 shadow-[0_2px_12px_rgba(0,0,0,0.06)]">
-        <h3 className="text-sm font-bold text-[#0F2C52] mb-1">Activité récente</h3>
-        <div className="flex h-[240px] items-center justify-center"><p className="text-sm text-[#9CA3AF]">Aucune donnée</p></div>
+        <h3 className="text-sm font-bold text-[#0F2C52] mb-1">Activité des consultations</h3>
+        <div className="flex h-[240px] items-center justify-center">
+          <p className="text-sm text-[#9CA3AF]">Aucune consultation sur cette période</p>
+        </div>
       </div>
     )
   }
@@ -54,8 +43,8 @@ export default function DashboardTimeline({ consultations, messages }: { consult
     <div className="rounded-2xl bg-white p-5 shadow-[0_2px_12px_rgba(0,0,0,0.06)]">
       <div className="flex items-center justify-between mb-4">
         <div>
-          <h3 className="text-sm font-bold text-[#0F2C52]">Activité récente</h3>
-          <p className="text-xs text-[#6B7280]">Consultations et messages</p>
+          <h3 className="text-sm font-bold text-[#0F2C52]">Activité des consultations</h3>
+          <p className="text-xs text-[#6B7280]">Volume quotidien</p>
         </div>
         <div className="flex gap-1">
           {([7, 14, 30] as Range[]).map((r) => (
@@ -82,7 +71,6 @@ export default function DashboardTimeline({ consultations, messages }: { consult
             labelStyle={{ fontWeight: 600 }}
           />
           <Bar dataKey="consultations" name="Consultations" fill="#3B6EF8" radius={[4, 4, 0, 0]} maxBarSize={16} />
-          <Bar dataKey="messages" name="Messages" fill="#10B981" radius={[4, 4, 0, 0]} maxBarSize={16} />
         </BarChart>
       </ResponsiveContainer>
     </div>

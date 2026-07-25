@@ -6,12 +6,8 @@ import { Search, ChevronDown, User, Loader2, Stethoscope, Building2, Activity, M
 import Avatar from '../ui/Avatar'
 import { useAuth } from '../../hooks/useAuth'
 import api from '../../api/axios'
-import { API_BASE } from '../../lib/config'
+import { imgUrl } from '../../lib/config'
 import { useNotification } from '../../contexts/NotificationContext'
-
-function imgUrl(path: string) {
-  return path.startsWith('http') ? path : `${API_BASE}${path}`
-}
 
 type SearchCategory = 'patients' | 'consultations' | 'messages' | 'maladies' | 'centres'
 

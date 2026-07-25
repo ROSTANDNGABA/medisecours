@@ -15,7 +15,7 @@ export function useWebSocket(userId: string, token: string, handlers: {
   onConsultationCreated?: (data: any) => void
   onConsultationAccepted?: (data: any) => void
   onConsultationClosed?: (data: any) => void
-}) {
+}, role?: string) {
   const wsRef = useRef<WebSocket | null>(null)
   const attemptRef = useRef(0)
   const closedRef = useRef(false)
@@ -23,6 +23,7 @@ export function useWebSocket(userId: string, token: string, handlers: {
   const pendingRef = useRef<any[]>([])
   const pingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const pongTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const authenticatedRef = useRef(false)
 
   useEffect(() => {
     handlersRef.current = handlers
@@ -61,7 +62,7 @@ export function useWebSocket(userId: string, token: string, handlers: {
 
   const send = useCallback((type: string, conversationId: string) => {
     const ws = wsRef.current
-    if (ws && ws.readyState === WebSocket.OPEN) {
+    if (ws && ws.readyState === WebSocket.OPEN && authenticatedRef.current) {
       ws.send(JSON.stringify({ type, conversationId }))
     } else {
       pendingRef.current.push({ type, conversationId })
@@ -77,20 +78,39 @@ export function useWebSocket(userId: string, token: string, handlers: {
     closedRef.current = false
     attemptRef.current = 0
     pendingRef.current = []
+    authenticatedRef.current = false
     clearTimers()
 
     const connect = () => {
-      const role = ''
-      const url = `${WS_URL}?userId=${encodeURIComponent(userId)}&token=${encodeURIComponent(token)}&role=${role}`
-      const ws = new WebSocket(url)
+      const ws = new WebSocket(WS_URL)
       wsRef.current = ws
 
-      ws.onopen = () => { attemptRef.current = 0; startPing(ws); flush() }
+      ws.onopen = () => {
+        attemptRef.current = 0
+        // Send auth message (no token in query string)
+        ws.send(JSON.stringify({ type: 'auth', token }))
+      }
 
       ws.onmessage = (event) => {
         try {
           const parsed = JSON.parse(event.data)
+
+          // Auth handshake
+          if (parsed.type === 'auth_ok') {
+            authenticatedRef.current = true
+            startPing(ws)
+            flush()
+            return
+          }
+
+          if (parsed.type === 'error') {
+            // Auth rejected — close and do not retry (bad token)
+            ws.close(4003, parsed.message)
+            return
+          }
+
           if (parsed.type === 'pong') { handlePong(); return }
+
           const { event: evt, payload } = parsed
           const h = handlersRef.current
           if (evt === 'new_message' && h.onNewMessage) h.onNewMessage(payload)
@@ -103,9 +123,12 @@ export function useWebSocket(userId: string, token: string, handlers: {
         } catch { /* ignore */ }
       }
 
-      ws.onclose = () => {
+      ws.onclose = (event) => {
         clearTimers()
+        authenticatedRef.current = false
         if (closedRef.current) return
+        // Do not retry if auth failed (code 4003)
+        if (event.code === 4003) return
         const backoff = Math.min(1000 * Math.pow(2, attemptRef.current), MAX_BACKOFF)
         attemptRef.current++
         setTimeout(connect, backoff)

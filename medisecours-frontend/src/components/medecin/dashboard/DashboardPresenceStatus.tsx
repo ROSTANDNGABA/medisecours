@@ -1,36 +1,43 @@
 'use client'
 
-import { useCallback, useState } from 'react'
-import { Power, PowerOff, Clock, MapPin } from 'lucide-react'
+import { useCallback, useMemo, useRef, useState } from 'react'
+import { Power, PowerOff, Clock } from 'lucide-react'
 import api from '../../../api/axios'
+import { useAuth } from '../../../hooks/useAuth'
+import type { Medecin } from '../../../types/api'
 
 const JOURS = ['lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi', 'dimanche']
 
-export default function DashboardPresenceStatus({ user }: { user: any }) {
-  const [online, setOnline] = useState(user?.estEnLigne ?? false)
+export default function DashboardPresenceStatus({ user }: { user: Medecin }) {
+  const { updateUser } = useAuth()
+
+  const [optimistic, setOptimistic] = useState<boolean | null>(null)
   const [toggling, setToggling] = useState(false)
+
+  // Revert optimistic value when user prop updates (e.g. from another tab)
+  const prevRef = useRef(user?.estEnLigne)
+  if (user?.estEnLigne !== prevRef.current) {
+    prevRef.current = user?.estEnLigne
+    if (optimistic !== null) setOptimistic(null)
+  }
+
+  const online = optimistic ?? (user?.estEnLigne ?? false)
 
   const togglePresence = useCallback(async () => {
     if (!user?.id || toggling) return
+    const previous = online
     setToggling(true)
-    const newStatus = !online
+    setOptimistic(!previous)
+
     try {
-      await api.patch(`/api/users/${user.id}`, { estEnLigne: newStatus })
-      setOnline(newStatus)
-      // Update local storage as well
-      const stored = localStorage.getItem('medisecours_user')
-      if (stored) {
-        const u = JSON.parse(stored)
-        u.estEnLigne = newStatus
-        localStorage.setItem('medisecours_user', JSON.stringify(u))
-        window.dispatchEvent(new Event('medisecours-auth-change'))
-      }
+      await api.patch(`/api/users/${user.id}`, { estEnLigne: !previous })
+      updateUser({ ...user, estEnLigne: !previous })
     } catch {
-      // revert on error
+      setOptimistic(null)
     } finally {
       setToggling(false)
     }
-  }, [user?.id, online, toggling])
+  }, [online, toggling, user, updateUser])
 
   const dispos = user?.disponibilites as Array<{ jour: string; debut: string; fin: string }> | null | undefined
   const dispoTexte = user?.disponibilitesTexte as string | null | undefined
@@ -65,7 +72,7 @@ export default function DashboardPresenceStatus({ user }: { user: any }) {
           <p className="flex items-center gap-1 text-[11px] font-semibold text-[#6B7280]">
             <Clock className="h-3 w-3" /> Horaires
           </p>
-          {dispos
+          {[...dispos]
             .sort((a, b) => JOURS.indexOf(a.jour) - JOURS.indexOf(b.jour))
             .map((d) => (
               <div key={d.jour} className="flex items-center justify-between text-[11px] text-[#374151]">

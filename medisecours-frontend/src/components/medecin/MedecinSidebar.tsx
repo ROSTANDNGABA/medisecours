@@ -1,14 +1,11 @@
 'use client'
 
-import { useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import {
   HeartPulse, LayoutDashboard, Users, CalendarClock, FileText, Pill, MessageCircle,
   BarChart3, Bell, Settings, Plus, LogOut,
 } from 'lucide-react'
-import { mutate as globalMutate } from 'swr'
-import api from '../../api/axios'
 import { useAuth } from '../../hooks/useAuth'
 import Avatar from '../ui/Avatar'
 import { useNotification } from '../../contexts/NotificationContext'
@@ -38,32 +35,22 @@ export default function MedecinSidebar({ setMobileOpen }: { setMobileOpen: (open
 
   const estSurLaPageMessages = pathname.startsWith('/medecin/messages')
 
-  // Effacement automatique en BDD dès qu'on est sur la page messages
-  useEffect(() => {
-    if (!estSurLaPageMessages) return
-    globalMutate('/api/messages/unread-count', { unreadCount: 0 }, { revalidate: false })
-    api.get('/api/messages?itemsPerPage=50&order[createdAt]=desc')
-      .then((res) => {
-        const raw = res.data?.['hydra:member'] ?? res.data?.member ?? (Array.isArray(res.data) ? res.data : [])
-        const unreadIds = raw.filter((m: any) => m.statut !== 'LU').map((m: any) => m.id)
-        if (unreadIds.length === 0) return
-        return Promise.allSettled(
-          unreadIds.map((id: number) =>
-            api.patch(`/api/messages/${id}`, { statut: 'LU' }, { headers: { 'Content-Type': 'application/merge-patch+json' } })
-          )
-        )
-      })
-      .then(() => globalMutate('/api/messages/unread-count'))
-      .catch(() => {})
-  }, [estSurLaPageMessages])
+  // NOTE (bug C5 corrigé) : on ne marque PLUS tous les messages comme lus à l'entrée
+  // de la page Messages. Cela effaçait les messages urgents non ouverts, y compris
+  // ceux des conversations non visualisées. Le marquage "lu" est désormais géré par
+  // la page messages elle-même, uniquement pour la conversation réellement ouverte.
+
+  // On cache juste le badge en local tant qu'on est sur la page (le compteur réel
+  // est recalculé via le WebSocket / la navigation). Aucune mutation BDD ici.
+  const displayUnread = estSurLaPageMessages ? 0 : unreadCount
 
   const isActive = (href: string, exact: boolean) => (exact ? pathname === href : pathname.startsWith(href))
 
   const renderBadge = (badgeType: string | undefined) => {
-    if (badgeType === 'unread' && unreadCount > 0 && !estSurLaPageMessages) {
+    if (badgeType === 'unread' && displayUnread > 0) {
       return (
         <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-red-500 px-1.5 text-[10px] font-bold text-white">
-          {unreadCount > 99 ? '99+' : unreadCount}
+          {displayUnread > 99 ? '99+' : displayUnread}
         </span>
       )
     }

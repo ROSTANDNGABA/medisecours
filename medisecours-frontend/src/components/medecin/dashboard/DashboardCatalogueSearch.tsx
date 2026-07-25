@@ -4,6 +4,9 @@ import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Search, BookOpen, ChevronRight, Loader2 } from 'lucide-react'
 import api from '../../../api/axios'
+import { useDebounce } from '../../../hooks/useDebounce'
+import useSWR from 'swr'
+import { fetcher } from '../../../lib/fetcher'
 
 interface MaladieResult {
   id: number
@@ -16,36 +19,20 @@ interface MaladieResult {
 export default function DashboardCatalogueSearch() {
   const router = useRouter()
   const [query, setQuery] = useState('')
-  const [results, setResults] = useState<MaladieResult[]>([])
-  const [loading, setLoading] = useState(false)
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
-  const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined as any)
+  const debouncedQuery = useDebounce(query, 300)
 
-  useEffect(() => {
-    if (debounceRef.current) clearTimeout(debounceRef.current)
-    if (query.trim().length < 2) {
-      setResults([])
-      setLoading(false)
-      return
-    }
-    setLoading(true)
-    debounceRef.current = setTimeout(async () => {
-      try {
-        const { data } = await api.get('/api/maladies', {
-          params: { nom: query.trim() },
-        })
-        const list = Array.isArray(data) ? data : data['hydra:member'] ?? data.member ?? []
-        setResults(list.slice(0, 6))
-      } catch {
-        setResults([])
-      } finally {
-        setLoading(false)
-      }
-    }, 300)
-    return () => { if (debounceRef.current) clearTimeout(debounceRef.current) }
-  }, [query])
+  // Utilise le endpoint full-text PostgreSQL (`/api/maladies/search?q=...`)
+  // au lieu du LIKE partiel (`/api/maladies?nom=...`).
+  const searchUrl = debouncedQuery.trim().length >= 2
+    ? `/api/maladies/search?q=${encodeURIComponent(debouncedQuery.trim())}&limit=6`
+    : null
 
+  const { data: raw, isLoading } = useSWR(searchUrl, fetcher)
+  const results: MaladieResult[] = Array.isArray(raw) ? raw : raw?.member ?? []
+
+  // Ferme le dropdown si on clique en dehors
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
@@ -72,12 +59,12 @@ export default function DashboardCatalogueSearch() {
             placeholder="Rechercher une maladie…"
             className="w-full rounded-xl bg-[#F3F4F6] py-2.5 pl-9 pr-3 text-sm text-[#374151] placeholder-[#9CA3AF] outline-none transition focus:bg-white focus:ring-2 focus:ring-[#3B6EF8]/20"
           />
-          {loading && (
+          {isLoading && (
             <Loader2 className="absolute right-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 animate-spin text-[#9CA3AF]" />
           )}
         </div>
 
-        {open && query.trim().length >= 2 && results.length > 0 && (
+        {open && results.length > 0 && (
           <div className="absolute left-0 right-0 top-full mt-1 z-20 rounded-xl border border-[#E5E7EB] bg-white shadow-lg overflow-hidden">
             {results.map((m) => (
               <button
@@ -102,7 +89,7 @@ export default function DashboardCatalogueSearch() {
           </div>
         )}
 
-        {open && query.trim().length >= 2 && !loading && results.length === 0 && (
+        {open && !isLoading && debouncedQuery.trim().length >= 2 && results.length === 0 && (
           <div className="absolute left-0 right-0 top-full mt-1 z-20 rounded-xl border border-[#E5E7EB] bg-white shadow-lg">
             <div className="px-4 py-6 text-center text-sm text-[#9CA3AF]">Aucune maladie trouvée</div>
           </div>

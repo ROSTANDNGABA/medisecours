@@ -1,38 +1,39 @@
 // @ts-nocheck
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import useSWR from 'swr'
 import { BarChart3, TrendingUp, Users, HeartPulse, CalendarCheck, Star, MessageSquare } from 'lucide-react'
+import api from '../../../api/axios'
 import { fetcher } from '../../../lib/fetcher'
 import { useAuth } from '../../../hooks/useAuth'
 import LoadingSpinner from '../../../components/ui/LoadingSpinner'
 import EmptyState from '../../../components/ui/EmptyState'
-
-function idFromIri(value) {
-  if (!value) return null
-  if (typeof value === 'object') return value.id
-  return value.split('/').pop()
-}
+import { CONSULTATIONS_KEY, UNREAD_MESSAGES_KEY } from '../../../lib/keys'
+import { idStrFromRelation } from '../../../types/api'
 
 export default function MedecinRapportsPage() {
   const { user } = useAuth()
-  const { data: consData, isLoading: consLoading } = useSWR('/api/consultations', fetcher, { revalidateOnFocus: false })
-  const { data: avisData, isLoading: avisLoading } = useSWR(user?.id ? `/api/avis?medecin=${user.id}` : null, fetcher, { revalidateOnFocus: false })
-  const { data: msgData, isLoading: msgLoading } = useSWR('/api/messages', fetcher, { revalidateOnFocus: false })
+  const { data: consData } = useSWR(CONSULTATIONS_KEY, fetcher, { revalidateOnFocus: false, keepPreviousData: true })
+  const { data: avisData } = useSWR(user?.id ? `/api/avis?medecin=${user.id}` : null, fetcher, { revalidateOnFocus: false, keepPreviousData: true })
+  // C2 corrigé : on ne charge PLUS tous les messages. On utilise le compteur léger.
+  const { data: unreadData } = useSWR<{ unreadCount: number }>(
+    UNREAD_MESSAGES_KEY,
+    async (url) => (await api.get(url)).data,
+    { revalidateOnFocus: false }
+  )
 
   const consultations = useMemo(() => (Array.isArray(consData) ? consData : []), [consData])
   const avis = useMemo(() => (Array.isArray(avisData) ? avisData : []), [avisData])
-  const messages = useMemo(() => (Array.isArray(msgData) ? msgData : []), [msgData])
+  const nonLus = unreadData?.unreadCount ?? 0
 
   const stats = useMemo(() => {
-    const patients = new Set(consultations.map((c) => idFromIri(c.patient)).filter(Boolean))
+    const patients = new Set(consultations.map((c) => idStrFromRelation(c.patient)).filter(Boolean))
     const ouvertes = consultations.filter((c) => c.statut === 'OUVERTE').length
     const enCours = consultations.filter((c) => c.statut === 'EN_COURS').length
     const terminees = consultations.filter((c) => c.statut === 'TERMINEE').length
     const annulees = consultations.filter((c) => c.statut === 'ANNULEE').length
     const noteMoy = avis.length ? (avis.reduce((s, a) => s + a.note, 0) / avis.length).toFixed(1) : '—'
-    const nonLus = messages.filter((m) => m.statut !== 'LU' && idFromIri(m.expediteur) !== user?.id).length
 
     const parMois = {}
     for (const c of consultations) {
@@ -50,9 +51,9 @@ export default function MedecinRapportsPage() {
       parMois: Object.entries(parMois).slice(-6),
       tauxCompletion: consultations.length ? Math.round((terminees / consultations.length) * 100) : 0,
     }
-  }, [consultations, avis, messages, user?.id])
+  }, [consultations, avis, nonLus])
 
-  if ((consLoading && !consData) || (avisLoading && !avisData) || (msgLoading && !msgData)) return <LoadingSpinner label="Chargement des rapports…" />
+
 
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 space-y-6">
@@ -151,7 +152,7 @@ export default function MedecinRapportsPage() {
           <div>
             <p className="text-xs font-medium text-primary-300">Messages non lus</p>
             <p className="font-display text-xl font-bold text-primary-900 dark:text-sable">{stats.nonLus}</p>
-            <p className="text-xs text-primary-300">sur {messages.length} messages</p>
+            <p className="text-xs text-primary-300">messages non lus</p>
           </div>
         </div>
         <div className="rounded-2xl bg-white dark:bg-primary-800 border border-primary-100 dark:border-white/5 p-5 flex items-center gap-4">

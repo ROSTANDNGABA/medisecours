@@ -15,7 +15,7 @@ import { fetcher } from '../../../lib/fetcher'
 export default function MedecinAvisPage() {
   const { user } = useAuth()
   const toast = useToast()
-  const { data: avis = [], isLoading } = useSWR(user?.id ? `/api/avis?medecin=${user.id}` : null, fetcher)
+  const { data: avis = [], isLoading } = useSWR(user?.id ? `/api/avis?medecin=${user.id}` : null, fetcher, { keepPreviousData: true })
   const [reportTarget, setReportTarget] = useState(null)
   const [reportReason, setReportReason] = useState('')
   const [submittingReport, setSubmittingReport] = useState(false)
@@ -55,7 +55,7 @@ export default function MedecinAvisPage() {
     }
   }
 
-  if (isLoading && avis.length === 0) return <LoadingSpinner label="Chargement des avis…" />
+
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8 space-y-6">

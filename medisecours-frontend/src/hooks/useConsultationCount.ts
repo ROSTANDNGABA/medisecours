@@ -2,6 +2,7 @@ import useSWR from 'swr'
 import api from '../api/axios'
 import { useWebSocket } from './useWebSocket'
 import { useAuth } from './useAuth'
+import { CONSULTATIONS_PENDING_KEY } from '../lib/keys'
 
 // Raw fetcher that returns the FULL API response (with hydra:totalItems)
 const rawFetcher = async (url: string) => {
@@ -11,11 +12,14 @@ const rawFetcher = async (url: string) => {
 
 export function useConsultationCount() {
   const { user, isMedecin } = useAuth()
-  
+
+  // M1 corrigé : pas de refreshInterval. Le WebSocket ci-dessous déclenche déjà
+  // mutate() sur les événements de consultation. On garde uniquement une
+  // revalidation au refocus de fenêtre (peu coûteuse, itemsPerPage=1).
   const { data, mutate } = useSWR(
-    (user && isMedecin) ? '/api/consultations?statut=OUVERTE&itemsPerPage=1' : null,
+    (user && isMedecin) ? CONSULTATIONS_PENDING_KEY : null,
     rawFetcher,
-    { refreshInterval: 15000, revalidateOnFocus: true }
+    { revalidateOnFocus: true }
   )
 
   const token = typeof window !== 'undefined' ? localStorage.getItem('medisecours_token') : null
