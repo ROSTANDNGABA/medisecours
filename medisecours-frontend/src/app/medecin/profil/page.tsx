@@ -3,11 +3,14 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { Camera, Save, ShieldCheck, Star, ClipboardList, MessageSquare, Plus, Trash2 } from 'lucide-react'
+import { mutate as globalMutate } from 'swr'
 import api from '../../../api/axios'
 import { useAuth } from '../../../hooks/useAuth'
+import { imgUrl } from '../../../lib/config'
 import { useToast } from '../../../components/ui/Toast'
 import Avatar from '../../../components/ui/Avatar'
 import LoadingSpinner from '../../../components/ui/LoadingSpinner'
+import { CONVERSATIONS_KEY } from '../../../lib/keys'
 
 const DAYS = [
   { key: 'lundi', label: 'Lun' },
@@ -94,15 +97,21 @@ export default function MedecinProfilPage() {
     const file = e.target.files?.[0]
     if (!file) return
     setUploading(true)
-    const formData = new FormData()
-    formData.append('file', file)
     try {
-      const { data } = await api.post('/api/media_objects', formData, { headers: { 'Content-Type': 'multipart/form-data' } })
+      const formData = new FormData()
+      formData.append('file', file)
+      // Use the working upload endpoint (dedicated controller, not API Platform deserialization)
+      const { data } = await api.post('/api/messages/media/upload', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      })
       const photoUrl = data.contentUrl || data['@id']
       const { data: updated } = await api.patch(`/api/users/${user.id}`, { photoProfil: photoUrl }, { headers: { 'Content-Type': 'application/merge-patch+json' } })
-      updateUser({ ...user, ...updated })
+      const nextUser = { ...user, ...updated }
+      updateUser(nextUser)
+      globalMutate(CONVERSATIONS_KEY)
       toast.success('Photo de profil mise à jour.')
-    } catch {
+    } catch (err) {
+      console.error('Upload error:', err?.response?.data || err)
       toast.error("Échec de l'envoi de la photo.")
     } finally {
       setUploading(false)
@@ -121,7 +130,7 @@ export default function MedecinProfilPage() {
           <div className="rounded-2xl bg-white dark:bg-primary-800 border border-primary-100 dark:border-white/5 p-6 sticky top-20 text-center">
             <div className="relative inline-block mb-4">
               <div className="w-20 h-20 rounded-full bg-mint-500 text-white flex items-center justify-center text-2xl font-bold overflow-hidden mx-auto">
-                {user.photoProfil ? <img src={user.photoProfil} alt="" className="w-full h-full object-cover" /> : `${user.prenom?.[0] || ''}${user.nom?.[0] || ''}`.toUpperCase()}
+                {user.photoProfil ? <img src={imgUrl(user.photoProfil) || ''} alt="" className="w-full h-full object-cover" /> : `${user.prenom?.[0] || ''}${user.nom?.[0] || ''}`.toUpperCase()}
               </div>
               <button
                 onClick={() => fileRef.current?.click()}

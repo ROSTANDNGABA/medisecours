@@ -51,7 +51,9 @@ wss.on('connection', (ws) => {
         const decoded = jwt.verify(msg.token, PUBLIC_KEY, {
           algorithms: ['RS256'],
         })
-        const userId = decoded.username || decoded.sub
+        // The JWT payload typically contains the email in username.
+        // We use msg.userId (the database ID sent by frontend) for routing.
+        const userId = msg.userId || decoded.sub || decoded.username
         if (!userId) {
           ws.close(4003, 'Invalid token: no subject')
           return

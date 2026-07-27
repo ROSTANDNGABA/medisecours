@@ -70,7 +70,7 @@ export default function ProfilPage() {
     const formData = new FormData()
     formData.append('file', file)
     try {
-      const { data } = await api.post('/api/media_objects', formData, { headers: { 'Content-Type': 'multipart/form-data' } })
+      const { data } = await api.post('/api/media_objects', formData, { headers: { 'Content-Type': undefined } })
       const photoUrl = data.contentUrl || data['@id']
       const { data: updated } = await api.patch(`/api/users/${user.id}`, { photoProfil: photoUrl }, { headers: { 'Content-Type': 'application/merge-patch+json' } })
       updateUser({ ...user, ...updated })

@@ -8,6 +8,7 @@ use ApiPlatform\Metadata\GetCollection;
 use ApiPlatform\Metadata\Post;
 use ApiPlatform\Metadata\Delete;
 use App\Repository\MediaObjectRepository;
+use App\State\MediaObjectProcessor;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\HttpFoundation\File\File;
 use Symfony\Component\Serializer\Annotation\Groups;
@@ -24,6 +25,7 @@ use Vich\UploaderBundle\Mapping\Annotation as Vich;
         new Get(),
         new Post(
             security: "is_granted('ROLE_USER')",
+            processor: MediaObjectProcessor::class,
             inputFormats: [
                 'json' => ['application/json'],
                 'multipart' => ['multipart/form-data'],

@@ -45,7 +45,8 @@ use Gedmo\Mapping\Annotation as Gedmo;
         // PATCH /api/users/{id} — modification du profil, uniquement par le propriétaire ou admin
         new Patch(
             security: "is_granted('ROLE_ADMIN') or object == user",
-            securityMessage: "Vous ne pouvez modifier que votre propre profil."
+            securityMessage: "Vous ne pouvez modifier que votre propre profil.",
+            processor: \App\State\UserProfileProcessor::class
         )
     ],
     normalizationContext: ['groups' => ['user:read']],
@@ -142,7 +143,6 @@ abstract class User implements UserInterface, PasswordAuthenticatedUserInterface
     private ?string $quartier = null;
 
     #[ORM\Column(length: 255, nullable: true)]
-    #[Assert\Url(requireTld: false, message: 'L\'URL de la photo de profil n\'est pas valide')]
     #[Groups(['user:read', 'user:search', 'user:write', 'consultation:read', 'conversation:read'])]
     private ?string $photoProfil = null;
 

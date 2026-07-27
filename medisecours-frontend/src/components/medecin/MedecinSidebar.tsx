@@ -22,7 +22,6 @@ const NAV_BOTTOM = [
   { href: '/medecin/rapports', label: 'Rapports', icon: BarChart3 },
   { href: '/medecin/notifications', label: 'Notifications', icon: Bell },
   { href: '/medecin/profil', label: 'Profil', icon: Settings },
-  { href: '/medecin/parametres', label: 'Paramètres', icon: Settings },
 ]
 
 export default function MedecinSidebar({ setMobileOpen }: { setMobileOpen: (open: boolean) => void }) {

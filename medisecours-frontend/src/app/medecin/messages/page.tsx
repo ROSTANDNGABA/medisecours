@@ -164,7 +164,7 @@ export default function MedecinMessagesPage() {
 
 function MedecinMessagesContent() {
   const { user } = useAuth()
-  const { activeConversationId, setActiveConversationId, subscribeToMessages, onlineUsers, markConversationAsRead, msgNotifications } = useNotification()
+  const { activeConversationId, setActiveConversationId, subscribeToMessages, subscribeToProfileChanges, onlineUsers, markConversationAsRead, msgNotifications } = useNotification()
   const toast = useToast()
   const searchParams = useSearchParams()
   const preselectConv = searchParams.get('conversation')
@@ -381,6 +381,20 @@ function MedecinMessagesContent() {
     }
   }, [conversations, allUsers])
 
+  // Subscribe to profile photo changes → update allUsers local state instantly
+  useEffect(() => {
+    return subscribeToProfileChanges((data: any) => {
+      if (!data?.userId || !('photoProfil' in data)) return
+      setAllUsers(prev => {
+        const idx = prev.findIndex(u => String(u.id) === String(data.userId))
+        if (idx === -1) return prev
+        const updated = [...prev]
+        updated[idx] = { ...updated[idx], photoProfil: data.photoProfil }
+        return updated
+      })
+    })
+  }, [subscribeToProfileChanges])
+
   const mediaCache = useMemo(() => new Map(), [])
   const [, bump] = useState(0)
   const [unreadCounts, setUnreadCounts] = useState(new Map())
@@ -453,6 +467,19 @@ function MedecinMessagesContent() {
           return [msg, ...prev]
         })
         
+        // Injection directe via mutation locale sur le cache SWR dynamique de la discussion (Filtre anti-rechargement)
+        const activeIdNum = Number(currentActiveId)
+        const msgKey = `/api/messages?conversation=/api/conversations/${activeIdNum}&order[createdAt]=DESC&itemsPerPage=${MSGS_PER_PAGE}&page=1`
+        globalMutate(msgKey, (currentCache: any) => {
+          const arr = Array.isArray(currentCache) ? currentCache : (currentCache?.['hydra:member'] || [])
+          // Sécurité contre les doublons (Race Condition)
+          if (arr.some((m: any) => String(m.id ?? m['@id']) === String(msg.id ?? msg['@id']))) {
+            return currentCache
+          }
+          const newArr = [msg, ...arr]
+          return Array.isArray(currentCache) ? newArr : { ...currentCache, 'hydra:member': newArr }
+        }, { revalidate: false })
+
         // Mark as read immediately on server without revalidating counts (context bypasses +1)
         api.patch(msg['@id'] || `/api/messages/${msg.id}`, { statut: 'LU' }, { headers: { 'Content-Type': 'application/merge-patch+json' } })
           .catch(() => {})
@@ -738,7 +765,7 @@ function MedecinMessagesContent() {
     const formData = new FormData()
     formData.append('file', file)
     const { data } = await api.post('/api/messages/media/upload', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' }
+      headers: { 'Content-Type': undefined }
     })
     return data
   }

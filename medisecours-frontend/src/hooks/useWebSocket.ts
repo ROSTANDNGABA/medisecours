@@ -15,6 +15,7 @@ export function useWebSocket(userId: string, token: string, handlers: {
   onConsultationCreated?: (data: any) => void
   onConsultationAccepted?: (data: any) => void
   onConsultationClosed?: (data: any) => void
+  onProfilePhotoChanged?: (data: any) => void
 }, role?: string) {
   const wsRef = useRef<WebSocket | null>(null)
   const attemptRef = useRef(0)
@@ -87,8 +88,8 @@ export function useWebSocket(userId: string, token: string, handlers: {
 
       ws.onopen = () => {
         attemptRef.current = 0
-        // Send auth message (no token in query string)
-        ws.send(JSON.stringify({ type: 'auth', token }))
+        // Send auth message with userId so Node server registers the correct database ID
+        ws.send(JSON.stringify({ type: 'auth', token, userId: String(userId) }))
       }
 
       ws.onmessage = (event) => {
@@ -120,6 +121,7 @@ export function useWebSocket(userId: string, token: string, handlers: {
           if (evt === 'consultation_created' && h.onConsultationCreated) h.onConsultationCreated(payload)
           if (evt === 'consultation_accepted' && h.onConsultationAccepted) h.onConsultationAccepted(payload)
           if (evt === 'consultation_closed' && h.onConsultationClosed) h.onConsultationClosed(payload)
+          if (evt === 'profile_photo_changed' && h.onProfilePhotoChanged) h.onProfilePhotoChanged(payload)
         } catch { /* ignore */ }
       }
 

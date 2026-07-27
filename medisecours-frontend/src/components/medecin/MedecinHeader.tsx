@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
-import { Search, ChevronDown, User, Loader2, Stethoscope, Building2, Activity, MessageCircle, Bell, MessageSquare, Clock, Settings, LogOut } from 'lucide-react'
+import { Search, ChevronDown, User, Loader2, Stethoscope, Building2, Activity, MessageCircle, Bell, MessageSquare, Clock, LogOut } from 'lucide-react'
 import Avatar from '../ui/Avatar'
 import { useAuth } from '../../hooks/useAuth'
 import api from '../../api/axios'
@@ -342,12 +342,6 @@ export default function MedecinHeader() {
               className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm text-[#374151] hover:bg-[#F3F4F6] transition"
             >
               <User className="h-4 w-4 text-[#9CA3AF]" /> Profil
-            </button>
-            <button
-              onClick={() => { router.push('/medecin/parametres'); setProfileOpen(false) }}
-              className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm text-[#374151] hover:bg-[#F3F4F6] transition"
-            >
-              <Settings className="h-4 w-4 text-[#9CA3AF]" /> Paramètres
             </button>
             <div className="border-t border-[#E5E7EB]" />
             <button

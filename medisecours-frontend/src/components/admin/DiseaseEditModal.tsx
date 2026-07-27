@@ -78,7 +78,7 @@ export default function DiseaseEditModal({
       const formData = new FormData()
       Array.from(files).forEach((f) => formData.append('files[]', f))
       const res = await api.post(`/api/admin/maladies/${editing.id}/images`, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
+        headers: { 'Content-Type': undefined },
       })
       const uploaded = res.data.images || []
       const urls = uploaded.map((img) => img.url)

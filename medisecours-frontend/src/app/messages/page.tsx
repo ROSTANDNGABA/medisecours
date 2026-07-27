@@ -242,11 +242,37 @@ export default function MessagesPage() {
           if (prev.some(m => sameMsg(m, msg))) return prev
           return [msg, ...prev]
         })
+        
+        // Injection directe via mutation locale sur le cache SWR dynamique de la discussion (Filtre anti-rechargement)
+        const activeIdNum = Number(currentActiveId)
+        const MSGS_PER_PAGE = 30
+        const msgKey = `/api/messages?conversation=/api/conversations/${activeIdNum}&order[createdAt]=DESC&itemsPerPage=${MSGS_PER_PAGE}&page=1`
+        globalMutate(msgKey, (currentCache: any) => {
+          const arr = Array.isArray(currentCache) ? currentCache : (currentCache?.['hydra:member'] || [])
+          // Sécurité contre les doublons (Race Condition)
+          if (arr.some((m: any) => String(m.id ?? m['@id']) === String(msg.id ?? msg['@id']))) {
+            return currentCache
+          }
+          const newArr = [msg, ...arr]
+          return Array.isArray(currentCache) ? newArr : { ...currentCache, 'hydra:member': newArr }
+        }, { revalidate: false })
+        
         mutateConvs()
       }
     },
     onMessageRead: (msg) => {
       setAllLoadedMsgs((prev) => prev.map((m) => sameMsg(m, msg) ? { ...m, statut: 'LU' } : m))
+    },
+    onProfilePhotoChanged: (data) => {
+      if (!data?.userId || !('photoProfil' in data)) return
+      mutateConvs()
+      setMedecins(prev => {
+        const idx = prev.findIndex(u => String(u.id) === String(data.userId))
+        if (idx === -1) return prev
+        const updated = [...prev]
+        updated[idx] = { ...updated[idx], photoProfil: data.photoProfil }
+        return updated
+      })
     },
   })
 
@@ -548,7 +574,7 @@ export default function MessagesPage() {
     const formData = new FormData()
     formData.append('file', file)
     const { data } = await api.post('/api/messages/media/upload', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' }
+      headers: { 'Content-Type': undefined }
     })
     return data
   }
@@ -698,8 +724,9 @@ export default function MessagesPage() {
                 onClick={() => setActiveId(c.id)}
                 className={`w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-primary-100/50 dark:hover:bg-primary-900/40 transition ${activeId === c.id ? 'bg-primary-100/70 dark:bg-primary-900/60' : ''}`}
               >
-                <div className="w-10 h-10 rounded-full bg-primary-500 text-white flex items-center justify-center font-bold text-sm shrink-0">
-                  {(c.info?.prenom?.[0] || '') + (c.info?.nom?.[0] || '')}
+                <div className="w-10 h-10 rounded-full bg-primary-500 text-white flex items-center justify-center font-bold text-sm shrink-0 overflow-hidden">
+                  {c.info?.photoProfil ? <img src={mediaUrl(c.info.photoProfil)} alt="" className="w-full h-full object-cover" onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex' }} /> : null}
+                  <span style={c.info?.photoProfil ? { display: 'none' } : undefined} className="flex items-center justify-center w-full h-full">{(c.info?.prenom?.[0] || '') + (c.info?.nom?.[0] || '')}</span>
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="font-semibold text-sm text-primary-900 dark:text-sable truncate">{c.info?.prenom} {c.info?.nom}</p>
@@ -721,8 +748,9 @@ export default function MessagesPage() {
             <>
               <div className="flex items-center gap-3 p-4 border-b border-primary-100 dark:border-white/10 bg-white/70 dark:bg-primary-700/40">
                 <button className="lg:hidden" onClick={() => setActiveId(null)} aria-label="Retour"><ArrowLeft className="w-5 h-5 text-primary-500" /></button>
-                <div className="w-9 h-9 rounded-full bg-primary-500 text-white flex items-center justify-center font-bold text-xs shrink-0">
-                  {(active.info?.prenom?.[0] || '') + (active.info?.nom?.[0] || '')}
+                <div className="w-9 h-9 rounded-full bg-primary-500 text-white flex items-center justify-center font-bold text-xs shrink-0 overflow-hidden">
+                  {active.info?.photoProfil ? <img src={mediaUrl(active.info.photoProfil)} alt="" className="w-full h-full object-cover" onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex' }} /> : null}
+                  <span style={active.info?.photoProfil ? { display: 'none' } : undefined} className="flex items-center justify-center w-full h-full">{(active.info?.prenom?.[0] || '') + (active.info?.nom?.[0] || '')}</span>
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="font-semibold text-sm text-primary-900 dark:text-sable truncate">{active.info?.prenom} {active.info?.nom}</p>
@@ -907,8 +935,9 @@ export default function MessagesPage() {
                   }}
                   className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-primary-100 dark:hover:bg-primary-900/40 text-left transition"
                 >
-                  <div className="w-9 h-9 rounded-full bg-primary-500 text-white flex items-center justify-center font-bold text-xs shrink-0">
-                    {(med.prenom?.[0] ?? '') + (med.nom?.[0] ?? '')}
+                  <div className="w-9 h-9 rounded-full bg-primary-500 text-white flex items-center justify-center font-bold text-xs shrink-0 overflow-hidden">
+                    {med.photoProfil ? <img src={mediaUrl(med.photoProfil)} alt="" className="w-full h-full object-cover" onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex' }} /> : null}
+                    <span style={med.photoProfil ? { display: 'none' } : undefined} className="flex items-center justify-center w-full h-full">{(med.prenom?.[0] ?? '') + (med.nom?.[0] ?? '')}</span>
                   </div>
                   <div className="min-w-0">
                     <p className="text-sm font-semibold text-primary-900 dark:text-sable truncate">

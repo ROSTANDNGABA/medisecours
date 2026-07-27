@@ -73,7 +73,7 @@ export function ImportPremiersSoinsModal({ isOpen, onClose, onSuccess }: { isOpe
             formData.append('file', file);
 
             const response = await api.post(`/api/admin/import/premiers-soins?updateExisting=${updateExisting}`, formData, {
-                headers: { 'Content-Type': 'multipart/form-data' },
+                headers: { 'Content-Type': undefined },
             });
 
             const data = response.data;

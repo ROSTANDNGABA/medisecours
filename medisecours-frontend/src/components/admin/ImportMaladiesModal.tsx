@@ -73,7 +73,7 @@ export function ImportMaladiesModal({ isOpen, onClose, onSuccess }: { isOpen: bo
             formData.append('file', file);
 
             const response = await api.post(`/api/admin/import/maladies?updateExisting=${updateExisting}`, formData, {
-                headers: { 'Content-Type': 'multipart/form-data' },
+                headers: { 'Content-Type': undefined },
             });
 
             const data = response.data;

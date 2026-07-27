@@ -18,7 +18,7 @@ import { useConsultationCount } from '../hooks/useConsultationCount'
 import { useWebSocket } from '../hooks/useWebSocket'
 import useSWR, { mutate as globalMutate } from 'swr'
 import api from '../api/axios'
-import { UNREAD_MESSAGES_KEY } from '../lib/keys'
+import { UNREAD_MESSAGES_KEY, CONVERSATIONS_KEY } from '../lib/keys'
 
 const MERGE_PATCH_HEADERS = { 'Content-Type': 'application/merge-patch+json' } as const
 
@@ -61,6 +61,7 @@ interface NotificationContextValue {
   activeConversationId: string | null
   setActiveConversationId: (id: string | null) => void
   subscribeToMessages: (handler: (msg: any) => void) => () => void
+  subscribeToProfileChanges: (handler: (data: any) => void) => () => void
   onlineUsers: Set<string>
 }
 
@@ -138,11 +139,19 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null)
   const [onlineUsers, setOnlineUsers] = useState<Set<string>>(new Set())
   const messageHandlers = React.useRef<((msg: any) => void)[]>([])
+  const profileChangeHandlers = React.useRef<((data: any) => void)[]>([])
 
   const subscribeToMessages = useCallback((handler: (msg: any) => void) => {
     messageHandlers.current.push(handler)
     return () => {
       messageHandlers.current = messageHandlers.current.filter((h) => h !== handler)
+    }
+  }, [])
+
+  const subscribeToProfileChanges = useCallback((handler: (data: any) => void) => {
+    profileChangeHandlers.current.push(handler)
+    return () => {
+      profileChangeHandlers.current = profileChangeHandlers.current.filter((h) => h !== handler)
     }
   }, [])
 
@@ -165,8 +174,10 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
 
       // 2. Injection optimiste dans les caches SWR /api/messages* (sans re-fetch)
       //    revalidate:false → le message reste dans le cache même après clearAll
+      //    EXCLUT les clés "conversation=" (gérées par la page chat via subscribeToMessages)
+      //    pour éviter que le useEffect msgData ne surcharge allLoadedMsgs (race condition).
       globalMutate(
-        (key: string) => typeof key === 'string' && key.startsWith('/api/messages') && key !== UNREAD_MESSAGES_KEY,
+        (key: string) => typeof key === 'string' && key.startsWith('/api/messages') && key !== UNREAD_MESSAGES_KEY && !key.includes('conversation='),
         (cache: any) => {
           if (!cache) return cache
           if (Array.isArray(cache)) {
@@ -217,6 +228,12 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
           return next
         })
       }
+    },
+    onProfilePhotoChanged: (payload: any) => {
+      // Dispatch aux abonnés (pages messages pour mettre à jour allUsers)
+      profileChangeHandlers.current.forEach((h) => h(payload))
+      // Revalide les conversations SWR pour récupérer le nouveau photoProfil
+      globalMutate(CONVERSATIONS_KEY)
     }
   })
 
@@ -448,13 +465,13 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     consultationCount: openConsultationCount, pendingConsultationCount, notificationCount,
     openNotif, dismissNotif, clearAllNotifications, closeNotif, notifOpen,
     msgNotifications: msgItems, msgLoading, msgOpen, openMsg, dismissMsg, markConversationAsRead, closeMsg, msgDisplayCount,
-    activeConversationId, setActiveConversationId, subscribeToMessages, onlineUsers,
+    activeConversationId, setActiveConversationId, subscribeToMessages, subscribeToProfileChanges, onlineUsers,
   }), [
     notifications, notifLoading, unreadCount,
     openConsultationCount, pendingConsultationCount, notificationCount,
     openNotif, dismissNotif, clearAllNotifications, closeNotif, notifOpen,
     msgItems, msgLoading, msgOpen, openMsg, dismissMsg, markConversationAsRead, closeMsg, msgDisplayCount,
-    activeConversationId, setActiveConversationId, subscribeToMessages, onlineUsers,
+    activeConversationId, setActiveConversationId, subscribeToMessages, subscribeToProfileChanges, onlineUsers,
   ])
 
   return (

@@ -55,7 +55,7 @@ export default function DiseaseDetailModal({ maladie, onClose, onMutate }) {
       const formData = new FormData()
       Array.from(selectedFiles).forEach((f) => formData.append('files[]', f))
       const res = await api.post(`/api/admin/maladies/${maladie.id}/images`, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
+        headers: { 'Content-Type': undefined },
       })
       const newImages = res.data?.images ?? []
       setImages((prev) => [...prev, ...newImages])

@@ -21,7 +21,6 @@ const PAGE_TITLES = {
   '/medecin/messages': 'Messages',
   '/medecin/rapports': 'Rapports',
   '/medecin/notifications': 'Notifications',
-  '/medecin/parametres': 'Paramètres',
 }
 
 function SidebarWrapper({ setMobileOpen }: { setMobileOpen: (open: boolean) => void }) {
