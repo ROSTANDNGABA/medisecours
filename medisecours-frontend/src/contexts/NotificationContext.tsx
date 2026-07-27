@@ -153,46 +153,43 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   }, [])
 
   // ── WebSocket listener — injecte chaque message reçu dans le cache SWR ──
-  // Après clearAllNotifications, le cache SWR est vidé/figé. Pour que les
-  // nouveaux messages WS réapparaissent sans F5, on injecte le payload dans
-  // hydra:member ET on force revalidate: true pour réouvrir le canal réseau.
+  // L'injection utilise revalidate:false pour ne PAS écraser l'état optimiste
+  // de la page chat (allLoadedMsgs géré par subscribeToMessages).
+  // Le compteur unread utilise revalidate:true pour rester synchronisé.
   useWebSocket(user?.id || '', token || '', {
     onNewMessage: (payload: any) => {
-      // 1. Handlers enregistrés (page messages temps réel)
+      // 1. Handlers enregistrés (page messages → ajout instantané dans allLoadedMsgs)
       messageHandlers.current.forEach((h) => h(payload))
 
       if (!payload || rawId(payload.expediteur) === user?.id) return
 
-      // 2. Injection optimiste + revalidation réseau sur /api/messages*
-      //    revalidate:true force SWR à fetcher le serveur après l'inject,
-      //    ce qui résout le blocage post-clearAllNotifications.
+      // 2. Injection optimiste dans les caches SWR /api/messages* (sans re-fetch)
+      //    revalidate:false → le message reste dans le cache même après clearAll
       globalMutate(
-        (key: string) => typeof key === 'string' && key.startsWith('/api/messages'),
+        (key: string) => typeof key === 'string' && key.startsWith('/api/messages') && key !== UNREAD_MESSAGES_KEY,
         (cache: any) => {
           if (!cache) return cache
-          // fetcher unwrap → tableau brut
           if (Array.isArray(cache)) {
             if (cache.some((m: any) => String(m.id) === String(payload.id))) return cache
             return [payload, ...cache]
           }
-          // rawFetcher → hydra:member
           if (cache?.['hydra:member']) {
             if (cache['hydra:member'].some((m: any) => String(m.id) === String(payload.id))) return cache
             return { ...cache, 'hydra:member': [payload, ...cache['hydra:member']] }
           }
           return cache
         },
-        { revalidate: true }
+        { revalidate: false }
       )
 
-      // 3. Sidebar conversations (dernier message + preview)
+      // 3. Sidebar conversations — revalide pour afficher le dernier message
       globalMutate('/api/conversations', undefined, { revalidate: true })
 
       const convId = String(rawId(payload.conversation))
       // 4. Si l'utilisateur lit cette conversation, ne PAS incrémenter le badge
       if (convId === activeConversationId) return
 
-      // 5. Compteur unread
+      // 5. Compteur unread — revalidate:true pour sync serveur
       globalMutate(UNREAD_MESSAGES_KEY, (data: any) => {
         if (!data) return { unreadCount: 1 }
         return { unreadCount: data.unreadCount + 1 }
