@@ -153,48 +153,50 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   }, [])
 
   // ── WebSocket listener — injecte chaque message reçu dans le cache SWR ──
-  // Résout le bug "il faut F5 pour voir le chat bouger".
-  // Le payload WS est injecté au début de hydra:member de TOUTES les clés
-  // /api/messages*, ce qui rend les listes notifications + messages instantanées.
+  // Après clearAllNotifications, le cache SWR est vidé/figé. Pour que les
+  // nouveaux messages WS réapparaissent sans F5, on injecte le payload dans
+  // hydra:member ET on force revalidate: true pour réouvrir le canal réseau.
   useWebSocket(user?.id || '', token || '', {
     onNewMessage: (payload: any) => {
-      // 1. Déclencher les handlers enregistrés (page messages en temps réel)
+      // 1. Handlers enregistrés (page messages temps réel)
       messageHandlers.current.forEach((h) => h(payload))
 
       if (!payload || rawId(payload.expediteur) === user?.id) return
 
-      // 2. Injection optimiste dans TOUS les caches SWR /api/messages*
+      // 2. Injection optimiste + revalidation réseau sur /api/messages*
+      //    revalidate:true force SWR à fetcher le serveur après l'inject,
+      //    ce qui résout le blocage post-clearAllNotifications.
       globalMutate(
         (key: string) => typeof key === 'string' && key.startsWith('/api/messages'),
         (cache: any) => {
           if (!cache) return cache
-          // Cache unwrap par fetcher (tableau brut)
+          // fetcher unwrap → tableau brut
           if (Array.isArray(cache)) {
             if (cache.some((m: any) => String(m.id) === String(payload.id))) return cache
             return [payload, ...cache]
           }
-          // Cache brut hydra:member (rawFetcher)
+          // rawFetcher → hydra:member
           if (cache?.['hydra:member']) {
             if (cache['hydra:member'].some((m: any) => String(m.id) === String(payload.id))) return cache
             return { ...cache, 'hydra:member': [payload, ...cache['hydra:member']] }
           }
           return cache
         },
-        { revalidate: false }
+        { revalidate: true }
       )
 
-      // 3. Invalider la sidebar conversations (dernier message + preview)
-      globalMutate('/api/conversations')
+      // 3. Sidebar conversations (dernier message + preview)
+      globalMutate('/api/conversations', undefined, { revalidate: true })
 
       const convId = String(rawId(payload.conversation))
       // 4. Si l'utilisateur lit cette conversation, ne PAS incrémenter le badge
       if (convId === activeConversationId) return
 
-      // 5. Mutation optimiste du compteur unread
+      // 5. Compteur unread
       globalMutate(UNREAD_MESSAGES_KEY, (data: any) => {
         if (!data) return { unreadCount: 1 }
         return { unreadCount: data.unreadCount + 1 }
-      }, { revalidate: false })
+      }, { revalidate: true })
     },
     onMessageRead: (payload: any) => {
       messageHandlers.current.forEach((h) => h({ _type: 'message_read', ...payload }))
