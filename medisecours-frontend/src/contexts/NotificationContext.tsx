@@ -152,9 +152,10 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     return val.split('/').pop()
   }, [])
 
-  // ── DIRECTIVE 4 : WebSocket ne met à jour QUE le compteur SWR ──────────
-  // Plus de setMsgItems / setNotifications ici → pas de double-write.
-  // Les listes sont fetchées on-demand par openMsg() / openNotif().
+  // ── WebSocket listener — injecte chaque message reçu dans le cache SWR ──
+  // Résout le bug "il faut F5 pour voir le chat bouger".
+  // Le payload WS est injecté au début de hydra:member de TOUTES les clés
+  // /api/messages*, ce qui rend les listes notifications + messages instantanées.
   useWebSocket(user?.id || '', token || '', {
     onNewMessage: (payload: any) => {
       // 1. Déclencher les handlers enregistrés (page messages en temps réel)
@@ -162,11 +163,34 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
 
       if (!payload || rawId(payload.expediteur) === user?.id) return
 
+      // 2. Injection optimiste dans TOUS les caches SWR /api/messages*
+      globalMutate(
+        (key: string) => typeof key === 'string' && key.startsWith('/api/messages'),
+        (cache: any) => {
+          if (!cache) return cache
+          // Cache unwrap par fetcher (tableau brut)
+          if (Array.isArray(cache)) {
+            if (cache.some((m: any) => String(m.id) === String(payload.id))) return cache
+            return [payload, ...cache]
+          }
+          // Cache brut hydra:member (rawFetcher)
+          if (cache?.['hydra:member']) {
+            if (cache['hydra:member'].some((m: any) => String(m.id) === String(payload.id))) return cache
+            return { ...cache, 'hydra:member': [payload, ...cache['hydra:member']] }
+          }
+          return cache
+        },
+        { revalidate: false }
+      )
+
+      // 3. Invalider la sidebar conversations (dernier message + preview)
+      globalMutate('/api/conversations')
+
       const convId = String(rawId(payload.conversation))
-      // 2. Si l'utilisateur lit cette conversation, ne PAS incrémenter
+      // 4. Si l'utilisateur lit cette conversation, ne PAS incrémenter le badge
       if (convId === activeConversationId) return
 
-      // 3. Mutation optimiste du compteur SWR uniquement (pas de rebuild de liste)
+      // 5. Mutation optimiste du compteur unread
       globalMutate(UNREAD_MESSAGES_KEY, (data: any) => {
         if (!data) return { unreadCount: 1 }
         return { unreadCount: data.unreadCount + 1 }
