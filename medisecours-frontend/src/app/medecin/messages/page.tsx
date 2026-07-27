@@ -17,6 +17,7 @@ import { ArrowLeft, Send, CheckCheck, Check, Plus, X, ExternalLink, Loader2, Pap
 import useSWR, { mutate as globalMutate } from 'swr'
 import api from '../../../api/axios'
 import { fetcher } from '../../../lib/fetcher'
+import { UNREAD_MESSAGES_KEY } from '../../../lib/keys'
 import { useAuth } from '../../../hooks/useAuth'
 import { useNotification } from '../../../contexts/NotificationContext'
 
@@ -217,13 +218,34 @@ function MedecinMessagesContent() {
   useEffect(() => { hasMoreRef.current = hasMore }, [hasMore])
   useEffect(() => { msgLoadingRef.current = msgLoading }, [msgLoading])
 
-  // Automatically clear unread badge when entering messages or switching conversation
+  // Immediately wipe unread counter when the messages page opens (even without a selected conversation)
+  useEffect(() => {
+    globalMutate(UNREAD_MESSAGES_KEY, { unreadCount: 0 }, false)
+  }, [])
+
+  // Mark conversation as read + force SWR counter to 0 instantly when switching conversations
   useEffect(() => {
     if (!activeId) return
     markConversationAsRead(activeId)
     if (activeConversationId !== activeId) {
       setActiveConversationId(activeId)
     }
+    api.get('/api/messages', { params: { conversation: `/api/conversations/${activeId}`, itemsPerPage: 100, order: { createdAt: 'desc' } } })
+      .then((res) => {
+        const msgs = res.data?.['hydra:member'] ?? res.data?.member ?? (Array.isArray(res.data) ? res.data : [])
+        const toMark = msgs.filter((m) => m.statut !== 'LU' && idFromIri(m.expediteur) !== user?.id)
+        if (toMark.length === 0) return null
+        return Promise.all(toMark.map((m) =>
+          api.patch(m['@id'] || `/api/messages/${m.id}`, { statut: 'LU' }, { headers: { 'Content-Type': 'application/merge-patch+json' } })
+        ))
+      })
+      .then(() => {
+        globalMutate(UNREAD_MESSAGES_KEY, { unreadCount: 0 }, false)
+        globalMutate(UNREAD_MESSAGES_KEY)
+      })
+      .catch(() => {
+        globalMutate(UNREAD_MESSAGES_KEY)
+      })
   }, [activeId])
 
   // Reset pagination when switching conversations
@@ -540,7 +562,7 @@ function MedecinMessagesContent() {
     readAttempted.current.add(msgId)
     setAllLoadedMsgs(prev => prev.map(m => m.id === msg.id ? { ...m, statut: 'LU' } : m))
     api.patch(msg['@id'], { statut: 'LU' }, { headers: { 'Content-Type': 'application/merge-patch+json' } })
-      .then(() => globalMutate('/api/messages/unread-count'))
+      .then(() => globalMutate(UNREAD_MESSAGES_KEY))
       .catch(() => {})
   }, [user?.id])
 

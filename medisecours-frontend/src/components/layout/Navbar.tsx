@@ -38,6 +38,8 @@ export default function Navbar() {
   const router = useRouter()
   const { unreadCount } = useUnreadCount()
 
+  const estDansLaMessagerie = pathname.includes('/messages') || pathname.includes('/conversations') || pathname.includes('/medecin/messages')
+
   useEffect(() => {
     document.documentElement.classList.toggle('dark', dark)
   }, [dark])
@@ -89,7 +91,7 @@ export default function Navbar() {
             <div className="hidden sm:flex items-center gap-1">
               <Link href="/messages" className="relative p-2 rounded-xl hover:bg-primary-100 dark:hover:bg-primary-700 text-primary-500 dark:text-sable" aria-label="Messages">
                 <MessageCircle className="w-5 h-5" />
-                {unreadCount > 0 && (
+                {unreadCount > 0 && !estDansLaMessagerie && (
                   <span className="absolute top-0 right-0 transform translate-x-1/4 -translate-y-1/4 bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full border-2 border-white dark:border-primary-900 shadow-sm animate-pulse">
                     {unreadCount > 99 ? '99+' : unreadCount}
                   </span>
@@ -153,7 +155,7 @@ export default function Navbar() {
             <>
               <Link onClick={() => setOpen(false)} href="/messages" className="px-3 py-2.5 rounded-xl text-sm font-medium text-primary-700 dark:text-sable flex items-center justify-between">
                 <span>Messagerie</span>
-                {unreadCount > 0 && (
+                {unreadCount > 0 && !estDansLaMessagerie && (
                   <span className="bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">
                     {unreadCount > 99 ? '99+' : unreadCount}
                   </span>

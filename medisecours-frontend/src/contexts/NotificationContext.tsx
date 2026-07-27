@@ -1,5 +1,15 @@
 'use client'
 
+/**
+ * NotificationContext — MediSecours+
+ *
+ * Architecture "Optimistic Update + Persist" :
+ * - Le compteur SWR (/api/messages/unread-count) est la SOURCE DE VÉRITÉ pour le badge cloche + sidebar.
+ * - Le WebSocket NE met à jour QUE le compteur SWR (optimiste, sans revalidation).
+ * - Les dropdowns (notifications, messages) fetchent leurs données ON DEMAND au clic.
+ * - Aucun double-write entre WebSocket et SWR → plus de désynchronisation.
+ */
+
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '../hooks/useAuth'
@@ -8,6 +18,7 @@ import { useConsultationCount } from '../hooks/useConsultationCount'
 import { useWebSocket } from '../hooks/useWebSocket'
 import useSWR, { mutate as globalMutate } from 'swr'
 import api from '../api/axios'
+import { UNREAD_MESSAGES_KEY } from '../lib/keys'
 
 const rawFetcher = async (url: string) => {
   const res = await api.get(url)
@@ -34,6 +45,7 @@ interface NotificationContextValue {
   notificationCount: number
   openNotif: () => Promise<void>
   dismissNotif: (id: string, href?: string) => Promise<void>
+  clearAllNotifications: () => Promise<void>
   closeNotif: () => void
   notifOpen: boolean
   msgNotifications: NotifItem[]
@@ -78,6 +90,11 @@ function msgToItem(m: any, rawId: (v: any) => any): NotifItem {
   }
 }
 
+/** Extrait les messages non lus d'une réponse API (hydra:member ou tableau brut). */
+function extractMsgs(data: any): any[] {
+  return data?.['hydra:member'] ?? data?.member ?? (Array.isArray(data) ? data : [])
+}
+
 export function NotificationProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth()
   const { unreadCount } = useUnreadCount()
@@ -86,7 +103,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
 
   const token = typeof window !== 'undefined' ? localStorage.getItem('medisecours_token') : null
 
-  // Consultations for sidebar badge: fetch all and filter client-side by 'En attente'
+  // ── Consultations en attente (badge sidebar amber) ──────────────────────
   const { data: consData } = useSWR(
     user ? '/api/consultations?itemsPerPage=200&order[createdAt]=desc' : null,
     rawFetcher,
@@ -95,15 +112,18 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   const allCons = consData?.['hydra:member'] ?? consData?.member ?? (Array.isArray(consData) ? consData : [])
   const pendingConsultationCount = allCons.filter((c: any) => c.statut === 'En attente').length
 
-  // Dismissed IDs for notification bell (persisted)
+  // ── IDs ignorées (dismissed) — persistées en localStorage ───────────────
   const [dismissedNotifIds, setDismissedNotifIds] = useState<Set<string>>(new Set(loadSet('notifDismissed')))
   useEffect(() => { saveSet('notifDismissed', dismissedNotifIds) }, [dismissedNotifIds])
 
-  // Conversations whose messages have been read (immune to SWR overwrite)
+  // ── Conversations marquées comme lues (protège contre SWR overwrite) ────
   const [readConversationIds, setReadConversationIds] = useState<Set<string>>(new Set(loadSet('readConvs')))
+
+  // ── Compteur local clearing pour le bouton ─────────────────────────────
+  const [clearing, setClearing] = useState(false)
   useEffect(() => { saveSet('readConvs', readConversationIds) }, [readConversationIds])
 
-  // Dropdown open state
+  // ── États dropdown ─────────────────────────────────────────────────────
   const [notifOpen, setNotifOpen] = useState(false)
   const [notifLoading, setNotifLoading] = useState(false)
   const [notifications, setNotifications] = useState<NotifItem[]>([])
@@ -112,7 +132,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   const [msgLoading, setMsgLoading] = useState(false)
   const [msgItems, setMsgItems] = useState<NotifItem[]>([])
 
-  // Global Event Bus state for messaging
+  // ── Event Bus WebSocket ────────────────────────────────────────────────
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null)
   const [onlineUsers, setOnlineUsers] = useState<Set<string>>(new Set())
   const messageHandlers = React.useRef<((msg: any) => void)[]>([])
@@ -130,60 +150,30 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     return val.split('/').pop()
   }, [])
 
-  // Polling fallback refresh (marche même sans WebSocket)
-  const { data: msgsData } = useSWR(
-    user?.id ? '/api/messages?itemsPerPage=50&order[createdAt]=desc' : null,
-    rawFetcher,
-    { refreshInterval: 15000, revalidateOnFocus: true }
-  )
-
-  useEffect(() => {
-    if (!msgsData) return
-    const raw = msgsData?.['hydra:member'] ?? msgsData?.member ?? (Array.isArray(msgsData) ? msgsData : [])
-    const items: NotifItem[] = []
-    for (const m of raw) {
-      if (rawId(m.expediteur) === user?.id) continue
-      if (m.statut === 'LU') continue
-      const convId = rawId(m.conversation)
-      if (convId && readConversationIds.has(convId)) continue
-      items.push(msgToItem(m, rawId))
-    }
-    items.sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime())
-    setMsgItems(items)
-  }, [msgsData, user?.id, rawId, readConversationIds])
-
-  // WebSocket: central connection for the whole app
+  // ── DIRECTIVE 4 : WebSocket ne met à jour QUE le compteur SWR ──────────
+  // Plus de setMsgItems / setNotifications ici → pas de double-write.
+  // Les listes sont fetchées on-demand par openMsg() / openNotif().
   useWebSocket(user?.id || '', token || '', {
     onNewMessage: (payload: any) => {
-      // 1. Trigger all registered handlers (page.tsx)
+      // 1. Déclencher les handlers enregistrés (page messages en temps réel)
       messageHandlers.current.forEach((h) => h(payload))
 
       if (!payload || rawId(payload.expediteur) === user?.id) return
-      
+
       const convId = String(rawId(payload.conversation))
-      // 2. If the user is actively viewing this conversation, DO NOT increment unread counts or show bell notification
+      // 2. Si l'utilisateur lit cette conversation, ne PAS incrémenter
       if (convId === activeConversationId) return
-      
-      const newItem = msgToItem(payload, rawId)
-      
-      setMsgItems((prev) => {
-        if (prev.some((x) => x.id === newItem.id)) return prev
-        return [newItem, ...prev]
-      })
 
-      setNotifications((prev) => {
-        if (prev.some((x) => x.id === newItem.id)) return prev
-        return [newItem, ...prev].sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime())
-      })
-
-      globalMutate('/api/messages/unread-count', (data: any) => {
+      // 3. Mutation optimiste du compteur SWR uniquement (pas de rebuild de liste)
+      globalMutate(UNREAD_MESSAGES_KEY, (data: any) => {
         if (!data) return { unreadCount: 1 }
         return { unreadCount: data.unreadCount + 1 }
       }, { revalidate: false })
     },
     onMessageRead: (payload: any) => {
       messageHandlers.current.forEach((h) => h({ _type: 'message_read', ...payload }))
-      globalMutate('/api/messages/unread-count')
+      // Revalide le compteur pour récupérer la vraie valeur serveur
+      globalMutate(UNREAD_MESSAGES_KEY)
     },
     onUserOnline: (payload: any) => {
       if (payload?.userId) {
@@ -205,18 +195,18 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     }
   })
 
-  // Open notification dropdown — fetch messages + consultations
+  // ── Dropdown notifications : fetch ON DEMAND au clic ───────────────────
   const openNotif = useCallback(async () => {
     if (notifOpen) { setNotifOpen(false); return }
     setNotifLoading(true)
     setNotifOpen(true)
     try {
       const [msgsRes, consRes] = await Promise.all([
-        api.get('/api/messages?itemsPerPage=20&order[createdAt]=desc'),
+        api.get('/api/messages?itemsPerPage=50&order[createdAt]=desc'),
         api.get('/api/consultations?itemsPerPage=10&order[createdAt]=desc'),
       ])
       const items: NotifItem[] = []
-      const msgs = msgsRes.data?.['hydra:member'] ?? msgsRes.data?.member ?? (Array.isArray(msgsRes.data) ? msgsRes.data : [])
+      const msgs = extractMsgs(msgsRes.data)
       for (const m of msgs) {
         if (rawId(m.expediteur) === user?.id) continue
         items.push({
@@ -230,7 +220,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
           sender: typeof m.expediteur === 'object' ? m.expediteur : null,
         })
       }
-      const cons = consRes.data?.['hydra:member'] ?? consRes.data?.member ?? (Array.isArray(consRes.data) ? consRes.data : [])
+      const cons = extractMsgs(consRes.data)
       for (const c of cons) {
         if (c.statut === 'OUVERTE') {
           items.push({
@@ -277,12 +267,10 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     setNotifications((prev) => prev.filter((x) => x.id !== id))
     setNotifOpen(false)
     if (isMsg) {
-      // Decrease SWR unread count so sidebar updates
-      globalMutate('/api/messages/unread-count', (data: any) => {
+      globalMutate(UNREAD_MESSAGES_KEY, (data: any) => {
         if (!data || data.unreadCount <= 0) return { unreadCount: 0 }
         return { unreadCount: data.unreadCount - 1 }
       }, { revalidate: false })
-      
       try {
         await api.patch(`/api/messages/${entityId}`, { statut: 'LU' }, { headers: { 'Content-Type': 'application/merge-patch+json' } })
       } catch { /* best effort */ }
@@ -290,6 +278,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     if (href) router.push(href)
   }, [router])
 
+  // ── Marquer une conversation comme lue (depuis la page messages) ────────
   const markConversationAsRead = useCallback((convId: string) => {
     setReadConversationIds((prev) => {
       if (prev.has(convId)) return prev
@@ -304,10 +293,9 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
         return id === convId
       })
       if (toRemove.length === 0) return prev
-
       const removeIds = new Set(toRemove.map((m) => m.id))
 
-      globalMutate('/api/messages/unread-count', (data: any) => {
+      globalMutate(UNREAD_MESSAGES_KEY, (data: any) => {
         if (!data) return { unreadCount: 0 }
         return { unreadCount: Math.max(0, data.unreadCount - toRemove.length) }
       }, { revalidate: false })
@@ -316,7 +304,6 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
         const entityId = item.id.replace('msg-', '')
         api.patch(`/api/messages/${entityId}`, { statut: 'LU' }, { headers: { 'Content-Type': 'application/merge-patch+json' } }).catch(() => {})
       }
-
       return prev.filter((m) => !removeIds.has(m.id))
     })
 
@@ -327,14 +314,14 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     }))
   }, [])
 
-  // Open message dropdown — fetch unread messages only
+  // ── Dropdown messages : fetch ON DEMAND au clic ─────────────────────────
   const openMsg = useCallback(async () => {
     if (msgOpen) { setMsgOpen(false); return }
     setMsgLoading(true)
     setMsgOpen(true)
     try {
-      const res = await api.get('/api/messages?itemsPerPage=20&order[createdAt]=desc')
-      const raw = res.data?.['hydra:member'] ?? res.data?.member ?? (Array.isArray(res.data) ? res.data : [])
+      const res = await api.get('/api/messages?itemsPerPage=50&order[createdAt]=desc')
+      const raw = extractMsgs(res.data)
       const items: NotifItem[] = []
       for (const m of raw) {
         if (rawId(m.expediteur) === user?.id) continue
@@ -350,49 +337,78 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   const closeMsg = useCallback(() => setMsgOpen(false), [])
 
   const dismissMsg = useCallback(async (id: string, href?: string) => {
-    // 1. FORCE LA MISE À JOUR DU STATE EN PREMIER (mise à jour locale instantanée)
     const entityId = id.replace('msg-', '')
     setMsgItems((prev) => prev.filter((m) => m.id !== id))
     setMsgOpen(false)
-
-    // On décrémente aussi le compteur global unreadCount optimiste pour que les 2 soient synchronisés
-    globalMutate('/api/messages/unread-count', (data: any) => {
+    globalMutate(UNREAD_MESSAGES_KEY, (data: any) => {
       if (!data || data.unreadCount <= 0) return { unreadCount: 0 }
       return { unreadCount: data.unreadCount - 1 }
     }, { revalidate: false })
-
-    // 2. REQUÊTE PATCH SÉCURISÉE vers API Platform
     try {
-      await api.patch(
-        `/api/messages/${entityId}`, 
-        { statut: 'LU' }, 
-        { headers: { 'Content-Type': 'application/merge-patch+json' } }
-      )
-    } catch { 
-      /* best effort */ 
-    }
-    
+      await api.patch(`/api/messages/${entityId}`, { statut: 'LU' }, { headers: { 'Content-Type': 'application/merge-patch+json' } })
+    } catch { /* best effort */ }
     if (href) router.push(href)
   }, [router])
 
-  // Derived counts
-  const activeConsIds = allCons.filter((c: any) => c.statut === 'En attente' || c.statut === 'OUVERTE').map((c: any) => `cons-${c.id}`)
-  const activeMsgIds = msgItems.map((m) => m.id)
-  const allActiveIds = [...activeConsIds, ...activeMsgIds]
-  const notificationCount = allActiveIds.filter((id) => !dismissedNotifIds.has(id)).length
-  
+  // ── DIRECTIVE 1 & 2 : clearAllNotifications — Optimistic + Persist ─────
+  const clearAllNotifications = useCallback(async () => {
+    setClearing(true)
+
+    // Étape A : Mutation optimiste instantanée (badge → 0 au毫秒)
+    setNotifications([])
+    setMsgItems([])
+    globalMutate(UNREAD_MESSAGES_KEY, { unreadCount: 0 }, false)
+
+    try {
+      // Étape B : Fetch les VRAIS non-lus depuis la BDD (pas le state local)
+      const res = await api.get('/api/messages', {
+        params: { itemsPerPage: 200, order: { createdAt: 'desc' } }
+      })
+      const allMsgs = extractMsgs(res.data)
+      const unreadMsgs = allMsgs.filter(
+        (m) => m.statut !== 'LU' && rawId(m.expediteur) !== user?.id
+      )
+
+      // Étape C : PATCH en masse vers PostgreSQL
+      if (unreadMsgs.length > 0) {
+        await Promise.all(
+          unreadMsgs.map((m) => {
+            const msgId = m.id ?? m['@id']?.split('/').pop()
+            return api.patch(
+              `/api/messages/${msgId}`,
+              { statut: 'LU' },
+              { headers: { 'Content-Type': 'application/merge-patch+json' } }
+            )
+          })
+        )
+      }
+
+      // Étape D : Revalidation SWR → F5 montre 0 définitivement
+      globalMutate(UNREAD_MESSAGES_KEY)
+    } catch {
+      // Rollback : revalide pour récupérer le vrai compteur
+      globalMutate(UNREAD_MESSAGES_KEY)
+    } finally {
+      setClearing(false)
+    }
+  }, [user?.id, rawId])
+
+  // ── DIRECTIVE 3 : notificationCount = SWR counter + consultations ──────
+  // Plus de calcul depuis msgItems (source dédoublonnée, fiable).
+  const notificationCount = unreadCount + pendingConsultationCount
+
   const msgDisplayCount = msgItems.length
 
   const ctxValue = useMemo(() => ({
     notifications, notifLoading, unreadCount,
     consultationCount: openConsultationCount, pendingConsultationCount, notificationCount,
-    openNotif, dismissNotif, closeNotif, notifOpen,
+    openNotif, dismissNotif, clearAllNotifications, closeNotif, notifOpen,
     msgNotifications: msgItems, msgLoading, msgOpen, openMsg, dismissMsg, markConversationAsRead, closeMsg, msgDisplayCount,
     activeConversationId, setActiveConversationId, subscribeToMessages, onlineUsers,
   }), [
     notifications, notifLoading, unreadCount,
     openConsultationCount, pendingConsultationCount, notificationCount,
-    openNotif, dismissNotif, closeNotif, notifOpen,
+    openNotif, dismissNotif, clearAllNotifications, closeNotif, notifOpen,
     msgItems, msgLoading, msgOpen, openMsg, dismissMsg, markConversationAsRead, closeMsg, msgDisplayCount,
     activeConversationId, setActiveConversationId, subscribeToMessages, onlineUsers,
   ])

@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import {
-  HeartPulse, LayoutDashboard, Users, CalendarClock, FileText, Pill, MessageCircle,
+  HeartPulse, LayoutDashboard, Users, CalendarClock, FileText, MessageCircle,
   BarChart3, Bell, Settings, Plus, LogOut,
 } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
@@ -14,8 +14,6 @@ const NAV = [
   { href: '/medecin', label: 'Overview', icon: LayoutDashboard, exact: true },
   { href: '/medecin/patients', label: 'Mes Patients', icon: Users },
   { href: '/medecin/consultations', label: 'Consultations', icon: CalendarClock, badge: 'consultations' },
-  { href: '/medecin/prescriptions', label: 'Prescriptions', icon: FileText },
-  { href: '/medecin/pharmacy', label: 'Pharmacie', icon: Pill },
   { href: '/medecin/avis', label: 'Avis', icon: MessageCircle },
   { href: '/medecin/messages', label: 'Messages', icon: MessageCircle, badge: 'unread' },
 ]

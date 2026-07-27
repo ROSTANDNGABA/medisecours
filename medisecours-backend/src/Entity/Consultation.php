@@ -93,6 +93,10 @@ class Consultation
     #[Groups(['consultation:read', 'consultation:write'])]
     private string $priorite = self::PRIORITE_NORMALE;
 
+    #[ORM\Column(type: 'text', nullable: true)]
+    #[Groups(['consultation:read', 'consultation:write'])]
+    private ?string $compteRendu = null;
+
     /**
      * Messages liés à cette consultation.
      *
@@ -216,6 +220,18 @@ class Consultation
     public function setPriorite(string $priorite): static
     {
         $this->priorite = $priorite;
+
+        return $this;
+    }
+
+    public function getCompteRendu(): ?string
+    {
+        return $this->compteRendu;
+    }
+
+    public function setCompteRendu(?string $compteRendu): static
+    {
+        $this->compteRendu = $compteRendu;
 
         return $this;
     }

@@ -1,171 +1,299 @@
 // @ts-nocheck
 'use client'
 
-import { useMemo } from 'react'
+import { useState, useMemo } from 'react'
 import useSWR from 'swr'
-import { BarChart3, TrendingUp, Users, HeartPulse, CalendarCheck, Star, MessageSquare } from 'lucide-react'
+import { FileText, Save, Printer, CheckCircle2, ChevronRight, Search, Stethoscope, User, Calendar } from 'lucide-react'
 import api from '../../../api/axios'
 import { fetcher } from '../../../lib/fetcher'
 import { useAuth } from '../../../hooks/useAuth'
 import LoadingSpinner from '../../../components/ui/LoadingSpinner'
 import EmptyState from '../../../components/ui/EmptyState'
-import { CONSULTATIONS_KEY, UNREAD_MESSAGES_KEY } from '../../../lib/keys'
+import { CONSULTATIONS_KEY } from '../../../lib/keys'
 import { idStrFromRelation } from '../../../types/api'
+
+function idFromRelation(r) {
+  if (!r) return null
+  if (typeof r === 'object') return r.id
+  if (typeof r === 'string') return r.split('/').pop()
+  return r
+}
+
+function formatDate(d) {
+  if (!d) return '—'
+  return new Date(d).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })
+}
 
 export default function MedecinRapportsPage() {
   const { user } = useAuth()
-  const { data: consData } = useSWR(CONSULTATIONS_KEY, fetcher, { revalidateOnFocus: false, keepPreviousData: true })
-  const { data: avisData } = useSWR(user?.id ? `/api/avis?medecin=${user.id}` : null, fetcher, { revalidateOnFocus: false, keepPreviousData: true })
-  // C2 corrigé : on ne charge PLUS tous les messages. On utilise le compteur léger.
-  const { data: unreadData } = useSWR<{ unreadCount: number }>(
-    UNREAD_MESSAGES_KEY,
-    async (url) => (await api.get(url)).data,
-    { revalidateOnFocus: false }
+  const { data: consData, mutate: mutateCons } = useSWR(CONSULTATIONS_KEY, fetcher, {
+    revalidateOnFocus: false,
+    keepPreviousData: true,
+  })
+
+  const consultations = useMemo(() => {
+    const raw = Array.isArray(consData) ? consData : consData?.['hydra:member'] ?? consData?.member ?? []
+    return raw.filter((c) => c.statut === 'TERMINEE' || c.statut === 'EN_COURS' || c.statut === 'OUVERTE')
+  }, [consData])
+
+  const [selectedId, setSelectedId] = useState(null)
+  const [search, setSearch] = useState('')
+  const [observations, setObservations] = useState('')
+  const [conclusions, setConclusions] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
+
+  const selected = useMemo(
+    () => consultations.find((c) => String(c.id) === String(selectedId)),
+    [consultations, selectedId]
   )
 
-  const consultations = useMemo(() => (Array.isArray(consData) ? consData : []), [consData])
-  const avis = useMemo(() => (Array.isArray(avisData) ? avisData : []), [avisData])
-  const nonLus = unreadData?.unreadCount ?? 0
+  const filtered = useMemo(() => {
+    if (!search.trim()) return consultations
+    const q = search.toLowerCase()
+    return consultations.filter((c) => {
+      const patientName = `${c.patient?.prenom || ''} ${c.patient?.nom || ''}`.toLowerCase()
+      const motif = (c.motif || '').toLowerCase()
+      return patientName.includes(q) || motif.includes(q)
+    })
+  }, [consultations, search])
 
-  const stats = useMemo(() => {
-    const patients = new Set(consultations.map((c) => idStrFromRelation(c.patient)).filter(Boolean))
-    const ouvertes = consultations.filter((c) => c.statut === 'OUVERTE').length
-    const enCours = consultations.filter((c) => c.statut === 'EN_COURS').length
-    const terminees = consultations.filter((c) => c.statut === 'TERMINEE').length
-    const annulees = consultations.filter((c) => c.statut === 'ANNULEE').length
-    const noteMoy = avis.length ? (avis.reduce((s, a) => s + a.note, 0) / avis.length).toFixed(1) : '—'
-
-    const parMois = {}
-    for (const c of consultations) {
-      const mois = new Date(c.createdAt).toLocaleDateString('fr-FR', { month: 'short', year: '2-digit' })
-      parMois[mois] = (parMois[mois] || 0) + 1
+  function handleSelect(c) {
+    setSelectedId(c.id)
+    setSaved(false)
+    const existing = c.compteRendu || ''
+    const parts = existing.split('\n---\n')
+    if (parts.length === 2) {
+      setObservations(parts[0])
+      setConclusions(parts[1])
+    } else {
+      setObservations(existing)
+      setConclusions('')
     }
+  }
 
-    return {
-      totalPatients: patients.size,
-      totalConsultations: consultations.length,
-      ouvertes, enCours, terminees, annulees,
-      noteMoyenne: noteMoy,
-      totalAvis: avis.length,
-      nonLus,
-      parMois: Object.entries(parMois).slice(-6),
-      tauxCompletion: consultations.length ? Math.round((terminees / consultations.length) * 100) : 0,
+  async function handleSave() {
+    if (!selectedId) return
+    setSaving(true)
+    try {
+      const compteRendu = [observations.trim(), conclusions.trim()].filter(Boolean).join('\n---\n')
+      await api.patch(`/api/consultations/${selectedId}`, { compteRendu }, {
+        headers: { 'Content-Type': 'application/merge-patch+json' },
+      })
+      setSaved(true)
+      mutateCons()
+    } catch {
+    } finally {
+      setSaving(false)
     }
-  }, [consultations, avis, nonLus])
+  }
 
-
+  function handlePrint() {
+    const patientName = selected?.patient ? `${selected.patient.prenom || ''} ${selected.patient.nom || ''}`.trim() : '—'
+    const content = `
+      <html><head><title>Rapport - ${patientName}</title>
+      <style>
+        body { font-family: Arial, sans-serif; padding: 40px; color: #333; }
+        h1 { color: #1D4E89; font-size: 20px; border-bottom: 2px solid #1D4E89; padding-bottom: 8px; }
+        h2 { color: #3B6EF8; font-size: 14px; margin-top: 24px; }
+        .meta { font-size: 13px; color: #666; margin-bottom: 20px; }
+        .section { margin-bottom: 16px; white-space: pre-wrap; font-size: 13px; line-height: 1.6; }
+        .footer { margin-top: 40px; font-size: 11px; color: #999; border-top: 1px solid #ddd; padding-top: 8px; }
+      </style></head><body>
+        <h1>Compte-rendu de consultation</h1>
+        <div class="meta">
+          <p><strong>Patient :</strong> ${patientName}</p>
+          <p><strong>Date :</strong> ${formatDate(selected?.createdAt)}</p>
+          <p><strong>Motif :</strong> ${selected?.motif || '—'}</p>
+          <p><strong>Statut :</strong> ${selected?.statut || '—'}</p>
+        </div>
+        <h2>Observations cliniques</h2>
+        <div class="section">${observations || 'Aucune observation.'}</div>
+        <h2>Conclusions / Conseils donnés</h2>
+        <div class="section">${conclusions || 'Aucune conclusion.'}</div>
+        <div class="footer">MediSecours+ — Rapport généré le ${new Date().toLocaleDateString('fr-FR')} par Dr ${user?.prenom || ''} ${user?.nom || ''}</div>
+      </body></html>
+    `
+    const win = window.open('', '_blank')
+    win.document.write(content)
+    win.document.close()
+    win.print()
+  }
 
   return (
-    <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 space-y-6">
-      <h2 className="font-display font-bold text-2xl text-primary-900 dark:text-sable">Rapports & Statistiques</h2>
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
+      <div className="mb-6">
+        <h2 className="font-display font-bold text-2xl text-[#0F2C52]">Rapports de consultation</h2>
+        <p className="mt-1 text-sm text-[#6B7280]">Rédigez vos comptes-rendus médicaux pour chaque consultation.</p>
+      </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {[
-          { icon: Users, label: 'Patients uniques', value: stats.totalPatients, color: '#3B6EF8' },
-          { icon: HeartPulse, label: 'Consultations', value: stats.totalConsultations, color: '#E84393' },
-          { icon: TrendingUp, label: 'Taux complétion', value: `${stats.tauxCompletion}%`, color: '#00C2B8' },
-          { icon: Star, label: 'Note moyenne', value: stats.noteMoyenne, color: '#F59E0B' },
-        ].map(({ icon: Icon, label, value, color }, i) => (
-          <div key={i} className="rounded-2xl bg-white dark:bg-primary-800 border border-primary-100 dark:border-white/5 p-5">
-            <div className="flex items-center gap-3 mb-3">
-              <div className="flex h-9 w-9 items-center justify-center rounded-lg" style={{ backgroundColor: `${color}20` }}>
-                <Icon className="h-4.5 w-4.5" style={{ color }} />
+      <div className="flex flex-col lg:flex-row gap-6">
+        {/* Left panel — consultation list */}
+        <div className="w-full lg:w-[380px] shrink-0">
+          <div className="rounded-2xl border border-[#E5E7EB] bg-white overflow-hidden">
+            <div className="border-b border-[#E5E7EB] px-4 py-3">
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#9CA3AF]" />
+                <input
+                  type="text"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Rechercher un patient..."
+                  className="w-full rounded-xl bg-[#F3F4F6] py-2 pl-9 pr-3 text-sm text-[#374151] placeholder-[#9CA3AF] outline-none focus:ring-2 focus:ring-[#3B6EF8]/20"
+                />
               </div>
-              <span className="text-xs font-medium text-primary-300">{label}</span>
             </div>
-            <p className="font-display text-2xl font-bold text-primary-900 dark:text-sable">{value}</p>
+            <div className="max-h-[calc(100vh-300px)] overflow-y-auto">
+              {filtered.length === 0 ? (
+                <EmptyState icon={Stethoscope} title="Aucune consultation" description="Pas encore de consultations à traiter." />
+              ) : (
+                filtered.map((c) => {
+                  const patientName = c.patient ? `${c.patient.prenom || ''} ${c.patient.nom || ''}`.trim() : 'Inconnu'
+                  const isActive = String(c.id) === String(selectedId)
+                  const hasReport = !!c.compteRendu
+                  return (
+                    <button
+                      key={c.id}
+                      onClick={() => handleSelect(c)}
+                      className={`flex w-full items-center gap-3 px-4 py-3 text-left transition border-b border-[#F3F4F6] last:border-0 ${
+                        isActive ? 'bg-[#F0F4FF]' : 'hover:bg-[#F9FAFB]'
+                      }`}
+                    >
+                      <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${
+                        hasReport ? 'bg-emerald-100' : 'bg-[#F3F4F6]'
+                      }`}>
+                        {hasReport ? (
+                          <CheckCircle2 className="h-4.5 w-4.5 text-emerald-500" />
+                        ) : (
+                          <FileText className="h-4.5 w-4.5 text-[#9CA3AF]" />
+                        )}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className={`text-sm font-medium truncate ${isActive ? 'text-[#3B6EF8]' : 'text-[#0F2C52]'}`}>
+                          {patientName}
+                        </p>
+                        <p className="text-xs text-[#9CA3AF] truncate">{c.motif || 'Sans motif'}</p>
+                        <p className="text-[10px] text-[#9CA3AF]">{formatDate(c.createdAt)}</p>
+                      </div>
+                      <ChevronRight className={`h-4 w-4 shrink-0 ${isActive ? 'text-[#3B6EF8]' : 'text-[#D1D5DB]'}`} />
+                    </button>
+                  )
+                })
+              )}
+            </div>
           </div>
-        ))}
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="rounded-2xl bg-white dark:bg-primary-800 border border-primary-100 dark:border-white/5 p-5">
-          <h3 className="text-sm font-bold text-primary-900 dark:text-sable mb-4">Statut des consultations</h3>
-          {consultations.length > 0 ? (
-            <div className="space-y-3">
-              {[
-                { label: 'Ouvertes', count: stats.ouvertes, color: '#3B6EF8' },
-                { label: 'En cours', count: stats.enCours, color: '#00C2B8' },
-                { label: 'Terminées', count: stats.terminees, color: '#10B981' },
-                { label: 'Annulées', count: stats.annulees, color: '#EF4444' },
-              ].map((s) => {
-                const pct = stats.totalConsultations ? ((s.count / stats.totalConsultations) * 100).toFixed(1) : 0
-                return (
-                  <div key={s.label}>
-                    <div className="flex justify-between text-sm mb-1">
-                      <span className="text-primary-700 dark:text-sable">{s.label}</span>
-                      <span className="font-semibold text-primary-900 dark:text-sable">{s.count} ({pct}%)</span>
-                    </div>
-                    <div className="h-2 w-full rounded-full bg-primary-100 dark:bg-primary-900/60">
-                      <div className="h-2 rounded-full transition-all" style={{ width: `${pct}%`, backgroundColor: s.color }} />
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          ) : (
-            <EmptyState icon={BarChart3} title="Aucune donnée" description="Pas encore de consultations." />
-          )}
         </div>
 
-        <div className="rounded-2xl bg-white dark:bg-primary-800 border border-primary-100 dark:border-white/5 p-5">
-          <h3 className="text-sm font-bold text-primary-900 dark:text-sable mb-4">Évolution des consultations</h3>
-          {stats.parMois.length > 0 ? (
-            <div className="space-y-3">
-              {stats.parMois.map(([mois, count]) => {
-                const max = Math.max(...stats.parMois.map(([, c]) => c), 1)
-                const pct = (count / max) * 100
-                return (
-                  <div key={mois}>
-                    <div className="flex justify-between text-sm mb-1">
-                      <span className="text-primary-700 dark:text-sable capitalize">{mois}</span>
-                      <span className="font-semibold text-primary-900 dark:text-sable">{count}</span>
-                    </div>
-                    <div className="h-2 w-full rounded-full bg-primary-100 dark:bg-primary-900/60">
-                      <div className="h-2 rounded-full transition-all" style={{ width: `${pct}%`, backgroundColor: '#3B6EF8' }} />
-                    </div>
-                  </div>
-                )
-              })}
+        {/* Right panel — report editor */}
+        <div className="flex-1 min-w-0">
+          {!selected ? (
+            <div className="rounded-2xl border border-[#E5E7EB] bg-white flex flex-col items-center justify-center py-20 px-6">
+              <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-[#F3F4F6] mb-4">
+                <FileText className="h-8 w-8 text-[#D1D5DB]" />
+              </div>
+              <p className="text-base font-semibold text-[#374151] mb-1">Sélectionnez une consultation</p>
+              <p className="text-sm text-[#9CA3AF] text-center max-w-xs">
+                Choisissez une consultation dans la liste pour rédiger ou modifier son compte-rendu médical.
+              </p>
             </div>
           ) : (
-            <EmptyState icon={CalendarCheck} title="Aucune donnée" description="Pas encore de consultations mensuelles." />
-          )}
-        </div>
-      </div>
+            <div className="rounded-2xl border border-[#E5E7EB] bg-white overflow-hidden">
+              {/* Patient info header */}
+              <div className="border-b border-[#E5E7EB] px-6 py-4 bg-[#F8FAFF]">
+                <div className="flex items-center justify-between flex-wrap gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#3B6EF8]/10">
+                      <User className="h-5 w-5 text-[#3B6EF8]" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-bold text-[#0F2C52]">
+                        {selected.patient?.prenom || ''} {selected.patient?.nom || ''}
+                      </p>
+                      <p className="text-xs text-[#6B7280]">
+                        Consultation du {formatDate(selected.createdAt)} {selected.motif ? `· ${selected.motif}` : ''}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-semibold ${
+                      selected.statut === 'TERMINEE' ? 'bg-emerald-100 text-emerald-700' :
+                      selected.statut === 'EN_COURS' ? 'bg-amber-100 text-amber-700' :
+                      'bg-blue-100 text-blue-700'
+                    }`}>
+                      {selected.statut}
+                    </span>
+                    {selected.compteRendu && (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-0.5 text-[10px] font-semibold text-emerald-600">
+                        <CheckCircle2 className="h-3 w-3" /> Rédigé
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <div className="rounded-2xl bg-white dark:bg-primary-800 border border-primary-100 dark:border-white/5 p-5 flex items-center gap-4">
-          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-amber-100">
-            <Star className="h-6 w-6 text-amber-500" />
-          </div>
-          <div>
-            <p className="text-xs font-medium text-primary-300">Avis reçus</p>
-            <p className="font-display text-xl font-bold text-primary-900 dark:text-sable">{stats.totalAvis}</p>
-            <p className="text-xs text-primary-300">Note moyenne: {stats.noteMoyenne}/5</p>
-          </div>
-        </div>
-        <div className="rounded-2xl bg-white dark:bg-primary-800 border border-primary-100 dark:border-white/5 p-5 flex items-center gap-4">
-          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-blue-100">
-            <MessageSquare className="h-6 w-6 text-blue-500" />
-          </div>
-          <div>
-            <p className="text-xs font-medium text-primary-300">Messages non lus</p>
-            <p className="font-display text-xl font-bold text-primary-900 dark:text-sable">{stats.nonLus}</p>
-            <p className="text-xs text-primary-300">messages non lus</p>
-          </div>
-        </div>
-        <div className="rounded-2xl bg-white dark:bg-primary-800 border border-primary-100 dark:border-white/5 p-5 flex items-center gap-4">
-          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-100">
-            <Users className="h-6 w-6 text-emerald-500" />
-          </div>
-          <div>
-            <p className="text-xs font-medium text-primary-300">Consultations/mois</p>
-            <p className="font-display text-xl font-bold text-primary-900 dark:text-sable">
-              {stats.totalConsultations ? Math.round(stats.totalConsultations / Math.max(stats.parMois.length, 1)) : 0}
-            </p>
-            <p className="text-xs text-primary-300">Moyenne mensuelle</p>
-          </div>
+              {/* Form */}
+              <div className="px-6 py-5 space-y-5">
+                <div>
+                  <label className="block text-sm font-semibold text-[#0F2C52] mb-1.5">
+                    Observations cliniques
+                  </label>
+                  <textarea
+                    value={observations}
+                    onChange={(e) => { setObservations(e.target.value); setSaved(false) }}
+                    placeholder="Décrivez les symptômes observés, les résultats de l'examen clinique, les signes vitaux, les analyses effectuées..."
+                    rows={8}
+                    className="w-full rounded-xl border border-[#E5E7EB] bg-[#FAFBFC] px-4 py-3 text-sm text-[#374151] placeholder-[#9CA3AF] outline-none transition focus:border-[#3B6EF8] focus:ring-2 focus:ring-[#3B6EF8]/10 resize-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-[#0F2C52] mb-1.5">
+                    Conclusions / Conseils donnés
+                  </label>
+                  <textarea
+                    value={conclusions}
+                    onChange={(e) => { setConclusions(e.target.value); setSaved(false) }}
+                    placeholder="Diagnostic posé, traitement prescrit, conseils prodigués au patient, prochain rendez-vous..."
+                    rows={6}
+                    className="w-full rounded-xl border border-[#E5E7EB] bg-[#FAFBFC] px-4 py-3 text-sm text-[#374151] placeholder-[#9CA3AF] outline-none transition focus:border-[#3B6EF8] focus:ring-2 focus:ring-[#3B6EF8]/10 resize-none"
+                  />
+                </div>
+              </div>
+
+              {/* Action bar */}
+              <div className="border-t border-[#E5E7EB] px-6 py-4 flex items-center justify-between bg-[#FAFBFC]">
+                <div className="flex items-center gap-2">
+                  {saved && (
+                    <span className="flex items-center gap-1.5 text-sm text-emerald-600 font-medium">
+                      <CheckCircle2 className="h-4 w-4" /> Sauvegardé
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={handlePrint}
+                    disabled={!selected.compteRendu && !observations.trim() && !conclusions.trim()}
+                    className="inline-flex items-center gap-2 rounded-xl border border-[#E5E7EB] bg-white px-4 py-2 text-sm font-medium text-[#374151] transition hover:bg-[#F3F4F6] disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    <Printer className="h-4 w-4" />
+                    Imprimer
+                  </button>
+                  <button
+                    onClick={handleSave}
+                    disabled={saving || (!observations.trim() && !conclusions.trim())}
+                    className="inline-flex items-center gap-2 rounded-xl bg-[#3B6EF8] px-5 py-2 text-sm font-semibold text-white transition hover:bg-[#2D5CD8] disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {saving ? (
+                      <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                    ) : (
+                      <Save className="h-4 w-4" />
+                    )}
+                    Enregistrer le rapport
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

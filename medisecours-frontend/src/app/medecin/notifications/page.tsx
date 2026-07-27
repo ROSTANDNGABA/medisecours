@@ -1,13 +1,15 @@
 // @ts-nocheck
 'use client'
 
-import { useEffect, useMemo, useRef } from 'react'
-import useSWR from 'swr'
+import { useEffect, useMemo, useCallback, useState } from 'react'
+import useSWR, { mutate as globalMutate } from 'swr'
 import Link from 'next/link'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Bell, MessageSquare, Star, ArrowRight, Clock } from 'lucide-react'
+import { Bell, MessageSquare, Star, ArrowRight, Clock, Trash2 } from 'lucide-react'
+import api from '../../../api/axios'
 import { fetcher } from '../../../lib/fetcher'
 import { useAuth } from '../../../hooks/useAuth'
+import { UNREAD_MESSAGES_KEY } from '../../../lib/keys'
 import LoadingSpinner from '../../../components/ui/LoadingSpinner'
 import EmptyState from '../../../components/ui/EmptyState'
 import Avatar from '../../../components/ui/Avatar'
@@ -48,8 +50,6 @@ export default function MedecinNotificationsPage() {
   // C2 corrigé : pagination stricte (20 derniers) au lieu de charger tous les messages.
   const { data: msgData, isLoading: msgLoading } = useSWR(RECENT_MESSAGES_KEY, fetcher, { revalidateOnFocus: false })
   const { data: avisData, isLoading: avisLoading } = useSWR(user?.id ? `/api/avis?medecin=${user.id}` : null, fetcher, { revalidateOnFocus: false })
-  const prevCount = useRef(0)
-
   const messages = useMemo(() => (Array.isArray(msgData) ? msgData : []), [msgData])
   const avis = useMemo(() => (Array.isArray(avisData) ? avisData : []), [avisData])
 
@@ -101,10 +101,28 @@ export default function MedecinNotificationsPage() {
   }, [messages, avis, user?.id])
 
   const unreadCount = useMemo(() => notifications.filter(n => n.unread).length, [notifications])
+  const [clearing, setClearing] = useState(false)
 
-  useEffect(() => {
-    prevCount.current = unreadCount
-  }, [unreadCount])
+  const clearAllNotifications = useCallback(async () => {
+    setClearing(true)
+    try {
+      const res = await api.get('/api/messages', { params: { itemsPerPage: 200, order: { createdAt: 'desc' } } })
+      const allMsgs = res.data?.['hydra:member'] ?? res.data?.member ?? (Array.isArray(res.data) ? res.data : [])
+      const unreadMsgs = allMsgs.filter((m) => m.statut !== 'LU' && idStrFromRelation(m.expediteur) !== user?.id)
+      globalMutate(UNREAD_MESSAGES_KEY, { unreadCount: 0 }, false)
+      globalMutate(UNREAD_MESSAGES_KEY)
+      if (unreadMsgs.length > 0) {
+        await Promise.all(unreadMsgs.map((m) => {
+          const msgId = m.id ?? m['@id']?.split('/').pop()
+          return api.patch(`/api/messages/${msgId}`, { statut: 'LU' }, { headers: { 'Content-Type': 'application/merge-patch+json' } }).catch(() => {})
+        }))
+      }
+      globalMutate(RECENT_MESSAGES_KEY)
+    } catch {
+    } finally {
+      setClearing(false)
+    }
+  }, [user?.id])
 
   if (msgLoading || avisLoading) return (
     <div className="flex min-h-[60vh] items-center justify-center">
@@ -119,7 +137,7 @@ export default function MedecinNotificationsPage() {
           <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#3B6EF8]/10">
             <Bell className="h-6 w-6 text-[#3B6EF8]" />
           </div>
-          <div>
+          <div className="flex-1">
             <h1 className="text-2xl font-bold tracking-tight text-[#0F2C52]">Notifications</h1>
             <p className="mt-0.5 text-sm text-[#6B7280]">
               {unreadCount > 0
@@ -127,6 +145,18 @@ export default function MedecinNotificationsPage() {
                 : 'Tout est à jour'}
             </p>
           </div>
+          <button
+            onClick={clearAllNotifications}
+            disabled={clearing}
+            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors duration-200 disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            {clearing ? (
+              <span className="h-4 w-4 animate-spin rounded-full border-2 border-red-400 border-t-transparent" />
+            ) : (
+              <Trash2 className="h-4 w-4" />
+            )}
+            Tout effacer
+          </button>
         </div>
       </motion.div>
 

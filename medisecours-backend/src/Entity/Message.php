@@ -58,7 +58,7 @@ class Message
 
     #[ORM\Column(length: 20)]
     #[Assert\Choice(choices: [self::STATUT_ENVOYE, self::STATUT_LIVRE, self::STATUT_LU])]
-    #[Groups(['message:read', 'conversation:read'])]
+    #[Groups(['message:read', 'message:write', 'conversation:read'])]
     private string $statut = self::STATUT_ENVOYE;
 
     #[ORM\Column(length: 20)]

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, usePathname } from 'next/navigation'
 import { Search, ChevronDown, User, Loader2, Stethoscope, Building2, Activity, MessageCircle, Bell, MessageSquare, Clock, Settings, LogOut } from 'lucide-react'
 import Avatar from '../ui/Avatar'
 import { useAuth } from '../../hooks/useAuth'
@@ -88,10 +88,12 @@ function timeAgo(dateString: string) {
 export default function MedecinHeader() {
   const { user, logout } = useAuth()
   const router = useRouter()
+  const pathname = usePathname()
+  const estSurPageNotifications = pathname?.includes('/medecin/notifications')
   const {
     notifications, notifLoading, notifOpen, notificationCount, msgDisplayCount,
     msgNotifications, msgLoading, msgOpen,
-    openNotif, dismissNotif, closeNotif,
+    openNotif, dismissNotif, clearAllNotifications, closeNotif,
     openMsg, dismissMsg, closeMsg,
   } = useNotification()
 
@@ -247,7 +249,7 @@ export default function MedecinHeader() {
           aria-label="Notifications"
         >
           <Bell className={`h-5 w-5 ${notifOpen ? 'text-[#3B6EF8]' : 'text-[#6B7280]'}`} />
-          {notificationCount > 0 && (
+          {!estSurPageNotifications && notificationCount > 0 && (
             <span className="absolute right-1.5 top-1.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-[#EF4444] px-1 text-[10px] font-bold leading-none text-white">
               {notificationCount > 99 ? '99+' : notificationCount}
             </span>
@@ -257,12 +259,22 @@ export default function MedecinHeader() {
           <div className="absolute right-0 top-full mt-2 w-[380px] origin-top-right rounded-xl border border-[#E5E7EB] bg-white shadow-xl">
             <div className="flex items-center justify-between border-b border-[#E5E7EB] px-4 py-3">
               <h3 className="text-sm font-bold text-[#0F2C52]">Notifications</h3>
-              <button
-                onClick={() => { closeNotif(); router.push('/medecin/notifications') }}
-                className="text-xs font-semibold text-[#3B6EF8] hover:underline"
-              >
-                Voir tout
-              </button>
+              <div className="flex items-center gap-3">
+                {notifications.some(n => n.unread) && (
+                  <button
+                    onClick={() => clearAllNotifications()}
+                    className="text-xs font-semibold text-[#EF4444] hover:underline"
+                  >
+                    Tout effacer
+                  </button>
+                )}
+                <button
+                  onClick={() => { closeNotif(); router.push('/medecin/notifications') }}
+                  className="text-xs font-semibold text-[#3B6EF8] hover:underline"
+                >
+                  Voir tout
+                </button>
+              </div>
             </div>
             <div className="max-h-[360px] overflow-y-auto">
               {notifLoading ? (
