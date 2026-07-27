@@ -20,6 +20,8 @@ import useSWR, { mutate as globalMutate } from 'swr'
 import api from '../api/axios'
 import { UNREAD_MESSAGES_KEY } from '../lib/keys'
 
+const MERGE_PATCH_HEADERS = { 'Content-Type': 'application/merge-patch+json' } as const
+
 const rawFetcher = async (url: string) => {
   const res = await api.get(url)
   return res.data
@@ -272,7 +274,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
         return { unreadCount: data.unreadCount - 1 }
       }, { revalidate: false })
       try {
-        await api.patch(`/api/messages/${entityId}`, { statut: 'LU' }, { headers: { 'Content-Type': 'application/merge-patch+json' } })
+        await api.patch(`/api/messages/${entityId}`, { statut: 'LU' }, { headers: MERGE_PATCH_HEADERS })
       } catch { /* best effort */ }
     }
     if (href) router.push(href)
@@ -302,7 +304,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
 
       for (const item of toRemove) {
         const entityId = item.id.replace('msg-', '')
-        api.patch(`/api/messages/${entityId}`, { statut: 'LU' }, { headers: { 'Content-Type': 'application/merge-patch+json' } }).catch(() => {})
+        api.patch(`/api/messages/${entityId}`, { statut: 'LU' }, { headers: MERGE_PATCH_HEADERS }).catch(() => {})
       }
       return prev.filter((m) => !removeIds.has(m.id))
     })
@@ -345,22 +347,24 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       return { unreadCount: data.unreadCount - 1 }
     }, { revalidate: false })
     try {
-      await api.patch(`/api/messages/${entityId}`, { statut: 'LU' }, { headers: { 'Content-Type': 'application/merge-patch+json' } })
+      await api.patch(`/api/messages/${entityId}`, { statut: 'LU' }, { headers: MERGE_PATCH_HEADERS })
     } catch { /* best effort */ }
     if (href) router.push(href)
   }, [router])
 
-  // ── DIRECTIVE 1 & 2 : clearAllNotifications — Optimistic + Persist ─────
+  // ── clearAllNotifications — Persist garanti + audit trail ────────────────
+  // Résout le bug "Tout effacer" qui ne persistait pas en BDD (F5 = retour).
+  // Protocol: fresh GET → Promise.allSettled (aucune abération) → SWR sync.
   const clearAllNotifications = useCallback(async () => {
     setClearing(true)
 
-    // Étape A : Mutation optimiste instantanée (badge → 0 au毫秒)
+    // 1) Mutation optimiste instantanée (UX : badge → 0 au毫秒)
     setNotifications([])
     setMsgItems([])
     globalMutate(UNREAD_MESSAGES_KEY, { unreadCount: 0 }, false)
 
     try {
-      // Étape B : Fetch les VRAIS non-lus depuis la BDD (pas le state local)
+      // 2) GET de sécurité en direct vers la BDD (pas le state local stale)
       const res = await api.get('/api/messages', {
         params: { itemsPerPage: 200, order: { createdAt: 'desc' } }
       })
@@ -369,25 +373,41 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
         (m) => m.statut !== 'LU' && rawId(m.expediteur) !== user?.id
       )
 
-      // Étape C : PATCH en masse vers PostgreSQL
-      if (unreadMsgs.length > 0) {
-        await Promise.all(
-          unreadMsgs.map((m) => {
-            const msgId = m.id ?? m['@id']?.split('/').pop()
-            return api.patch(
-              `/api/messages/${msgId}`,
-              { statut: 'LU' },
-              { headers: { 'Content-Type': 'application/merge-patch+json' } }
-            )
-          })
+      if (unreadMsgs.length === 0) {
+        globalMutate(UNREAD_MESSAGES_KEY)
+        return
+      }
+
+      // 3) PATCH en masse — Promise.allSettled (aucune abération sur échec partiel)
+      const results = await Promise.allSettled(
+        unreadMsgs.map((m) => {
+          const msgId = m.id ?? String(m['@id']?.split('/').pop())
+          return api.patch(
+            `/api/messages/${msgId}`,
+            { statut: 'LU' },
+            { headers: MERGE_PATCH_HEADERS }
+          )
+        })
+      )
+
+      // 4) Audit trail : log chaque échec pour diagnostiquer le 415/403/422
+      const failed = results.filter((r) => r.status === 'rejected') as PromiseRejectedResult[]
+      if (failed.length > 0) {
+        console.error(
+          `[clearAllNotifications] ${failed.length}/${unreadMsgs.length} PATCH échoués:`,
+          failed.map((r) => r.reason?.message ?? r.reason)
         )
       }
 
-      // Étape D : Revalidation SWR → F5 montre 0 définitivement
+      // 5) Revalidation SWR — APRÈS résolution de TOUTES les promesses
+      // Compteur unread (badge cloche + sidebar)
       globalMutate(UNREAD_MESSAGES_KEY)
-    } catch {
-      // Rollback : revalide pour récupérer le vrai compteur
+      // Liste messages (page messages, page notifications, dropdown header)
+      globalMutate((key: string) => typeof key === 'string' && key.startsWith('/api/messages'))
+    } catch (err) {
+      console.error('[clearAllNotifications] Erreur fatale:', err)
       globalMutate(UNREAD_MESSAGES_KEY)
+      globalMutate((key: string) => typeof key === 'string' && key.startsWith('/api/messages'))
     } finally {
       setClearing(false)
     }

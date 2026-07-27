@@ -109,16 +109,26 @@ export default function MedecinNotificationsPage() {
       const res = await api.get('/api/messages', { params: { itemsPerPage: 200, order: { createdAt: 'desc' } } })
       const allMsgs = res.data?.['hydra:member'] ?? res.data?.member ?? (Array.isArray(res.data) ? res.data : [])
       const unreadMsgs = allMsgs.filter((m) => m.statut !== 'LU' && idStrFromRelation(m.expediteur) !== user?.id)
-      globalMutate(UNREAD_MESSAGES_KEY, { unreadCount: 0 }, false)
-      globalMutate(UNREAD_MESSAGES_KEY)
+
       if (unreadMsgs.length > 0) {
-        await Promise.all(unreadMsgs.map((m) => {
-          const msgId = m.id ?? m['@id']?.split('/').pop()
-          return api.patch(`/api/messages/${msgId}`, { statut: 'LU' }, { headers: { 'Content-Type': 'application/merge-patch+json' } }).catch(() => {})
-        }))
+        const results = await Promise.allSettled(
+          unreadMsgs.map((m) => {
+            const msgId = m.id ?? String(m['@id']?.split('/').pop())
+            return api.patch(`/api/messages/${msgId}`, { statut: 'LU' }, { headers: { 'Content-Type': 'application/merge-patch+json' } })
+          })
+        )
+        const failed = results.filter((r) => r.status === 'rejected')
+        if (failed.length > 0) {
+          console.error(`[notifications/clearAll] ${failed.length}/${unreadMsgs.length} PATCH échoués`)
+        }
       }
+
+      globalMutate(UNREAD_MESSAGES_KEY)
       globalMutate(RECENT_MESSAGES_KEY)
-    } catch {
+    } catch (err) {
+      console.error('[notifications/clearAll] Erreur:', err)
+      globalMutate(UNREAD_MESSAGES_KEY)
+      globalMutate(RECENT_MESSAGES_KEY)
     } finally {
       setClearing(false)
     }
