@@ -61,13 +61,14 @@ export default function MedecinNotificationsPage() {
     const items = []
     for (const m of messages) {
       if (idStrFromRelation(m.expediteur) === user?.id) continue
+      if (m.statut === 'LU') continue
       items.push({
         id: `msg-${m.id}`,
         type: 'message',
         title: 'Nouveau message',
         description: m.contenu?.slice(0, 100) || 'Message reçu',
         time: m.createdAt,
-        unread: m.statut !== 'LU',
+        unread: true,
         link: '/medecin/messages',
         sender: m.expediteur,
       })

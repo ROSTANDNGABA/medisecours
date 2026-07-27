@@ -211,13 +211,14 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       const msgs = extractMsgs(msgsRes.data)
       for (const m of msgs) {
         if (rawId(m.expediteur) === user?.id) continue
+        if (m.statut === 'LU') continue
         items.push({
           id: `msg-${m.id}`,
           type: 'message',
           title: 'Nouveau message',
           description: m.contenu?.slice(0, 100) || 'Message reçu',
           time: m.createdAt,
-          unread: m.statut !== 'LU',
+          unread: true,
           href: `/medecin/messages?id=${rawId(m.conversation)}`,
           sender: typeof m.expediteur === 'object' ? m.expediteur : null,
         })
