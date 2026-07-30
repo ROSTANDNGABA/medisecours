@@ -7,9 +7,13 @@
 @theme {
   --color-primary-50: #EAF0F7;
   --color-primary-100: #CBDBEA;
+  --color-primary-200: #9DBBD3;
   --color-primary-300: #6F94B8;
+  --color-primary-400: #466F99;
   --color-primary-500: #1E3A5F;
+  --color-primary-600: #1A3252;
   --color-primary-700: #152A45;
+  --color-primary-800: #102237;
   --color-primary-900: #0C1A2C;
   --color-primary: #1E3A5F;
 

@@ -86,8 +86,8 @@ export default function ProfilPage() {
   const initials = `${user.prenom?.[0] || ''}${user.nom?.[0] || ''}`.toUpperCase()
 
   return (
-    <div className="max-w-2xl mx-auto px-6 py-12">
-      <div className="rounded-2xl bg-white/80 dark:bg-primary-700/40 border border-white/50 dark:border-white/10 shadow-glass p-8">
+    <div className="max-w-2xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
+      <div className="rounded-2xl bg-white/80 dark:bg-primary-700/40 border border-white/50 dark:border-white/10 shadow-glass p-5 sm:p-8">
         <div className="flex flex-col items-center mb-8">
           <div className="relative">
             <div className="w-24 h-24 rounded-full bg-primary-500 text-white flex items-center justify-center text-2xl font-bold overflow-hidden">

@@ -9,14 +9,8 @@ import LoadingSpinner from '../../../components/ui/LoadingSpinner'
 import EmptyState from '../../../components/ui/EmptyState'
 import { useToast } from '../../../components/ui/Toast'
 import { CategoryIcon } from '../../../components/ui/CategoryIcon'
-import { API_BASE } from '../../../lib/config'
 
 const GRAVITES = ['LÉGÈRE', 'MODÉRÉE', 'SÉVÈRE', 'CRITIQUE', 'VARIABLE']
-
-function imageUrl(path: string) {
-  if (!path) return null
-  return path.startsWith('http') ? path : `${API_BASE}/uploads/media/${path}`
-}
 
 export default function CategoryDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
@@ -28,31 +22,25 @@ export default function CategoryDetailPage({ params }: { params: Promise<{ id: s
   const toast = useToast()
 
   useEffect(() => {
-    let active = true
-    api.get(`/api/categories/${id}`)
-      .then((res: any) => {
+    let active = true;
+    (async () => {
+      try {
+        const catRes = await api.get(`/api/categories/${id}`)
         if (!active) return
-        setCategory(res.data)
-        const refs = res.data.maladies || []
-        if (refs.length === 0) {
-          setMaladies([])
-          return
-        }
-        if (typeof refs[0] === 'object') {
-          setMaladies(refs)
-          return
-        }
-        return api.get('/api/maladies').then((mr: any) => {
-          const all = mr.data['hydra:member'] || mr.data.member || mr.data
-          const list = Array.isArray(all) ? all : []
-          setMaladies(list.filter((m: any) => String(m.categorie?.id) === String(id)))
-        })
-      })
-      .catch((err: any) => {
+        setCategory(catRes.data)
+
+        const malRes = await api.get(`/api/maladies?categorie=/api/categories/${id}`)
+        if (!active) return
+        const raw = malRes.data['hydra:member'] ?? malRes.data?.member ?? malRes.data
+        setMaladies(Array.isArray(raw) ? raw : [])
+      } catch (err: any) {
+        if (!active) return
         if (err.response?.status === 404) setNotFound(true)
         else toast.error('Impossible de charger cette catégorie.')
-      })
-      .finally(() => active && setLoading(false))
+      } finally {
+        if (active) setLoading(false)
+      }
+    })()
     return () => { active = false }
   }, [id, toast])
 

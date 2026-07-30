@@ -1,33 +1,40 @@
-import Link from 'next/link'
-import { ArrowUpRight } from 'lucide-react'
+import { ArrowRight } from 'lucide-react'
 import { CategoryIcon } from '../ui/CategoryIcon'
 
-export default function CategoryCard({ category }: { category: any }) {
+export default function CategoryCard({ category, onExplore }: { category: any; onExplore: (cat: any) => void }) {
   const count = category.maladies?.length ?? 0
-  const bg = `${category.couleur || '#1E3A5F'}14`
+  const color = category.couleur || '#10B981'
+
   return (
-    <Link
-      href={`/categories/${category.id}`}
-      className="group relative overflow-hidden rounded-2xl p-6 border border-white/40 dark:border-white/10 shadow-lg hover:shadow-xl hover:-translate-y-1 transition-all duration-300"
-      style={{ backgroundColor: bg }}
-    >
-      <div
-        className="absolute -right-6 -top-6 w-24 h-24 rounded-full opacity-20 group-hover:scale-125 transition-transform duration-500"
-        style={{ backgroundColor: category.couleur || '#1E3A5F' }}
-      />
-      <div className="relative">
-        <div className="mb-3">
-          <CategoryIcon iconName={category.icone} categoryName={category.nom} size="md" />
-        </div>
-        <h3 className="font-display font-bold text-lg text-primary-900 dark:text-sable mb-1">{category.nom}</h3>
-        <p className="text-sm text-primary-300 line-clamp-2 mb-4">{category.description}</p>
-        <div className="flex items-center justify-between">
-          <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-white/70 dark:bg-primary-700/60 text-primary-700 dark:text-sable">
+    <div className="group flex flex-col justify-between h-full rounded-3xl bg-white dark:bg-[#162032] border border-slate-100 dark:border-white/[0.06] p-7 hover:border-slate-200 dark:hover:border-white/[0.12] transition-all duration-300 hover:shadow-[0_12px_40px_rgba(0,0,0,0.06)] dark:hover:shadow-[0_12px_40px_rgba(0,0,0,0.2)] hover:-translate-y-1">
+      <div>
+        <div className="flex items-start justify-between mb-5">
+          <div
+            className="w-12 h-12 rounded-2xl flex items-center justify-center shadow-sm transition-transform group-hover:scale-105"
+            style={{ backgroundColor: `${color}1A`, color: color }}
+          >
+            <CategoryIcon iconName={category.icone} categoryName={category.nom} size="md" />
+          </div>
+          <span className="text-[11px] font-bold tracking-wide uppercase px-3 py-1.5 rounded-full bg-slate-50 dark:bg-white/[0.03] text-slate-500 dark:text-slate-400 border border-slate-100 dark:border-white/[0.05]">
             {count} maladie{count > 1 ? 's' : ''}
           </span>
-          <ArrowUpRight className="w-4 h-4 text-primary-300 group-hover:text-mint-500 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition" />
         </div>
+
+        <h3 className="font-display font-bold text-lg text-slate-900 dark:text-white mb-2 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
+          {category.nom}
+        </h3>
+        <p className="text-sm text-slate-500 dark:text-slate-400 line-clamp-2 leading-relaxed">
+          {category.description}
+        </p>
       </div>
-    </Link>
+
+      <button
+        onClick={(e) => { e.stopPropagation(); onExplore(category) }}
+        className="mt-6 flex items-center gap-2 text-sm font-semibold text-slate-900 dark:text-white group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors cursor-pointer"
+      >
+        Explorer la catégorie
+        <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+      </button>
+    </div>
   )
 }

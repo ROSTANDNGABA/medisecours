@@ -2,7 +2,13 @@
 import { useEffect, useState, useSyncExternalStore } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { HeartPulse, Menu, X, Sun, Moon, MessageCircle, UserCircle, LogOut } from 'lucide-react'
+import { 
+  HeartPulse, Sun, Moon, 
+  MessageCircle, UserCircle, LogOut, 
+  Home, Grid, Activity, MapPin, 
+  ChevronDown, ArrowRight, FileText,
+  Cross, Stethoscope, FolderOpen
+} from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 import { useUnreadCount } from '../../hooks/useUnreadCount'
 
@@ -23,15 +29,7 @@ function getThemeSnapshot() {
   return localStorage.getItem('medisecours_theme') === 'dark'
 }
 
-const links = [
-  { to: '/', label: 'Accueil' },
-  { to: '/categories', label: 'Catégories' },
-  { to: '/maladies', label: 'Maladies' },
-  { to: '/centres', label: 'Centres de santé' },
-]
-
 export default function Navbar() {
-  const [open, setOpen] = useState(false)
   const dark = useSyncExternalStore(subscribeTheme, getThemeSnapshot, () => false)
   const { isAuthenticated, user, isAdmin, logout } = useAuth()
   const pathname = usePathname()
@@ -54,123 +52,273 @@ export default function Navbar() {
   const initials = user ? `${user.prenom?.[0] || ''}${user.nom?.[0] || ''}`.toUpperCase() : ''
   const isActive = (to: string) => (to === '/' ? pathname === '/' : pathname.startsWith(to))
 
+  /* ─── Desktop links ─── */
+  type NavLink = { to: string; label: string; icon: any; hasDropdown?: boolean; badge?: number }
+  const publicLinks: NavLink[] = [
+    { to: '/', label: 'Accueil', icon: Home },
+    { to: '/categories', label: 'Catégories', icon: Grid, hasDropdown: true },
+    { to: '/maladies', label: 'Maladies', icon: Activity },
+    { to: '/centres', label: 'Centres', icon: MapPin },
+  ]
+
+  const patientLinks: NavLink[] = [
+    { to: '/', label: 'Accueil', icon: Home },
+    { to: '/categories', label: 'Catégories', icon: Grid },
+    { to: '/maladies', label: 'Maladies', icon: Activity },
+    { to: '/patient/consultations', label: 'Consultations', icon: FileText, hasDropdown: true },
+    { to: '/centres', label: 'Centres', icon: MapPin },
+    { to: '/messages', label: 'Messagerie', icon: MessageCircle, badge: unreadCount },
+  ]
+
+  const activeLinks = isAuthenticated && !isAdmin ? patientLinks : publicLinks
+
+  /* ─── Mobile bottom tab bar items ─── */
+  const publicMobileNav: NavLink[] = [
+    { to: '/', label: 'Accueil', icon: Home },
+    { to: '/categories', label: 'Catégories', icon: Grid },
+    { to: '/maladies', label: 'Maladies', icon: Activity },
+    { to: '/centres', label: 'Centres', icon: MapPin },
+    { to: '/login', label: 'Connexion', icon: UserCircle },
+  ]
+
+  const patientMobileNav: NavLink[] = [
+    { to: '/', label: 'Accueil', icon: Home },
+    { to: '/categories', label: 'Catégories', icon: Grid },
+    { to: '/maladies', label: 'Maladies', icon: Activity },
+    { to: '/patient/consultations', label: 'Rendez-vous', icon: FileText },
+    { to: '/centres', label: 'Centres', icon: Stethoscope },
+    { to: '/messages', label: 'Messages', icon: MessageCircle, badge: unreadCount },
+  ]
+
+  const mobileNavItems: NavLink[] = isAuthenticated && !isAdmin ? patientMobileNav : publicMobileNav
+
   return (
-    <header className="sticky top-0 z-50 bg-white/70 dark:bg-primary-900/70 backdrop-blur-lg border-b border-white/40 dark:border-white/5">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
-        <Link href="/" className="flex items-center gap-2 font-display font-extrabold text-lg text-primary-500 dark:text-mint-500">
-          <HeartPulse className="w-6 h-6 text-urgence-500" />
-          MediSecours<span className="text-mint-500">+</span>
-        </Link>
-
-        <nav className="hidden md:flex items-center gap-1">
-          {links.map((l) => (
-            <Link
-              key={l.to}
-              href={l.to}
-              className={`px-3 py-2 rounded-xl text-sm font-medium transition ${
-                isActive(l.to)
-                  ? 'bg-primary-500 text-white'
-                  : 'text-primary-700 dark:text-sable hover:bg-primary-100 dark:hover:bg-primary-700'
-              }`}
-            >
-              {l.label}
-            </Link>
-          ))}
-        </nav>
-
-        <div className="flex items-center gap-2">
-          <button
-            onClick={toggleDark}
-            className="p-2 rounded-xl hover:bg-primary-100 dark:hover:bg-primary-700 text-primary-500 dark:text-sable"
-            aria-label="Basculer le mode sombre"
-          >
-            {dark ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
-          </button>
-
-          {isAuthenticated ? (
-            <div className="hidden sm:flex items-center gap-1">
-              <Link href="/messages" className="relative p-2 rounded-xl hover:bg-primary-100 dark:hover:bg-primary-700 text-primary-500 dark:text-sable" aria-label="Messages">
-                <MessageCircle className="w-5 h-5" />
-                {unreadCount > 0 && !estDansLaMessagerie && (
-                  <span className="absolute top-0 right-0 transform translate-x-1/4 -translate-y-1/4 bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full border-2 border-white dark:border-primary-900 shadow-sm animate-pulse">
-                    {unreadCount > 99 ? '99+' : unreadCount}
-                  </span>
-                )}
-              </Link>
-              {!isAdmin && (
-                <Link href="/patient/consultations" className="px-3 py-2 rounded-xl text-sm font-medium text-primary-700 dark:text-sable hover:bg-primary-100 dark:hover:bg-primary-700">
-                  Consultations
-                </Link>
-              )}
-              {isAdmin && (
-                <Link href="/admin" className="px-3 py-2 rounded-xl text-sm font-medium text-primary-700 dark:text-sable hover:bg-primary-100 dark:hover:bg-primary-700">
-                  Admin
-                </Link>
-              )}
-              <Link
-                href="/profil"
-                className="w-9 h-9 rounded-full bg-primary-500 text-white flex items-center justify-center text-xs font-bold"
-                title={`${user?.prenom} ${user?.nom}`}
-              >
-                {initials || <UserCircle className="w-5 h-5" />}
-              </Link>
-              <button
-                onClick={() => { logout(); router.push('/') }}
-                className="p-2 rounded-xl hover:bg-urgence-100 text-primary-500 hover:text-urgence-700 dark:text-sable"
-                aria-label="Se déconnecter"
-              >
-                <LogOut className="w-5 h-5" />
-              </button>
+    <>
+      {/* ══════════════════════════════════════════════════════════════════
+       *  DESKTOP Floating Navbar (hidden on mobile/tablet)
+       * ══════════════════════════════════════════════════════════════════ */}
+      <div className="hidden lg:flex fixed top-4 inset-x-0 z-50 justify-center px-4 pointer-events-none">
+        <header className="w-full max-w-6xl pointer-events-auto bg-white/80 dark:bg-[#111827]/80 backdrop-blur-xl rounded-full shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-gray-100 dark:border-gray-800 px-3 py-2.5 flex items-center justify-between transition-all duration-300 hover:shadow-[0_8px_30px_rgb(0,0,0,0.08)]">
+          
+          {/* Logo */}
+          <Link href="/" className="flex items-center gap-2 pl-2">
+            <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-gradient-to-br from-[#4F46E5] to-[#818CF8] shadow-md">
+              <HeartPulse className="w-4 h-4 text-white" />
             </div>
-          ) : (
-            <Link
-              href="/login"
-              className="hidden sm:inline-flex px-4 py-2 rounded-xl bg-mint-500 hover:bg-mint-700 text-white text-sm font-semibold shadow-lg transition"
-            >
-              Connexion
-            </Link>
-          )}
+            <span className="font-display font-extrabold text-lg text-gray-900 dark:text-white tracking-tight">
+              MediSecours
+            </span>
+          </Link>
 
-          <button className="md:hidden p-2 text-primary-500 dark:text-sable" onClick={() => setOpen((o) => !o)} aria-label="Menu">
-            {open ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
-          </button>
+          {/* Center: Navigation Links */}
+          <nav className="flex items-center gap-1">
+            {activeLinks.map((l) => {
+              const active = isActive(l.to)
+              const Icon = l.icon
+              return (
+                <Link
+                  key={l.to}
+                  href={l.to}
+                  className={`relative flex items-center gap-1.5 px-4 py-2.5 rounded-full text-[13px] font-semibold transition-all duration-200 ${
+                    active
+                      ? 'bg-indigo-50/80 dark:bg-indigo-900/30 text-indigo-900 dark:text-indigo-100'
+                      : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-800/50'
+                  }`}
+                >
+                  <Icon className={`w-4 h-4 ${active ? 'text-indigo-600 dark:text-indigo-400' : 'text-gray-400 dark:text-gray-500'}`} />
+                  {l.label}
+                  
+                  {l.badge !== undefined && l.badge > 0 && !estDansLaMessagerie && (
+                    <span className="ml-1 flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold shadow-sm animate-pulse">
+                      {l.badge > 99 ? '99+' : l.badge}
+                    </span>
+                  )}
+                  
+                  {l.hasDropdown && (
+                    <ChevronDown className="w-3.5 h-3.5 ml-0.5 opacity-50" />
+                  )}
+
+                  {active && (
+                    <span className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-1.5 h-1.5 bg-indigo-600 dark:bg-indigo-400 rounded-full shadow-[0_0_8px_rgba(79,70,229,0.8)]" />
+                  )}
+                </Link>
+              )
+            })}
+            
+            {isAdmin && (
+              <Link
+                href="/admin"
+                className={`relative flex items-center gap-1.5 px-4 py-2.5 rounded-full text-[13px] font-semibold transition-all ${
+                  isActive('/admin')
+                    ? 'bg-indigo-50/80 dark:bg-indigo-900/30 text-indigo-900'
+                    : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'
+                }`}
+              >
+                <Grid className="w-4 h-4" /> Admin
+                {isActive('/admin') && <span className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-1.5 h-1.5 bg-indigo-600 rounded-full" />}
+              </Link>
+            )}
+          </nav>
+
+          {/* Right: Actions */}
+          <div className="flex items-center gap-2 pr-1">
+            <button
+              onClick={toggleDark}
+              className="flex items-center justify-center w-9 h-9 rounded-full text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+              aria-label="Basculer le mode sombre"
+            >
+              {dark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+            </button>
+
+            {isAuthenticated ? (
+              <div className="flex items-center gap-2">
+                <Link
+                  href="/profil"
+                  className="group relative flex items-center gap-2 pl-1 pr-3 py-1 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-full shadow-[0_4px_14px_0_rgb(79,70,229,0.39)] transition-all duration-200 hover:shadow-[0_6px_20px_rgba(79,70,229,0.23)] hover:-translate-y-0.5"
+                >
+                  <div className="w-7 h-7 rounded-full bg-white/20 flex items-center justify-center text-[10px] font-bold">
+                    {initials || <UserCircle className="w-4 h-4" />}
+                  </div>
+                  <span className="text-[13px] font-semibold">Mon Profil</span>
+                  <ArrowRight className="w-3.5 h-3.5 opacity-70 group-hover:translate-x-0.5 transition-transform" />
+                </Link>
+                
+                <button
+                  onClick={() => { logout(); router.push('/') }}
+                  className="flex items-center justify-center w-9 h-9 rounded-full bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/30 dark:hover:text-red-400 transition-colors"
+                  aria-label="Se déconnecter"
+                  title="Déconnexion"
+                >
+                  <LogOut className="w-4 h-4" />
+                </button>
+              </div>
+            ) : (
+              <Link
+                href="/login"
+                className="group relative flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-full shadow-[0_4px_14px_0_rgb(79,70,229,0.39)] transition-all duration-200 hover:shadow-[0_6px_20px_rgba(79,70,229,0.23)] hover:-translate-y-0.5"
+              >
+                <span className="text-[13px] font-semibold">Connexion</span>
+                <ArrowRight className="w-4 h-4 opacity-70 group-hover:translate-x-0.5 transition-transform" />
+              </Link>
+            )}
+          </div>
+        </header>
+      </div>
+
+      {/* Desktop spacer */}
+      {pathname !== '/' && <div className="hidden lg:block h-24" />}
+
+
+      {/* ══════════════════════════════════════════════════════════════════
+       *  MOBILE / TABLET — Minimal Top Bar (logo + theme toggle only)
+       * ══════════════════════════════════════════════════════════════════ */}
+      <div className="lg:hidden fixed top-0 inset-x-0 z-50 bg-white/90 dark:bg-[#111827]/90 backdrop-blur-xl border-b border-gray-100 dark:border-gray-800">
+        <div className="flex items-center justify-between px-4 py-3">
+          <Link href="/" className="flex items-center gap-2">
+            <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-gradient-to-br from-[#4F46E5] to-[#818CF8] shadow-md">
+              <HeartPulse className="w-4 h-4 text-white" />
+            </div>
+            <span className="font-display font-extrabold text-lg text-gray-900 dark:text-white tracking-tight">
+              MediSecours
+            </span>
+          </Link>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={toggleDark}
+              className="flex items-center justify-center w-9 h-9 rounded-full text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+              aria-label="Basculer le mode sombre"
+            >
+              {dark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+            </button>
+
+            {isAuthenticated && (
+              <>
+                <Link
+                  href="/profil"
+                  className="flex items-center justify-center w-9 h-9 rounded-full text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-colors"
+                  aria-label="Profil"
+                >
+                  <UserCircle className="w-5 h-5" />
+                </Link>
+                <button
+                  onClick={() => { logout(); router.push('/') }}
+                  className="flex items-center justify-center w-9 h-9 rounded-full text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                  aria-label="Se déconnecter"
+                >
+                  <LogOut className="w-4 h-4" />
+                </button>
+              </>
+            )}
+          </div>
         </div>
       </div>
 
-      {open && (
-        <nav className="md:hidden border-t border-white/40 dark:border-white/5 px-4 py-3 flex flex-col gap-1 bg-white/90 dark:bg-primary-900/90">
-          {links.map((l) => (
-            <Link
-              key={l.to}
-              href={l.to}
-              onClick={() => setOpen(false)}
-              className={`px-3 py-2.5 rounded-xl text-sm font-medium ${
-                isActive(l.to) ? 'bg-primary-500 text-white' : 'text-primary-700 dark:text-sable'
-              }`}
-            >
-              {l.label}
-            </Link>
-          ))}
-          {isAuthenticated ? (
-            <>
-              <Link onClick={() => setOpen(false)} href="/messages" className="px-3 py-2.5 rounded-xl text-sm font-medium text-primary-700 dark:text-sable flex items-center justify-between">
-                <span>Messagerie</span>
-                {unreadCount > 0 && !estDansLaMessagerie && (
-                  <span className="bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">
-                    {unreadCount > 99 ? '99+' : unreadCount}
+      {/* Mobile top spacer */}
+      <div className="lg:hidden h-[60px]" />
+
+
+      {/* ══════════════════════════════════════════════════════════════════
+       *  MOBILE / TABLET — Bottom Tab Bar (iOS/Android native feel)
+       * ══════════════════════════════════════════════════════════════════ */}
+      <nav className="lg:hidden fixed bottom-0 inset-x-0 z-50">
+        {/* Glassmorphism container with safe area padding */}
+        <div className="bg-white/80 dark:bg-[#111827]/80 backdrop-blur-2xl border-t border-gray-200/60 dark:border-gray-700/40 shadow-[0_-4px_30px_rgba(0,0,0,0.06)]">
+          <div className="flex items-stretch justify-around px-2 pt-2 pb-[calc(0.5rem+env(safe-area-inset-bottom,0px))]">
+            {mobileNavItems.map((item) => {
+              const active = isActive(item.to)
+              const Icon = item.icon
+              return (
+                <Link
+                  key={item.to}
+                  href={item.to}
+                  className="relative flex flex-col items-center justify-center min-w-[60px] py-1 gap-0.5 group"
+                >
+                  {/* Active pill background behind icon */}
+                  <div className={`relative flex items-center justify-center w-12 h-8 rounded-2xl transition-all duration-300 ${
+                    active 
+                      ? 'bg-indigo-100 dark:bg-indigo-500/20' 
+                      : 'group-active:bg-gray-100 dark:group-active:bg-gray-800'
+                  }`}>
+                    <Icon 
+                      className={`w-[22px] h-[22px] transition-colors duration-200 ${
+                        active 
+                          ? 'text-indigo-600 dark:text-indigo-400' 
+                          : 'text-gray-400 dark:text-gray-500'
+                      }`}
+                      strokeWidth={active ? 2.5 : 1.8}
+                    />
+
+                    {/* Notification badge */}
+                    {item.badge !== undefined && item.badge > 0 && !estDansLaMessagerie && (
+                      <span className="absolute -top-1 -right-1 flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold shadow-md ring-2 ring-white dark:ring-[#111827]">
+                        {item.badge > 99 ? '99+' : item.badge}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Label */}
+                  <span className={`text-[10px] font-semibold leading-tight transition-colors duration-200 ${
+                    active 
+                      ? 'text-indigo-600 dark:text-indigo-400' 
+                      : 'text-gray-400 dark:text-gray-500'
+                  }`}>
+                    {item.label}
                   </span>
-                )}
-              </Link>
-              <Link onClick={() => setOpen(false)} href="/patient/consultations" className="px-3 py-2.5 rounded-xl text-sm font-medium text-primary-700 dark:text-sable">Consultations</Link>
-              <Link onClick={() => setOpen(false)} href="/profil" className="px-3 py-2.5 rounded-xl text-sm font-medium text-primary-700 dark:text-sable">Profil</Link>
-              {isAdmin && <Link onClick={() => setOpen(false)} href="/admin" className="px-3 py-2.5 rounded-xl text-sm font-medium text-primary-700 dark:text-sable">Admin</Link>}
-              <button onClick={() => { logout(); setOpen(false); router.push('/') }} className="text-left px-3 py-2.5 rounded-xl text-sm font-medium text-urgence-700">Déconnexion</button>
-            </>
-          ) : (
-            <Link onClick={() => setOpen(false)} href="/login" className="px-3 py-2.5 rounded-xl text-sm font-semibold bg-mint-500 text-white text-center">Connexion</Link>
-          )}
-        </nav>
-      )}
-    </header>
+
+                  {/* Active bar indicator */}
+                  {active && (
+                    <span className="absolute -bottom-1 w-5 h-[3px] rounded-full bg-indigo-600 dark:bg-indigo-400 shadow-[0_0_10px_rgba(79,70,229,0.6)]" />
+                  )}
+                </Link>
+              )
+            })}
+          </div>
+        </div>
+      </nav>
+
+      {/* Bottom spacer so page content doesn't hide behind the tab bar */}
+      <div className="lg:hidden h-[80px]" />
+    </>
   )
 }

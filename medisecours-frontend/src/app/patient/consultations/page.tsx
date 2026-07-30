@@ -19,10 +19,10 @@ import ConsultationDetailModal from '../../../components/consultations/Consultat
 import ConfirmModal from '../../../components/ui/ConfirmModal'
 
 const STATUT_STYLES = {
-  OUVERTE:  { badge: 'bg-amber-50 text-amber-700 ring-1 ring-amber-200', icon: 'bg-amber-100 text-amber-600', label: 'En attente' },
-  EN_COURS: { badge: 'bg-blue-50 text-blue-700 ring-1 ring-blue-200', icon: 'bg-blue-100 text-blue-600', label: 'En cours' },
-  TERMINEE: { badge: 'bg-green-50 text-green-700 ring-1 ring-green-200', icon: 'bg-green-100 text-green-600', label: 'Terminée' },
-  ANNULEE:  { badge: 'bg-gray-100 text-gray-500 ring-1 ring-gray-200', icon: 'bg-gray-100 text-gray-400', label: 'Annulée' },
+  OUVERTE:  { badge: 'bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 ring-1 ring-amber-200 dark:ring-amber-500/30', icon: 'bg-amber-100 dark:bg-amber-900/50 text-amber-600 dark:text-amber-400', label: 'En attente' },
+  EN_COURS: { badge: 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 ring-1 ring-blue-200 dark:ring-blue-500/30', icon: 'bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-400', label: 'En cours' },
+  TERMINEE: { badge: 'bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-400 ring-1 ring-green-200 dark:ring-green-500/30', icon: 'bg-green-100 dark:bg-green-900/50 text-green-600 dark:text-green-400', label: 'Terminée' },
+  ANNULEE:  { badge: 'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 ring-1 ring-gray-200 dark:ring-gray-700', icon: 'bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-500', label: 'Annulée' },
 }
 
 const STATUT_ICON = {
@@ -30,9 +30,9 @@ const STATUT_ICON = {
 }
 
 const PRIORITE_CONFIG = {
-  NORMALE:  { label: 'Normal',  class: 'bg-gray-100 text-gray-700 hover:bg-gray-200 ring-gray-400' },
-  URGENTE:  { label: 'Urgent',  class: 'bg-amber-50 text-amber-700 hover:bg-amber-100 ring-amber-400' },
-  CRITIQUE: { label: 'Critique', class: 'bg-red-50 text-red-700 hover:bg-red-100 ring-red-400' },
+  NORMALE:  { label: 'Normal',  class: 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 ring-gray-400 dark:ring-gray-500' },
+  URGENTE:  { label: 'Urgent',  class: 'bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-900/50 ring-amber-400 dark:ring-amber-500' },
+  CRITIQUE: { label: 'Critique', class: 'bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/50 ring-red-400 dark:ring-red-500' },
 }
 
 type FilterTab = 'TOUTES' | 'OUVERTE' | 'EN_COURS' | 'TERMINEE'
@@ -312,45 +312,47 @@ export default function PatientConsultationsPage() {
                       initial={{ opacity: 0, y: 6 }}
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: -6 }}
-                      className="rounded-2xl bg-white dark:bg-primary-800 border border-primary-100 dark:border-white/5 p-4 sm:p-5 flex items-start sm:items-center gap-4 hover:border-primary-200 dark:hover:border-white/20 transition-colors"
+                      className="rounded-2xl bg-white dark:bg-primary-800 border border-primary-100 dark:border-white/5 p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center gap-4 hover:border-primary-200 dark:hover:border-white/20 transition-colors"
                     >
-                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${style.icon}`}>
-                        <Icon className="w-5 h-5" />
-                      </div>
-
-                      <div className="flex-1 min-w-0">
-                        <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-3">
-                          <p className="text-sm font-semibold text-primary-900 dark:text-sable truncate">
-                            {c.motif || 'Consultation'}
-                          </p>
-                          {c.priorite !== 'NORMALE' && (
-                            <span className="flex items-center gap-1 text-xs font-semibold text-red-500 shrink-0">
-                              <AlertTriangle className="w-3 h-3" />
-                              Urgence {c.priorite === 'CRITIQUE' ? 'critique' : c.priorite.toLowerCase()}
-                            </span>
-                          )}
+                      <div className="flex items-start gap-4 w-full sm:w-auto flex-1 min-w-0">
+                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${style.icon}`}>
+                          <Icon className="w-5 h-5" />
                         </div>
-                        <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                          <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${style.badge}`}>
-                            {style.label}
-                          </span>
-                          <span className="text-xs text-primary-300">
-                            {new Date(c.createdAt).toLocaleDateString('fr-FR', {
-                              day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
-                            })}
-                          </span>
-                          {c.medecin && (
-                            <>
-                              <span className="text-primary-200 dark:text-white/10 hidden sm:inline">·</span>
-                              <span className="text-xs text-primary-300">
-                Dr {c.medecin.prenom} {c.medecin.nom}
+
+                        <div className="flex-1 min-w-0">
+                          <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-3">
+                            <p className="text-sm font-semibold text-primary-900 dark:text-sable truncate">
+                              {c.motif || 'Consultation'}
+                            </p>
+                            {c.priorite !== 'NORMALE' && (
+                              <span className="flex items-center gap-1 text-xs font-semibold text-red-500 shrink-0">
+                                <AlertTriangle className="w-3 h-3" />
+                                Urgence {c.priorite === 'CRITIQUE' ? 'critique' : c.priorite.toLowerCase()}
                               </span>
-                            </>
-                          )}
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                            <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${style.badge}`}>
+                              {style.label}
+                            </span>
+                            <span className="text-xs text-primary-300">
+                              {new Date(c.createdAt).toLocaleDateString('fr-FR', {
+                                day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
+                              })}
+                            </span>
+                            {c.medecin && (
+                              <>
+                                <span className="text-primary-200 dark:text-white/10 hidden sm:inline">·</span>
+                                <span className="text-xs text-primary-300">
+                  Dr {c.medecin.prenom} {c.medecin.nom}
+                                </span>
+                              </>
+                            )}
+                          </div>
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-2 shrink-0">
+                      <div className="flex items-center justify-end w-full sm:w-auto gap-2 shrink-0 border-t sm:border-t-0 border-primary-100 dark:border-white/10 pt-3 sm:pt-0">
                         <button
                           onClick={() => setDetailFor(c.id)}
                           className="p-2 rounded-xl border border-primary-100 dark:border-white/10 text-primary-300 hover:bg-primary-50 dark:hover:bg-primary-700 transition"
@@ -366,7 +368,7 @@ export default function PatientConsultationsPage() {
                           <Trash2 className="w-4 h-4" />
                         </button>
                         {c.statut === 'OUVERTE' && (
-                          <span className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-amber-50 text-amber-600 animate-pulse">
+                          <span className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 animate-pulse">
                             En attente
                           </span>
                         )}
@@ -380,7 +382,7 @@ export default function PatientConsultationsPage() {
                           </button>
                         )}
                         {c.statut === 'TERMINEE' && (
-                          <span className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-green-50 text-green-600">
+                          <span className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-green-50 dark:bg-green-900/30 text-green-600 dark:text-green-400">
                             Terminée
                           </span>
                         )}

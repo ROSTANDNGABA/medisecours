@@ -707,7 +707,7 @@ export default function MessagesPage() {
   if (convLoading) return <LoadingSpinner label="Chargement de la messagerie…" />
 
   return (
-    <div className="max-w-6xl mx-auto p-0 lg:px-6 lg:py-10 h-[calc(100vh-4rem)] lg:h-full flex flex-col">
+    <div className="max-w-6xl mx-auto w-full p-0 lg:px-6 lg:py-10 flex-1 min-h-0 flex flex-col">
       <div className="grid grid-cols-1 lg:grid-cols-3 flex-1 lg:rounded-2xl overflow-hidden border border-primary-100 dark:border-white/10 shadow-xl">
 
         <div className={`lg:col-span-1 border-r border-primary-100 dark:border-white/10 bg-white/70 dark:bg-primary-700/40 flex flex-col ${activeId ? 'hidden lg:flex' : 'flex'}`}>
