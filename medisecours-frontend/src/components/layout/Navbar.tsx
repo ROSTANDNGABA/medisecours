@@ -11,6 +11,7 @@ import {
 } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 import { useUnreadCount } from '../../hooks/useUnreadCount'
+import { resolveImgPath } from '../../lib/config'
 
 const THEME_EVENT = 'medisecours-theme-change'
 
@@ -181,8 +182,13 @@ export default function Navbar() {
                   href="/profil"
                   className="group relative flex items-center gap-2 pl-1 pr-3 py-1 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-full shadow-[0_4px_14px_0_rgb(79,70,229,0.39)] transition-all duration-200 hover:shadow-[0_6px_20px_rgba(79,70,229,0.23)] hover:-translate-y-0.5"
                 >
-                  <div className="w-7 h-7 rounded-full bg-white/20 flex items-center justify-center text-[10px] font-bold">
-                    {initials || <UserCircle className="w-4 h-4" />}
+                  <div className="w-7 h-7 rounded-full overflow-hidden bg-white/20 flex items-center justify-center text-[10px] font-bold">
+                    {user?.photoProfil ? (
+                      <img src={resolveImgPath(user.photoProfil)} alt="" className="w-full h-full object-cover" onError={(e) => { const img = e.target as HTMLImageElement; img.style.display = 'none'; const fb = img.nextSibling as HTMLElement | null; if (fb) fb.style.display = 'flex' }} />
+                    ) : null}
+                    <span style={user?.photoProfil ? { display: 'none' } : undefined} className="flex items-center justify-center w-full h-full">
+                      {initials || <UserCircle className="w-4 h-4" />}
+                    </span>
                   </div>
                   <span className="text-[13px] font-semibold">Mon Profil</span>
                   <ArrowRight className="w-3.5 h-3.5 opacity-70 group-hover:translate-x-0.5 transition-transform" />
@@ -244,10 +250,14 @@ export default function Navbar() {
               <>
                 <Link
                   href="/profil"
-                  className="flex items-center justify-center w-9 h-9 rounded-full text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-colors"
+                  className="flex items-center justify-center w-9 h-9 rounded-full overflow-hidden text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-colors"
                   aria-label="Profil"
                 >
-                  <UserCircle className="w-5 h-5" />
+                  {user?.photoProfil ? (
+                    <img src={resolveImgPath(user.photoProfil)} alt="" className="w-full h-full object-cover" />
+                  ) : (
+                    <UserCircle className="w-5 h-5" />
+                  )}
                 </Link>
                 <button
                   onClick={() => { logout(); router.push('/') }}

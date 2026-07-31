@@ -49,7 +49,6 @@ class MediaObject
     private ?int $id = null;
 
     #[Vich\UploadableField(mapping: 'media_object', fileNameProperty: 'filePath', size: 'size', mimeType: 'mimeType', originalName: 'originalName')]
-    #[Groups(['media:write'])]
     private ?File $file = null;
 
     #[ORM\Column(length: 255, nullable: true)]
