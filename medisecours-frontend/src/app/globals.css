@@ -66,3 +66,13 @@ h1, h2, h3, h4 {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Hide the mobile top bar on mobile when user is inside an active conversation */
+body.chat-open #app-topbar {
+  display: none;
+}
+@media (min-width: 1024px) {
+  body.chat-open #app-topbar {
+    display: block;
+  }
+}

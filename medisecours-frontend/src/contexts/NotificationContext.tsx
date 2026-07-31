@@ -80,7 +80,12 @@ function saveSet(key: string, set: Set<string>) {
   try { localStorage.setItem(key, JSON.stringify([...set])) } catch { /* ignore */ }
 }
 
-function msgToItem(m: any, rawId: (v: any) => any): NotifItem {
+function msgHref(convId: string | number, user: any): string {
+  const base = user?.roles?.includes('ROLE_MEDECIN') ? '/medecin' : '/patient'
+  return `${base}/messages?id=${convId}`
+}
+
+function msgToItem(m: any, rawId: (v: any) => any, user?: any): NotifItem {
   return {
     id: `msg-${m.id}`,
     type: 'message' as const,
@@ -88,7 +93,7 @@ function msgToItem(m: any, rawId: (v: any) => any): NotifItem {
     description: m.contenu?.slice(0, 80) || 'Message',
     time: m.createdAt,
     unread: true,
-    href: `/medecin/messages?id=${rawId(m.conversation)}`,
+    href: msgHref(rawId(m.conversation), user),
     sender: typeof m.expediteur === 'object' ? m.expediteur : null,
   }
 }
@@ -259,7 +264,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
           description: m.contenu?.slice(0, 100) || 'Message reçu',
           time: m.createdAt,
           unread: true,
-          href: `/medecin/messages?id=${rawId(m.conversation)}`,
+          href: msgHref(rawId(m.conversation), user),
           sender: typeof m.expediteur === 'object' ? m.expediteur : null,
         })
       }
@@ -369,7 +374,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       for (const m of raw) {
         if (rawId(m.expediteur) === user?.id) continue
         if (m.statut === 'LU') continue
-        items.push(msgToItem(m, rawId))
+        items.push(msgToItem(m, rawId, user))
       }
       items.sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime())
       setMsgItems(items)

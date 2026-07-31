@@ -91,7 +91,7 @@ function FitBounds({
   destination,
 }: {
   position: { lat: number; lng: number } | null
-  destination: { lat: number; lng: number } | null
+  destination: { lat: number; lng: number; nom?: string } | null
 }) {
   const map = useMap()
   useEffect(() => {
@@ -224,7 +224,7 @@ interface CentresMapProps {
   onSelect?: (id: number) => void
   route?: RouteGeometry | null
   isFallback?: boolean
-  destination?: { lat: number; lng: number } | null
+  destination?: { lat: number; lng: number; nom?: string } | null
 }
 
 // ─── Main Component ─────────────────────────────────────────────────────────

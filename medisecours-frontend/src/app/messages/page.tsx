@@ -16,7 +16,7 @@ import { useAuth } from '../../hooks/useAuth'
 import { useWebSocket } from '../../hooks/useWebSocket'
 import useSWR, { mutate as globalMutate } from 'swr'
 import { fetcher } from '../../lib/fetcher'
-import { useSearchParams } from 'next/navigation'
+import { useSearchParams, useRouter } from 'next/navigation'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import EmptyState from '../../components/ui/EmptyState'
 import { useToast } from '../../components/ui/Toast'
@@ -73,6 +73,7 @@ function msgTypeFromMime(mime) {
 export default function MessagesPage() {
   const { user, mounted } = useAuth()
   const toast = useToast()
+  const router = useRouter()
 
   const searchParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null
   const [conversationsLocal, setConversationsLocal] = useState([])
@@ -172,7 +173,37 @@ export default function MessagesPage() {
     setAllLoadedMsgs([])
     setHasMore(true)
     setLoadingMore(false)
+    scrollToBottomPendingRef.current = true
   }, [activeId])
+
+  useEffect(() => {
+    if (activeId) {
+      document.body.classList.add('chat-open')
+    } else {
+      document.body.classList.remove('chat-open')
+    }
+    return () => document.body.classList.remove('chat-open')
+  }, [activeId])
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    if (activeId) {
+      params.set('conversation', String(activeId))
+    } else {
+      params.delete('conversation')
+    }
+    const qs = params.toString()
+    router.replace(qs ? `/messages?${qs}` : '/messages', { scroll: false })
+  }, [activeId, router])
+
+  useEffect(() => {
+    const onPopState = () => {
+      const params = new URLSearchParams(window.location.search)
+      setActiveId(params.get('conversation') || null)
+    }
+    window.addEventListener('popstate', onPopState)
+    return () => window.removeEventListener('popstate', onPopState)
+  }, [])
 
   useEffect(() => {
     if (!msgData) return
@@ -291,10 +322,17 @@ export default function MessagesPage() {
   }, [activeId, subscribe])
 
   const prevMsgCountRef = useRef(0)
+  const scrollToBottomPendingRef = useRef(false)
   useEffect(() => {
     const el = msgContainerRef.current
     if (!el) return
     const currentCount = allLoadedMsgs.length
+    if (scrollToBottomPendingRef.current && currentCount > 0) {
+      scrollToBottomPendingRef.current = false
+      prevMsgCountRef.current = currentCount
+      requestAnimationFrame(() => { el.scrollTop = el.scrollHeight })
+      return
+    }
     if (currentCount <= prevMsgCountRef.current) {
       prevMsgCountRef.current = currentCount
       return
@@ -707,10 +745,10 @@ export default function MessagesPage() {
   if (convLoading) return <LoadingSpinner label="Chargement de la messagerie…" />
 
   return (
-    <div className="max-w-6xl mx-auto w-full p-0 lg:px-6 lg:py-10 flex-1 min-h-0 flex flex-col">
-      <div className="grid grid-cols-1 lg:grid-cols-3 flex-1 lg:rounded-2xl overflow-hidden border border-primary-100 dark:border-white/10 shadow-xl">
+    <div className={`max-w-6xl mx-auto w-full p-0 lg:px-6 lg:py-10 flex flex-col overflow-hidden relative ${activeId ? 'h-[100dvh] lg:h-[calc(100dvh_-_96px)]' : 'flex-1 min-h-0'}`}>
+      <div className="grid grid-cols-1 lg:grid-cols-3 flex-1 min-h-0 lg:rounded-2xl overflow-hidden border border-primary-100 dark:border-white/10 shadow-xl">
 
-        <div className={`lg:col-span-1 border-r border-primary-100 dark:border-white/10 bg-white/70 dark:bg-primary-700/40 flex flex-col ${activeId ? 'hidden lg:flex' : 'flex'}`}>
+        <div className={`lg:col-span-1 min-h-0 border-r border-primary-100 dark:border-white/10 bg-white/70 dark:bg-primary-700/40 flex flex-col ${activeId ? 'hidden lg:flex' : 'flex'}`}>
           <div className="flex items-center justify-between p-4 border-b border-primary-100 dark:border-white/10">
             <h2 className="font-display font-bold text-primary-900 dark:text-sable">Messages</h2>
             <button onClick={openNewConversation} className="p-2 rounded-xl bg-mint-500 text-white"><Plus className="w-4 h-4" /></button>
@@ -743,10 +781,10 @@ export default function MessagesPage() {
           </div>
         </div>
 
-        <div className={`lg:col-span-2 flex flex-col bg-sable dark:bg-primary-900 ${activeId ? 'flex' : 'hidden lg:flex'}`}>
+        <div className={`lg:col-span-2 h-full min-h-0 flex flex-col overflow-hidden relative bg-sable dark:bg-primary-900 ${activeId ? 'flex' : 'hidden lg:flex'}`}>
           {active ? (
             <>
-              <div className="flex items-center gap-3 p-4 border-b border-primary-100 dark:border-white/10 bg-white/70 dark:bg-primary-700/40">
+              <div className="sticky top-0 z-30 flex-none h-16 flex items-center gap-3 p-4 border-b border-primary-100 dark:border-white/10 bg-white/70 dark:bg-primary-700/40">
                 <button className="lg:hidden" onClick={() => setActiveId(null)} aria-label="Retour"><ArrowLeft className="w-5 h-5 text-primary-500" /></button>
                 <div className="w-9 h-9 rounded-full bg-primary-500 text-white flex items-center justify-center font-bold text-xs shrink-0 overflow-hidden">
                   {active.info?.photoProfil ? <img src={mediaUrl(active.info.photoProfil)} alt="" className="w-full h-full object-cover" onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex' }} /> : null}
@@ -760,7 +798,7 @@ export default function MessagesPage() {
                 </button>
               </div>
 
-              <div ref={msgContainerRef} className="flex-1 overflow-y-auto p-4 space-y-2 min-h-0">
+              <div ref={msgContainerRef} className="flex-1 overflow-y-auto p-4 space-y-2 min-h-0 pb-24">
                 {hasMore && (
                   <div ref={topSentinelRef} className="flex justify-center py-4">
                     <Loader2 className="w-5 h-5 animate-spin text-primary-300" />
@@ -824,7 +862,7 @@ export default function MessagesPage() {
                 <div ref={bottomRef} />
               </div>
 
-              <div className="border-t border-primary-100 dark:border-white/10 bg-white/70 dark:bg-primary-700/40">
+              <div className="absolute bottom-0 left-0 right-0 z-30 border-t border-primary-100 dark:border-white/10 bg-white/70 dark:bg-primary-700/40 pb-[env(safe-area-inset-bottom,0px)] md:pb-0">
                 {attachments.length > 0 && (
                   <div className="flex gap-2 p-2 overflow-x-auto border-b border-primary-100/50 dark:border-white/5">
                     {attachments.map((att) => (

@@ -19,6 +19,7 @@ export default function Providers({ children }: { children: React.ReactNode }) {
   const isAdminRoute = pathname?.startsWith('/admin')
   const isMedecinRoute = pathname?.startsWith('/medecin')
   const hideShell = isAdminRoute || isMedecinRoute
+  const isMessagingRoute = pathname === '/messages' || pathname?.startsWith('/patient/messages')
 
   return (
     <StableGoogleProvider>
@@ -30,7 +31,7 @@ export default function Providers({ children }: { children: React.ReactNode }) {
             <>
               <Navbar />
               <main className="flex-1 flex flex-col min-h-0">{children}</main>
-              <Footer />
+              {!isMessagingRoute && <Footer />}
             </>
           )}
         </ToastProvider>

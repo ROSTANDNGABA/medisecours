@@ -1,7 +1,7 @@
 'use client'
-import { useEffect, useState, useSyncExternalStore } from 'react'
+import { useEffect, useState, useSyncExternalStore, Suspense, type ReactNode } from 'react'
 import Link from 'next/link'
-import { usePathname, useRouter } from 'next/navigation'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { 
   HeartPulse, Sun, Moon, 
   MessageCircle, UserCircle, LogOut, 
@@ -27,6 +27,11 @@ function subscribeTheme(onChange: () => void) {
 function getThemeSnapshot() {
   if (typeof window === 'undefined') return false
   return localStorage.getItem('medisecours_theme') === 'dark'
+}
+
+function ConversationAware({ children }: { children: (inConversation: boolean) => ReactNode }) {
+  const searchParams = useSearchParams()
+  return children(Boolean(searchParams.get('conversation')))
 }
 
 export default function Navbar() {
@@ -211,7 +216,10 @@ export default function Navbar() {
 
       {/* ══════════════════════════════════════════════════════════════════
        *  MOBILE / TABLET — Minimal Top Bar (logo + theme toggle only)
+       *  Wrapped in #app-topbar so it can be hidden on mobile when a
+       *  conversation is open (body.chat-open) — the bottom tab bar stays.
        * ══════════════════════════════════════════════════════════════════ */}
+      <div id="app-topbar">
       <div className="lg:hidden fixed top-0 inset-x-0 z-50 bg-white/90 dark:bg-[#111827]/90 backdrop-blur-xl border-b border-gray-100 dark:border-gray-800">
         <div className="flex items-center justify-between px-4 py-3">
           <Link href="/" className="flex items-center gap-2">
@@ -256,12 +264,18 @@ export default function Navbar() {
 
       {/* Mobile top spacer */}
       <div className="lg:hidden h-[60px]" />
+      </div>
 
 
       {/* ══════════════════════════════════════════════════════════════════
        *  MOBILE / TABLET — Bottom Tab Bar (iOS/Android native feel)
+       *  Hidden on mobile/tablet while a conversation is open (?conversation=)
        * ══════════════════════════════════════════════════════════════════ */}
-      <nav className="lg:hidden fixed bottom-0 inset-x-0 z-50">
+      <Suspense fallback={null}>
+        <ConversationAware>
+          {(inConversation) => (
+      <>
+      <nav className={`lg:hidden fixed bottom-0 inset-x-0 z-50 ${inConversation ? 'hidden md:flex' : ''}`}>
         {/* Glassmorphism container with safe area padding */}
         <div className="bg-white/80 dark:bg-[#111827]/80 backdrop-blur-2xl border-t border-gray-200/60 dark:border-gray-700/40 shadow-[0_-4px_30px_rgba(0,0,0,0.06)]">
           <div className="flex items-stretch justify-around px-2 pt-2 pb-[calc(0.5rem+env(safe-area-inset-bottom,0px))]">
@@ -318,7 +332,11 @@ export default function Navbar() {
       </nav>
 
       {/* Bottom spacer so page content doesn't hide behind the tab bar */}
-      <div className="lg:hidden h-[80px]" />
+      <div className={`lg:hidden h-[80px] ${inConversation ? 'hidden md:block' : ''}`} />
+      </>
+          )}
+        </ConversationAware>
+      </Suspense>
     </>
   )
 }
