@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState, useCallback } from 'react'
+import { useMemo, useState, useCallback, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
@@ -55,6 +55,17 @@ export default function PatientConsultationsPage() {
   const [priorite, setPriorite] = useState('NORMALE')
   const [submitting, setSubmitting] = useState(false)
   const [filter, setFilter] = useState<FilterTab>('TOUTES')
+
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get('new') !== '1') return
+
+    const timer = window.setTimeout(() => {
+      setShowForm(true)
+      router.replace('/patient/consultations', { scroll: false })
+    }, 0)
+
+    return () => window.clearTimeout(timer)
+  }, [router])
 
   const { data, isLoading, error, mutate } = useSWR(
     user ? '/api/consultations' : null,

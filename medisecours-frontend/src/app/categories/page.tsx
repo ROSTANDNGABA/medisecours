@@ -42,7 +42,7 @@ export default function CategoriesPage() {
 
   // Fetching sans les paramètres de pagination pour laisser le frontend gérer le découpage
   const swrKey = categoryId
-    ? `/api/maladies?categorie=${encodeURIComponent(categoryId)}&pagination=false`
+    ? `/api/public/conditions?category=${encodeURIComponent(String(categoryId).split('/').pop() ?? '')}&itemsPerPage=30`
     : null // SWR ne fetch pas si la clé est null
 
   const { data: maladiesData, isLoading: maladiesLoading } = useSWR(
@@ -54,9 +54,9 @@ export default function CategoriesPage() {
     }
   )
 
-  /* ─── 3. Extraction des données Hydra ─── */
-  const maladies: any[] = maladiesData?.['hydra:member'] ?? maladiesData?.member ?? (Array.isArray(maladiesData) ? maladiesData : [])
-  const totalItems: number = maladiesData?.['hydra:totalItems'] ?? maladies.length
+  /* ─── 3. Extraction du DTO public assaini ─── */
+  const maladies: any[] = maladiesData?.items ?? []
+  const totalItems: number = maladiesData?.total ?? maladies.length
   const totalPages = Math.max(1, Math.ceil(totalItems / ITEMS_PER_PAGE))
 
   /* ─── Handlers ─── */

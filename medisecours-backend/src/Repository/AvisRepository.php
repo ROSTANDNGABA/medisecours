@@ -6,6 +6,7 @@ namespace App\Repository;
 
 use App\Entity\Avis;
 use App\Entity\Medecin;
+use App\Entity\Patient;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 
@@ -17,6 +18,22 @@ class AvisRepository extends ServiceEntityRepository
     public function __construct(ManagerRegistry $registry)
     {
         parent::__construct($registry, Avis::class);
+    }
+
+    /**
+     * Vérifie si un patient a déjà publié un avis pour un médecin
+     * (contrainte unique patient + médecin).
+     */
+    public function existsForPatientAndMedecin(Patient $patient, Medecin $medecin): bool
+    {
+        return (int) $this->createQueryBuilder('a')
+            ->select('COUNT(a.id)')
+            ->where('a.patient = :patient')
+            ->andWhere('a.medecin = :medecin')
+            ->setParameter('patient', $patient)
+            ->setParameter('medecin', $medecin)
+            ->getQuery()
+            ->getSingleScalarResult() > 0;
     }
 
     /**
@@ -33,6 +50,17 @@ class AvisRepository extends ServiceEntityRepository
             ->getSingleScalarResult();
 
         return round((float) $result, 1);
+    }
+
+    public function countPublishedByMedecin(Medecin $medecin): int
+    {
+        return (int) $this->createQueryBuilder('a')
+            ->select('COUNT(a.id)')
+            ->where('a.medecin = :medecin')
+            ->andWhere('a.signale = false')
+            ->setParameter('medecin', $medecin)
+            ->getQuery()
+            ->getSingleScalarResult();
     }
 
     /**

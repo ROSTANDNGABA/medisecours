@@ -1,168 +1,166 @@
 'use client'
 
-import { useEffect, useState, use } from 'react'
+import { use, useEffect, useState } from 'react'
 import Link from 'next/link'
-import Image from 'next/image'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft } from 'lucide-react'
-import api from '../../../api/axios'
-import LoadingSpinner from '../../../components/ui/LoadingSpinner'
-import EmptyState from '../../../components/ui/EmptyState'
-
-const PLACEHOLDER_IMG = '/images/placeholder-maladie.svg'
+import {
+  AlertTriangle,
+  ArrowLeft,
+  Building2,
+  CheckCircle2,
+  MessageSquareText,
+  ShieldAlert,
+} from 'lucide-react'
+import api from '@/api/axios'
+import EmptyState from '@/components/ui/EmptyState'
+import LoadingSpinner from '@/components/ui/LoadingSpinner'
 
 export default function MaladieDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
+  const router = useRouter()
   const [maladie, setMaladie] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
-  const router = useRouter()
 
   useEffect(() => {
     let active = true
-    api.get(`/api/maladies/${id}`)
-      .then((res: any) => active && setMaladie(res.data))
-      .catch((err: any) => {
-        if (err.response?.status === 404) setNotFound(true)
+    api.get(`/api/public/conditions/${id}`)
+      .then((response) => {
+        if (active) setMaladie(response.data)
       })
-      .finally(() => active && setLoading(false))
+      .catch((error) => {
+        if (active && error.response?.status === 404) setNotFound(true)
+      })
+      .finally(() => {
+        if (active) setLoading(false)
+      })
     return () => { active = false }
   }, [id])
 
-  if (loading) return <LoadingSpinner label="Chargement du guide…" />
+  if (loading) return <LoadingSpinner label="Chargement de la fiche..." />
   if (notFound || !maladie) {
     return (
-      <div className="pt-20 min-h-screen bg-[#f4f4f4] dark:bg-slate-900">
+      <main className="mx-auto min-h-[60vh] max-w-4xl px-4 py-12 sm:px-6">
         <EmptyState
-          title="Guide introuvable"
-          description="Cet article n'existe pas ou a été retiré."
-          action={<Link href="/maladies" className="text-gray-900 dark:text-white font-semibold text-sm underline">← Retour aux guides</Link>}
+          title="Fiche indisponible"
+          description="Cette fiche n'appartient pas au catalogue patient ou n'est pas autorisée dans cet environnement."
+          action={<Link href="/maladies" className="font-semibold text-emerald-700 underline">Retour à l&apos;orientation</Link>}
         />
-      </div>
+      </main>
     )
   }
 
-  const imgSrc = maladie.imageUrl || maladie.photo || PLACEHOLDER_IMG
-  const premiersSoins: any[] = maladie.premiersSoins ?? []
+  const symptoms = splitContent(maladie.symptomes)
+  const precautions = splitContent(maladie.precautions)
 
   return (
-    <div className="min-h-screen bg-[#f4f4f4] dark:bg-slate-900 py-12 px-6 transition-colors">
-      <div className="max-w-2xl mx-auto">
-        
-        {/* Navigation retour */}
-        <button 
-          onClick={() => router.back()} 
-          className="inline-flex items-center gap-2 text-sm font-medium text-gray-500 dark:text-slate-400 hover:text-gray-900 dark:hover:text-white transition-colors mb-8"
-        >
-          <ArrowLeft className="w-4 h-4" /> Retour
-        </button>
+    <main className="mx-auto w-full max-w-4xl px-4 py-8 sm:px-6 sm:py-10">
+      <button type="button" onClick={() => router.back()} className="inline-flex h-10 items-center gap-2 text-sm font-semibold text-slate-600 hover:text-slate-950 dark:text-slate-300 dark:hover:text-white">
+        <ArrowLeft className="h-4 w-4" /> Retour
+      </button>
 
-        {/* Grand Titre Éditorial */}
-        <h1 className="text-3xl md:text-4xl font-extrabold text-gray-900 dark:text-white tracking-tight leading-tight mb-8">
-          Le Guide Ultime des Premiers Secours : {maladie.nom}
-        </h1>
+      <header className="mt-4 border-b border-slate-200 pb-6 dark:border-white/10">
+        <p className="text-xs font-bold uppercase tracking-[0.15em] text-emerald-700 dark:text-emerald-300">
+          Fiche d&apos;information pour préparer une consultation
+        </p>
+        <h1 className="mt-2 font-display text-3xl font-bold text-slate-950 dark:text-white sm:text-4xl">{maladie.nom}</h1>
+        <p className="mt-3 text-sm leading-6 text-slate-600 dark:text-slate-300">
+          Cette page aide à reconnaître des signes et à savoir quand consulter. Elle ne confirme pas une maladie et ne fournit ni ordonnance ni plan de traitement.
+        </p>
+      </header>
 
-        {/* Image Panoramique */}
-        <div className="relative w-full h-72 md:h-80 mb-10 overflow-hidden rounded-3xl shadow-sm">
-          <Image
-            src={imgSrc}
-            alt={maladie.nom}
-            fill
-            sizes="(max-width: 768px) 100vw, 800px"
-            className="object-cover"
-            unoptimized
-          />
-        </div>
+      {maladie.urgence && (
+        <section className="mt-6 flex gap-3 border border-red-200 bg-red-50 p-4 text-red-900 dark:border-red-500/25 dark:bg-red-500/10 dark:text-red-100">
+          <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />
+          <div>
+            <h2 className="font-bold">Une évaluation urgente peut être nécessaire</h2>
+            <p className="mt-1 text-sm leading-6">
+              En cas de difficulté respiratoire, perte de connaissance, convulsions, douleur thoracique ou saignement important, contactez immédiatement les urgences.
+            </p>
+          </div>
+        </section>
+      )}
 
-        {/* Corps de l'article */}
-        <article className="space-y-10">
-          
-          {/* Description */}
+      <div className="mt-8 grid gap-8 lg:grid-cols-[minmax(0,1fr)_280px]">
+        <article className="space-y-8">
           {maladie.description && (
-            <section>
-              <h2 className="text-xl font-bold text-gray-800 dark:text-slate-100 mb-4">Vue d'ensemble</h2>
-              <p className="text-gray-600 dark:text-slate-300 text-sm font-medium leading-relaxed whitespace-pre-line">
-                {maladie.description}
-              </p>
-            </section>
+            <InfoSection title="Comprendre la situation" icon={ShieldAlert}>
+              <p className="whitespace-pre-line text-sm leading-7 text-slate-600 dark:text-slate-300">{maladie.description}</p>
+            </InfoSection>
           )}
 
-          {/* Symptômes */}
-          {maladie.symptomes && (
-            <section>
-              <h2 className="text-xl font-bold text-gray-800 dark:text-slate-100 mb-4">Ce qu'il faut surveiller :</h2>
-              <p className="text-gray-600 dark:text-slate-300 text-sm font-medium leading-relaxed whitespace-pre-line mb-3">
-                Identifiez rapidement les signes caractéristiques pour réagir au plus vite.
-              </p>
+          {symptoms.length > 0 && (
+            <InfoSection title="Signes à décrire au médecin" icon={CheckCircle2}>
               <ul className="space-y-2">
-                {maladie.symptomes.split(',').map((s: string, i: number) => (
-                  <li key={i} className="text-gray-600 dark:text-slate-300 text-sm font-medium leading-relaxed flex items-start gap-2">
-                    <span className="text-gray-400 dark:text-slate-500 mt-1">•</span>
-                    <span>{s.trim()}</span>
+                {symptoms.map((symptom) => (
+                  <li key={symptom} className="flex gap-3 text-sm leading-6 text-slate-600 dark:text-slate-300">
+                    <span className="font-black text-emerald-700 dark:text-emerald-300">•</span>
+                    <span>{symptom}</span>
                   </li>
                 ))}
               </ul>
-            </section>
+            </InfoSection>
           )}
 
-          {/* Gestes de Premiers Secours (Liste Ordonnée Discrète) */}
-          {premiersSoins.length > 0 && (
-            <section>
-              <h2 className="text-xl font-bold text-gray-800 dark:text-slate-100 mb-4">Les Étapes Qui Sauvent :</h2>
-              <div className="space-y-6">
-                {premiersSoins.map((ps: any, i: number) => (
-                  <div key={ps.id ?? i}>
-                    <h3 className="text-gray-800 dark:text-slate-200 text-sm font-bold mb-1">
-                      Étape {i + 1} : {ps.titre}
-                    </h3>
-                    <p className="text-gray-600 dark:text-slate-300 text-sm font-medium leading-relaxed whitespace-pre-line">
-                      {ps.description}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            </section>
-          )}
-
-          {/* Causes */}
           {maladie.causes && (
-            <section>
-              <h2 className="text-xl font-bold text-gray-800 dark:text-slate-100 mb-4">Origines et Causes</h2>
-              <p className="text-gray-600 dark:text-slate-300 text-sm font-medium leading-relaxed whitespace-pre-line">
-                {maladie.causes}
-              </p>
-            </section>
+            <InfoSection title="Éléments que le médecin pourra rechercher" icon={MessageSquareText}>
+              <p className="whitespace-pre-line text-sm leading-7 text-slate-600 dark:text-slate-300">{maladie.causes}</p>
+            </InfoSection>
           )}
 
-          {/* Précautions */}
-          {maladie.precautions && (
-            <section>
-              <h2 className="text-xl font-bold text-gray-800 dark:text-slate-100 mb-4">Précautions à prendre</h2>
-              <p className="text-gray-600 dark:text-slate-300 text-sm font-medium leading-relaxed whitespace-pre-line">
-                {maladie.precautions}
-              </p>
-            </section>
+          {precautions.length > 0 && (
+            <InfoSection title="Prévention et précautions générales" icon={ShieldAlert}>
+              <ul className="space-y-2">
+                {precautions.map((item) => (
+                  <li key={item} className="flex gap-3 text-sm leading-6 text-slate-600 dark:text-slate-300">
+                    <span className="font-black text-blue-700 dark:text-blue-300">•</span>
+                    <span>{item}</span>
+                  </li>
+                ))}
+              </ul>
+            </InfoSection>
           )}
-
-          {/* Traitement */}
-          {maladie.traitement && (
-            <section>
-              <h2 className="text-xl font-bold text-gray-800 dark:text-slate-100 mb-4">Traitements médicaux</h2>
-              <p className="text-gray-600 dark:text-slate-300 text-sm font-medium leading-relaxed whitespace-pre-line">
-                {maladie.traitement}
-              </p>
-            </section>
-          )}
-
         </article>
 
-        <div className="mt-16 pt-8 border-t border-gray-200 dark:border-white/10">
-          <p className="text-xs text-gray-400 dark:text-slate-500 text-center">
-            À la fin de ce guide, vous disposez des éléments clairs pour réagir face à l'urgence. En cas de doute, consultez immédiatement un médecin.
+        <aside className="h-fit border border-slate-200 bg-slate-50 p-5 dark:border-white/10 dark:bg-slate-900">
+          <h2 className="font-display text-lg font-bold text-slate-950 dark:text-white">Prochaine étape</h2>
+          <p className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300">
+            Notez les symptômes, leur heure de début, leur évolution, les allergies et les traitements habituels.
           </p>
-        </div>
-
+          <div className="mt-4 space-y-2">
+            <Link href="/medecins" className="flex h-11 items-center justify-center gap-2 bg-emerald-700 px-4 text-sm font-bold text-white hover:bg-emerald-600">
+              <MessageSquareText className="h-4 w-4" /> Consulter un médecin
+            </Link>
+            <Link href="/centres" className="flex h-11 items-center justify-center gap-2 border border-slate-300 bg-white px-4 text-sm font-bold text-slate-800 hover:bg-slate-100 dark:border-white/15 dark:bg-slate-950 dark:text-white">
+              <Building2 className="h-4 w-4" /> Trouver un centre
+            </Link>
+            <Link href="/premiers-soins" className="flex h-11 items-center justify-center gap-2 border border-slate-300 bg-white px-4 text-sm font-bold text-slate-800 hover:bg-slate-100 dark:border-white/15 dark:bg-slate-950 dark:text-white">
+              <ShieldAlert className="h-4 w-4" /> Premiers secours
+            </Link>
+          </div>
+        </aside>
       </div>
-    </div>
+    </main>
   )
+}
+
+function InfoSection({ title, icon: Icon, children }: { title: string; icon: any; children: React.ReactNode }) {
+  return (
+    <section>
+      <h2 className="flex items-center gap-2 font-display text-xl font-bold text-slate-950 dark:text-white">
+        <Icon className="h-5 w-5 text-emerald-700 dark:text-emerald-300" />
+        {title}
+      </h2>
+      <div className="mt-3">{children}</div>
+    </section>
+  )
+}
+
+function splitContent(value?: string | null): string[] {
+  if (!value) return []
+  return value
+    .split(/[,;\n\r]+/)
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .slice(0, 20)
 }

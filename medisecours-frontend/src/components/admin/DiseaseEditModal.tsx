@@ -57,8 +57,9 @@ export default function DiseaseEditModal({
 
   const resolveImgSrc = (img) => {
     if (typeof img === 'string') return img.startsWith('http') ? img : `${API_BASE}${img}`
+    if (img.contentUrl) return img.contentUrl.startsWith('http') ? img.contentUrl : `${API_BASE}${img.contentUrl}`
     if (img.url) return img.url.startsWith('http') ? img.url : `${API_BASE}${img.url}`
-    if (img.filePath) return `${API_BASE}/uploads/media/${img.filePath}`
+    if (img.id) return `${API_BASE}/api/media_objects/${img.id}/download`
     return null
   }
 

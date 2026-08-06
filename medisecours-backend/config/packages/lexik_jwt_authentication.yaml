@@ -6,3 +6,11 @@ lexik_jwt_authentication:
     # Par défaut 3600s (1h). En production, 7200s (2h) est raisonnable.
     # Ne pas dépasser 86400s (24h) sans mécanisme de révocation.
     token_ttl:   '%env(int:JWT_TTL)%'
+    token_extractors:
+        authorization_header:
+            enabled: true
+            prefix: Bearer
+            name: Authorization
+        cookie:
+            enabled: true
+            name: medisecours_access

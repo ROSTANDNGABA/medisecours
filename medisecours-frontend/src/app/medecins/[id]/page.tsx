@@ -1,280 +1,380 @@
-// @ts-nocheck
 'use client'
 
-import { useEffect, useState, use } from 'react'
+import { use, useState } from 'react'
+import Image from 'next/image'
 import Link from 'next/link'
-import { motion } from 'framer-motion'
+import useSWR from 'swr'
 import {
-  Stethoscope, Star, Clock, MessageSquare,
-  ArrowLeft, User, CheckCircle
+  ArrowLeft,
+  CalendarDays,
+  CheckCircle2,
+  Clock3,
+  LoaderCircle,
+  MessageSquareText,
+  PhoneCall,
+  ShieldCheck,
+  Star,
+  Stethoscope,
+  UserRound,
 } from 'lucide-react'
-import api from '../../../api/axios'
-import LoadingSpinner from '../../../components/ui/LoadingSpinner'
-import { useAuth } from '../../../hooks/useAuth'
-import { useToast } from '../../../components/ui/Toast'
+import api from '@/api/axios'
+import { emergencyCallHref, EMERGENCY_NUMBER } from '@/config/firstAid'
+import { useAuth } from '@/hooks/useAuth'
+import { resolveImgPath } from '@/lib/config'
+import CertifiedBadge from '@/components/ui/CertifiedBadge'
+import {
+  idFromRelation,
+  type Consultation,
+  type PublicMedecinAvis,
+  type PublicMedecinDetail,
+} from '@/types/api'
+import { useToast } from '@/components/ui/Toast'
 
-/**
- * Profil public d'un médecin avec ses avis.
- * Accessible sans authentification.
- */
-export default function MedecinDetailPage({ params }) {
-  // Next.js 16 — params est une Promise
-  const { id } = use(params)
-  const { user, mounted } = useAuth()
-  const toast = useToast()
+function fullName(medecin: PublicMedecinDetail): string {
+  return `Dr ${medecin.prenom ?? ''} ${medecin.nom ?? ''}`.replace(/\s+/g, ' ').trim()
+}
 
-  const [medecin, setMedecin] = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [notFound, setNotFound] = useState(false)
-
-  // Formulaire avis
-  const [avisNote, setAvisNote] = useState(0)
-  const [avisHover, setAvisHover] = useState(0)
-  const [avisCommentaire, setAvisCommentaire] = useState('')
-  const [avisLoading, setAvisLoading] = useState(false)
-  const [avisEnvoye, setAvisEnvoye] = useState(false)
-
-  useEffect(() => {
-    api.get(`/api/medecins-publics/${id}`)
-      .then((res) => setMedecin(res.data))
-      .catch((err) => {
-        if (err.response?.status === 404) setNotFound(true)
-        else toast.error('Impossible de charger le profil.')
-      })
-      .finally(() => setLoading(false))
-  }, [id, toast])
-
-  const handleAvis = async (e) => {
-    e.preventDefault()
-    if (!avisNote) { toast.error('Veuillez choisir une note.'); return }
-
-    setAvisLoading(true)
-    try {
-      await api.post('/api/avis', {
-        medecin: `/api/users/${id}`,
-        note: avisNote,
-        commentaire: avisCommentaire.trim() || null,
-      }, { headers: { 'Content-Type': 'application/ld+json' } })
-      toast.success('Votre avis a été publié.')
-      setAvisEnvoye(true)
-      // Recharger le profil pour afficher le nouvel avis
-      const res = await api.get(`/api/medecins-publics/${id}`)
-      setMedecin(res.data)
-    } catch (err) {
-      if (err.response?.status === 422) {
-        toast.error('Vous avez déjà laissé un avis sur ce médecin.')
-      } else {
-        toast.error("Erreur lors de l'envoi de l'avis.")
-      }
-    } finally {
-      setAvisLoading(false)
-    }
-  }
-
-  if (loading) return <LoadingSpinner label="Chargement du profil…" />
-
-  if (notFound) {
-    return (
-      <div className="max-w-2xl mx-auto px-6 py-20 text-center">
-        <Stethoscope className="w-12 h-12 text-primary-300 mx-auto mb-4" />
-        <h1 className="font-display font-bold text-2xl text-primary-900 dark:text-sable mb-2">Médecin introuvable</h1>
-        <p className="text-primary-400 mb-6">Ce profil n&apos;existe pas ou n&apos;est plus disponible.</p>
-        <Link href="/medecins" className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-primary-500 hover:bg-primary-700 text-white font-semibold text-sm">
-          <ArrowLeft className="w-4 h-4" /> Voir tous les médecins
-        </Link>
-      </div>
-    )
-  }
-
-  const note = medecin?.noteMoyenne ?? 0
-  const avis = medecin?.avis ?? []
-  const initiales = `${medecin?.prenom?.[0] || ''}${medecin?.nom?.[0] || ''}`.toUpperCase()
-  const isPatient = mounted && user?.roles?.includes('ROLE_PATIENT')
-
+function Stars({ note, size = 'h-4 w-4' }: { note: number; size?: string }) {
   return (
-    <div className="max-w-3xl mx-auto px-6 py-10">
-      {/* Retour */}
-      <Link href="/medecins" className="inline-flex items-center gap-1.5 text-sm text-primary-400 hover:text-primary-700 mb-6">
-        <ArrowLeft className="w-4 h-4" /> Tous les médecins
-      </Link>
-
-      {/* En-tête profil */}
-      <motion.div
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="rounded-2xl bg-white/80 dark:bg-primary-700/40 border border-white/50 dark:border-white/10 shadow-lg p-6 mb-6"
-      >
-        <div className="flex items-start gap-5">
-          <div className="w-16 h-16 rounded-full bg-primary-500 text-white flex items-center justify-center font-bold text-lg shrink-0 overflow-hidden">
-            {medecin?.photoProfil
-              ? <img src={medecin.photoProfil} alt="" className="w-full h-full object-cover" />
-              : initiales
-            }
-          </div>
-          <div className="flex-1">
-            <div className="flex items-center gap-2 flex-wrap">
-              <h1 className="font-display font-bold text-2xl text-primary-900 dark:text-sable">
-                Dr {medecin?.prenom} {medecin?.nom}
-              </h1>
-              <span className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full bg-mint-100 text-mint-700">
-                <CheckCircle className="w-3.5 h-3.5" /> Vérifié
-              </span>
-            </div>
-            <p className="text-primary-400 mt-0.5">{medecin?.specialite || 'Médecin généraliste'}</p>
-
-            {/* Note globale */}
-            <div className="flex items-center gap-2 mt-2">
-              <div className="flex gap-0.5">
-                {[1, 2, 3, 4, 5].map((n) => (
-                  <Star key={n} className={`w-4 h-4 ${n <= Math.round(note) ? 'text-amber-400 fill-amber-400' : 'text-primary-200'}`} />
-                ))}
-              </div>
-              <span className="text-sm font-semibold text-primary-700 dark:text-sable">
-                {note > 0 ? note.toFixed(1) : '—'}
-              </span>
-              <span className="text-xs text-primary-400">
-                ({avis.length} avis)
-              </span>
-            </div>
-
-            {/* Disponibilités */}
-            {medecin?.disponibilites && (
-              <div className="flex items-center gap-1.5 mt-2 text-sm text-primary-400">
-                <Clock className="w-4 h-4 shrink-0" />
-                {medecin.disponibilites}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Bouton contacter */}
-        <div className="mt-5 pt-5 border-t border-primary-100 dark:border-white/10">
-          <Link
-            href={`/messages?medecin=${id}`}
-            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-mint-500 hover:bg-mint-700 text-white font-semibold text-sm transition"
-          >
-            <MessageSquare className="w-4 h-4" />
-            Contacter ce médecin
-          </Link>
-        </div>
-      </motion.div>
-
-      {/* Section avis */}
-      <div className="space-y-4">
-        <h2 className="font-display font-bold text-xl text-primary-900 dark:text-sable">
-          Avis des patients ({avis.length})
-        </h2>
-
-        {/* Formulaire laisser un avis */}
-        {isPatient && !avisEnvoye && (
-          <motion.form
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            onSubmit={handleAvis}
-            className="rounded-2xl bg-white/80 dark:bg-primary-700/40 border border-white/50 dark:border-white/10 p-5 space-y-3"
-          >
-            <p className="font-semibold text-sm text-primary-700 dark:text-sable">
-              Laisser un avis
-            </p>
-
-            {/* Étoiles interactives */}
-            <div className="flex gap-1">
-              {[1, 2, 3, 4, 5].map((n) => (
-                <button
-                  key={n}
-                  type="button"
-                  onMouseEnter={() => setAvisHover(n)}
-                  onMouseLeave={() => setAvisHover(0)}
-                  onClick={() => setAvisNote(n)}
-                  className="focus:outline-none"
-                  aria-label={`Note ${n}`}
-                >
-                  <Star
-                    className={`w-6 h-6 transition ${
-                      n <= (avisHover || avisNote)
-                        ? 'text-amber-400 fill-amber-400'
-                        : 'text-primary-200'
-                    }`}
-                  />
-                </button>
-              ))}
-              {avisNote > 0 && (
-                <span className="text-sm text-primary-400 ml-2 self-center">
-                  {['', 'Mauvais', 'Passable', 'Bien', 'Très bien', 'Excellent'][avisNote]}
-                </span>
-              )}
-            </div>
-
-            <textarea
-              value={avisCommentaire}
-              onChange={(e) => setAvisCommentaire(e.target.value)}
-              placeholder="Partagez votre expérience (optionnel, 10 caractères minimum si renseigné)…"
-              rows={3}
-              maxLength={2000}
-              className="w-full px-3 py-2.5 rounded-xl border border-primary-100 dark:border-white/10 bg-white dark:bg-primary-900/40 focus:outline-none focus:ring-2 focus:ring-mint-500 text-sm resize-none"
-            />
-
-            <button
-              type="submit"
-              disabled={avisLoading || !avisNote}
-              className="px-5 py-2 rounded-xl bg-mint-500 hover:bg-mint-700 text-white text-sm font-semibold disabled:opacity-50 transition"
-            >
-              {avisLoading ? 'Publication…' : 'Publier mon avis'}
-            </button>
-          </motion.form>
-        )}
-
-        {/* Liste des avis */}
-        {avis.length === 0 ? (
-          <div className="rounded-2xl bg-white/60 dark:bg-primary-700/30 border border-white/50 dark:border-white/10 p-6 text-center">
-            <p className="text-primary-400 text-sm">Aucun avis pour ce médecin pour le moment.</p>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {avis.map((a) => (
-              <AvisCard key={a.id} avis={a} />
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
+    <span className="flex gap-0.5" aria-label={`Note ${note} sur 5`}>
+      {[1, 2, 3, 4, 5].map((value) => (
+        <Star
+          key={value}
+          className={`${size} ${
+            value <= Math.round(note)
+              ? 'fill-amber-400 text-amber-400'
+              : 'text-slate-300 dark:text-slate-600'
+          }`}
+          aria-hidden="true"
+        />
+      ))}
+    </span>
   )
 }
 
-function AvisCard({ avis }) {
-  const auteur = avis.patient
-    ? `${avis.patient.prenom || ''} ${avis.patient.nom || ''}`.trim() || 'Patient anonyme'
-    : 'Patient anonyme'
-
-  const date = avis.createdAt
-    ? new Intl.DateTimeFormat('fr-CM', { day: 'numeric', month: 'long', year: 'numeric' }).format(new Date(avis.createdAt))
-    : ''
+function Review({ review }: { review: PublicMedecinAvis }) {
+  const patient = `${review.patient.prenom ?? ''} ${review.patient.nom ?? ''}`.trim() || 'Patient'
+  const date = new Intl.DateTimeFormat('fr-CM', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  }).format(new Date(review.createdAt))
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="rounded-2xl bg-white/80 dark:bg-primary-700/40 border border-white/50 dark:border-white/10 p-4"
-    >
+    <article className="border border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-slate-900">
       <div className="flex items-start gap-3">
-        <div className="w-8 h-8 rounded-full bg-primary-200 dark:bg-primary-800 flex items-center justify-center shrink-0">
-          <User className="w-4 h-4 text-primary-500" />
-        </div>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center justify-between gap-2 flex-wrap">
-            <p className="font-semibold text-sm text-primary-900 dark:text-sable">{auteur}</p>
-            <span className="text-xs text-primary-300">{date}</span>
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center bg-slate-100 dark:bg-white/10">
+          <UserRound className="h-4 w-4 text-slate-500" aria-hidden="true" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap justify-between gap-2">
+            <p className="font-bold text-slate-900 dark:text-white">{patient}</p>
+            <time dateTime={review.createdAt} className="text-xs text-slate-500">{date}</time>
           </div>
-          <div className="flex gap-0.5 mt-1">
-            {[1, 2, 3, 4, 5].map((n) => (
-              <Star key={n} className={`w-3.5 h-3.5 ${n <= avis.note ? 'text-amber-400 fill-amber-400' : 'text-primary-200'}`} />
-            ))}
-          </div>
-          {avis.commentaire && (
-            <p className="text-sm text-primary-600 dark:text-primary-200 mt-1.5">{avis.commentaire}</p>
+          <div className="mt-1"><Stars note={review.note} size="h-3.5 w-3.5" /></div>
+          {review.commentaire && (
+            <p className="mt-3 break-words text-sm leading-6 text-slate-600 dark:text-slate-300">
+              {review.commentaire}
+            </p>
           )}
         </div>
       </div>
-    </motion.div>
+    </article>
+  )
+}
+
+export default function MedecinDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = use(params)
+  const { mounted, isAuthenticated, isMedecin, user } = useAuth()
+  const toast = useToast()
+  const [note, setNote] = useState(0)
+  const [commentaire, setCommentaire] = useState('')
+  const [sending, setSending] = useState(false)
+  const [reviewSent, setReviewSent] = useState(false)
+
+  const { data: medecin, error, isLoading, mutate } = useSWR<PublicMedecinDetail>(
+    `/api/medecins-publics/${encodeURIComponent(id)}`,
+    async (url: string) => {
+      const response = await api.get(url)
+      return response.data as PublicMedecinDetail
+    },
+    { revalidateOnFocus: false },
+  )
+
+  const isPatient = mounted && Boolean(user?.roles?.includes('ROLE_PATIENT'))
+  const { data: consultations = [] } = useSWR<Consultation[]>(
+    isPatient ? '/api/consultations?itemsPerPage=100' : null,
+    async (url: string) => {
+      const response = await api.get(url)
+      const payload = response.data
+      return (Array.isArray(payload) ? payload : payload?.member ?? payload?.['hydra:member'] ?? []) as Consultation[]
+    },
+    { revalidateOnFocus: false },
+  )
+  const canReview = consultations.some((consultation) => (
+    consultation.statut === 'TERMINEE'
+    && String(idFromRelation(consultation.medecin)) === String(id)
+  ))
+
+  const submitReview = async (event: React.FormEvent) => {
+    event.preventDefault()
+    const text = commentaire.trim()
+    if (!note) {
+      toast.error('Choisissez une note.')
+      return
+    }
+    if (text && text.length < 10) {
+      toast.error('Le commentaire doit contenir au moins 10 caractères.')
+      return
+    }
+
+    setSending(true)
+    try {
+      await api.post('/api/avis', {
+        medecin: `/api/users/${id}`,
+        note,
+        commentaire: text || null,
+      })
+      setReviewSent(true)
+      setNote(0)
+      setCommentaire('')
+      await mutate()
+      toast.success('Votre avis a été publié.')
+    } catch (requestError: unknown) {
+      const status = (requestError as { response?: { status?: number } }).response?.status
+      if (status === 403) {
+        toast.error('Un avis peut être publié après une consultation terminée avec ce médecin.')
+      } else if (status === 422) {
+        toast.error('Vous avez déjà publié un avis pour ce médecin.')
+      } else {
+        toast.error('Impossible de publier cet avis.')
+      }
+    } finally {
+      setSending(false)
+    }
+  }
+
+  if (isLoading) {
+    return (
+      <main className="flex min-h-[440px] items-center justify-center text-sm text-slate-500" role="status">
+        <LoaderCircle className="mr-3 h-5 w-5 animate-spin" aria-hidden="true" />
+        Chargement du profil
+      </main>
+    )
+  }
+
+  if (error || !medecin) {
+    return (
+      <main className="mx-auto max-w-2xl px-4 py-16 text-center sm:px-6">
+        <Stethoscope className="mx-auto h-12 w-12 text-slate-400" aria-hidden="true" />
+        <h1 className="mt-4 font-display text-2xl font-bold text-slate-950 dark:text-white">
+          Médecin introuvable
+        </h1>
+        <p className="mt-2 text-sm text-slate-500">Ce profil n&apos;est plus accessible.</p>
+        <Link
+          href="/medecins"
+          className="mt-6 inline-flex min-h-11 items-center gap-2 bg-slate-950 px-4 text-sm font-bold text-white"
+        >
+          <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+          Retour aux médecins
+        </Link>
+      </main>
+    )
+  }
+
+  const messagesPath = `/messages?medecin=${encodeURIComponent(id)}`
+  const contactHref = !mounted || !isAuthenticated
+    ? `/login?from=${encodeURIComponent(messagesPath)}`
+    : isMedecin
+      ? '/medecin'
+      : messagesPath
+  const contactLabel = !mounted || !isAuthenticated
+    ? 'Se connecter pour contacter'
+    : isMedecin
+      ? 'Retour à mon espace'
+      : 'Contacter ce médecin'
+  const photo = medecin.photoProfil ? resolveImgPath(medecin.photoProfil) : null
+  const initials = `${medecin.prenom?.[0] ?? ''}${medecin.nom?.[0] ?? ''}`.toUpperCase() || 'DR'
+
+  return (
+    <main className="mx-auto w-full max-w-5xl px-4 py-8 sm:px-6 sm:py-10">
+      <Link
+        href="/medecins"
+        className="inline-flex min-h-10 items-center gap-2 text-sm font-bold text-slate-600 hover:text-slate-950 dark:text-slate-300"
+      >
+        <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+        Tous les médecins
+      </Link>
+
+      <section className="mt-4 border border-slate-200 bg-white dark:border-white/10 dark:bg-slate-900">
+        <div className="grid gap-6 p-5 sm:p-7 lg:grid-cols-[minmax(0,1fr)_300px]">
+          <div className="flex min-w-0 flex-col gap-5 sm:flex-row">
+            <div className="flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden bg-emerald-100 text-xl font-black text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-200">
+              {photo ? (
+                <Image
+                  src={photo}
+                  alt={`Photo de ${fullName(medecin)}`}
+                  width={96}
+                  height={96}
+                  unoptimized
+                  className="h-full w-full object-cover"
+                />
+              ) : initials}
+            </div>
+
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <h1 className="break-words font-display text-2xl font-bold text-slate-950 dark:text-white sm:text-3xl">
+                  {fullName(medecin)}
+                </h1>
+                {medecin.estValide && <CertifiedBadge className="h-6 w-6" />}
+                <span className="inline-flex items-center gap-1.5 bg-blue-100 px-2 py-1 text-[11px] font-bold text-blue-800 dark:bg-[#1DA1F2]/15 dark:text-[#60A5FA]">
+                  <ShieldCheck className="h-3.5 w-3.5" aria-hidden="true" />
+                  Compte certifié
+                </span>
+              </div>
+              <p className="mt-2 font-semibold text-emerald-700 dark:text-emerald-300">
+                {medecin.specialite || 'Médecine générale'}
+              </p>
+              <div className="mt-4 flex flex-wrap items-center gap-2">
+                <Stars note={medecin.noteMoyenne || 0} />
+                <span className="text-sm font-semibold text-slate-600 dark:text-slate-300">
+                  {medecin.totalAvis > 0
+                    ? `${medecin.noteMoyenne.toFixed(1)} · ${medecin.totalAvis} avis`
+                    : 'Aucun avis publié'}
+                </span>
+              </div>
+              <div className="mt-4 flex items-start gap-2 text-sm leading-6 text-slate-600 dark:text-slate-300">
+                <Clock3 className="mt-1 h-4 w-4 shrink-0" aria-hidden="true" />
+                <span>{medecin.disponibilitesLabel || 'Horaires non renseignés'}</span>
+              </div>
+            </div>
+          </div>
+
+          <aside className="border border-slate-200 bg-slate-50 p-4 dark:border-white/10 dark:bg-slate-950">
+            <p className={`inline-flex items-center gap-2 text-sm font-bold ${
+              medecin.isDisponibleMaintenant
+                ? 'text-emerald-700 dark:text-emerald-300'
+                : 'text-slate-600 dark:text-slate-300'
+            }`}>
+              <span className={`h-2.5 w-2.5 rounded-full ${
+                medecin.isDisponibleMaintenant ? 'bg-emerald-500' : 'bg-slate-400'
+              }`} aria-hidden="true" />
+              {medecin.isDisponibleMaintenant ? 'Disponible selon ses horaires' : 'Indisponible actuellement'}
+            </p>
+            <p className="mt-3 text-xs leading-5 text-slate-500 dark:text-slate-400">
+              Le médecin confirme lui-même la prise en charge, le rappel ou le rendez-vous.
+            </p>
+            <Link
+              href={contactHref}
+              className="mt-5 inline-flex min-h-11 w-full items-center justify-center gap-2 bg-emerald-700 px-4 text-center text-sm font-bold text-white hover:bg-emerald-600"
+            >
+              <MessageSquareText className="h-4 w-4" aria-hidden="true" />
+              {contactLabel}
+            </Link>
+            {isPatient && (
+              <Link
+                href="/patient/consultations?new=1"
+                className="mt-2 inline-flex min-h-11 w-full items-center justify-center gap-2 border border-slate-300 bg-white px-4 text-sm font-bold text-slate-700 dark:border-white/15 dark:bg-slate-900 dark:text-white"
+              >
+                <CalendarDays className="h-4 w-4" aria-hidden="true" />
+                Nouvelle consultation
+              </Link>
+            )}
+          </aside>
+        </div>
+
+        <div className="grid gap-4 border-t border-slate-200 p-5 dark:border-white/10 sm:grid-cols-2 sm:p-7">
+          <div className="flex gap-3">
+            <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-700" aria-hidden="true" />
+            <p className="text-xs leading-5 text-slate-600 dark:text-slate-300">
+              Indiquez le motif, les symptômes observés, leur durée et les informations utiles.
+            </p>
+          </div>
+          <div className="flex gap-3">
+            <PhoneCall className="h-5 w-5 shrink-0 text-red-700" aria-hidden="true" />
+            <p className="text-xs leading-5 text-slate-600 dark:text-slate-300">
+              En cas de danger immédiat, la messagerie ne remplace pas les secours : appelez le{' '}
+              <a href={emergencyCallHref()} className="font-bold text-red-700 underline">{EMERGENCY_NUMBER}</a>.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section className="mt-8" aria-labelledby="reviews-title">
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h2 id="reviews-title" className="font-display text-xl font-bold text-slate-950 dark:text-white">
+              Avis des patients
+            </h2>
+            <p className="mt-1 text-xs text-slate-500">
+              Les avis sont réservés aux patients ayant terminé une consultation avec ce médecin.
+            </p>
+          </div>
+          <span className="text-sm font-semibold text-slate-600 dark:text-slate-300">
+            {medecin.avis.length} avis
+          </span>
+        </div>
+
+        {isPatient && canReview && !reviewSent && (
+          <form
+            onSubmit={submitReview}
+            className="mt-5 border border-slate-200 bg-slate-50 p-5 dark:border-white/10 dark:bg-slate-900"
+          >
+            <h3 className="text-sm font-bold text-slate-950 dark:text-white">Partager mon expérience</h3>
+            <div className="mt-3 flex gap-1" role="group" aria-label="Choisir une note">
+              {[1, 2, 3, 4, 5].map((value) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => setNote(value)}
+                  aria-label={`${value} étoile${value > 1 ? 's' : ''}`}
+                  aria-pressed={note === value}
+                  className="p-1 focus-visible:outline-2 focus-visible:outline-emerald-600"
+                >
+                  <Star
+                    className={`h-6 w-6 ${
+                      value <= note ? 'fill-amber-400 text-amber-400' : 'text-slate-300 dark:text-slate-600'
+                    }`}
+                    aria-hidden="true"
+                  />
+                </button>
+              ))}
+            </div>
+            <textarea
+              value={commentaire}
+              onChange={(event) => setCommentaire(event.target.value)}
+              rows={4}
+              maxLength={2000}
+              placeholder="Commentaire facultatif, 10 caractères minimum s’il est renseigné."
+              className="mt-4 w-full resize-y border border-slate-300 bg-white px-3 py-3 text-sm outline-none focus:border-emerald-500 dark:border-white/10 dark:bg-slate-950 dark:text-white"
+            />
+            <button
+              type="submit"
+              disabled={sending || note === 0}
+              className="mt-3 min-h-11 bg-emerald-700 px-5 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {sending ? 'Publication...' : 'Publier mon avis'}
+            </button>
+          </form>
+        )}
+
+        {isPatient && !canReview && (
+          <div className="mt-5 border border-blue-200 bg-blue-50 p-4 text-sm leading-6 text-blue-900 dark:border-blue-500/25 dark:bg-blue-500/10 dark:text-blue-100">
+            Le formulaire d&apos;avis sera disponible après une consultation terminée avec ce médecin.
+          </div>
+        )}
+
+        {medecin.avis.length === 0 ? (
+          <div className="mt-5 border border-slate-200 bg-white p-7 text-center text-sm text-slate-500 dark:border-white/10 dark:bg-slate-900">
+            Aucun avis publié pour le moment.
+          </div>
+        ) : (
+          <div className="mt-5 grid gap-3">
+            {medecin.avis.map((review) => <Review key={review.id} review={review} />)}
+          </div>
+        )}
+      </section>
+    </main>
   )
 }

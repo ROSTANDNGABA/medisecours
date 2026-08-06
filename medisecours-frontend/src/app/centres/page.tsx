@@ -332,7 +332,7 @@ export default function CentresPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
         {/* Map */}
-        <div className="lg:col-span-3 relative rounded-2xl overflow-hidden shadow-xl border border-white/50 dark:border-white/10 h-[420px] lg:h-[600px]">
+        <div className="isolate z-0 lg:col-span-3 relative rounded-2xl overflow-hidden shadow-xl border border-white/50 dark:border-white/10 h-[420px] lg:h-[600px]">
           <CentresMap
             centres={sorted}
             position={position || undefined}
@@ -342,9 +342,9 @@ export default function CentresPage() {
             destination={destination}
           />
           
-          {/* Bouton de contrôle de suivi (Z-index 1000) */}
+          {/* Contrôle au-dessus de la carte, limité à son contexte d'empilement. */}
           {position && (
-            <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-[1000]">
+            <div className="absolute bottom-6 left-1/2 z-20 -translate-x-1/2">
               <button
                 onClick={() => setIsTracking(!isTracking)}
                 className={`flex items-center gap-2 px-6 py-3 rounded-full font-bold text-white shadow-xl transition-all ${

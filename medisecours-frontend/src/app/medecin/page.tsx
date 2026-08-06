@@ -18,6 +18,7 @@ import { useWebSocket } from '../../hooks/useWebSocket'
 import { imgUrl } from '../../lib/config'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import Avatar from '../../components/ui/Avatar'
+import CertifiedBadge from '../../components/ui/CertifiedBadge'
 import DashboardAnalytics from '../../components/medecin/dashboard/DashboardAnalytics'
 import { DASHBOARD_KEY } from '../../lib/keys'
 import type { DashboardData, Consultation, Patient } from '../../types/api'
@@ -30,8 +31,6 @@ async function dashboardFetcher(url: string): Promise<DashboardData> {
     const status = err?.response?.status
     if (status === 401) {
       if (typeof window !== 'undefined') {
-        localStorage.removeItem('medisecours_token')
-        localStorage.removeItem('medisecours_user')
         window.location.href = '/login'
       }
     }
@@ -130,7 +129,7 @@ export default function MedecinDashboard() {
           </div>
           <div className="relative z-10 max-w-[60%]">
             <h2 className="text-2xl font-bold mb-1">
-              {getGreeting()}, Dr. {user?.prenom} 👋
+              {getGreeting()}, Dr. {user?.prenom} {user?.estValide && <CertifiedBadge className="inline-block h-5 w-5 align-middle" />} 👋
             </h2>
             <p className="text-sm text-white/80 mb-4 leading-relaxed">
               Vous avez <span className="font-semibold text-white">{kpis.enAttente} consultation{kpis.enAttente > 1 ? 's' : ''} en attente</span> et{' '}
@@ -305,7 +304,10 @@ export default function MedecinDashboard() {
             </div>
             <span className="absolute bottom-0 right-0 w-4 h-4 rounded-full bg-emerald-400 border-2 border-white" />
           </div>
-          <h4 className="font-bold text-[#0F2C52] text-sm">Dr. {user?.prenom} {user?.nom}</h4>
+          <div className="flex items-center justify-center gap-1.5">
+            <h4 className="font-bold text-[#0F2C52] text-sm">Dr. {user?.prenom} {user?.nom}</h4>
+            {user?.estValide && <CertifiedBadge className="h-3.5 w-3.5" />}
+          </div>
           <p className="text-[11px] text-[#6B7280] mb-1">{user?.specialite || 'Médecin'}</p>
           <Link href="/medecin/profil" className="text-[11px] text-[#4F46E5] font-semibold hover:underline">
             Voir profil →

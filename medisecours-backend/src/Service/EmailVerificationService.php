@@ -34,7 +34,8 @@ class EmailVerificationService
     public function sendVerificationEmail(User $user): void
     {
         $token = bin2hex(random_bytes(32));
-        $user->setEmailVerificationToken($token);
+        $user->setEmailVerificationToken(hash('sha256', $token));
+        $user->setEmailVerificationTokenExpiresAt(new \DateTimeImmutable('+24 hours'));
         $user->setEmailVerified(false);
 
         $verificationUrl = sprintf('%s/verify-email?token=%s', rtrim($this->appUrl, '/'), $token);
@@ -184,7 +185,7 @@ class EmailVerificationService
     public function sendPasswordResetEmail(User $user): void
     {
         $token = bin2hex(random_bytes(32));
-        $user->setPasswordResetToken($token);
+        $user->setPasswordResetToken(hash('sha256', $token));
         $user->setPasswordResetTokenExpiresAt(new \DateTimeImmutable('+1 hour'));
 
         $resetUrl = sprintf('%s/reset-password?token=%s', rtrim($this->appUrl, '/'), $token);

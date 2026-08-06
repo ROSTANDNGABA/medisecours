@@ -71,7 +71,7 @@ h1, h2, h3, h4 {
 body.chat-open #app-topbar {
   display: none;
 }
-@media (min-width: 1024px) {
+@media (min-width: 1280px) {
   body.chat-open #app-topbar {
     display: block;
   }

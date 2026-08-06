@@ -10,7 +10,7 @@ import Modal from '../../../components/ui/Modal'
 import { useToast } from '../../../components/ui/Toast'
 
 export default function AdminParametresPage() {
-  const { user, updateUser } = useAuth()
+  const { user, updateUser, logout } = useAuth()
   const toast = useToast()
   const [savingProfile, setSavingProfile] = useState(false)
   const [changingPassword, setChangingPassword] = useState(false)
@@ -43,7 +43,9 @@ export default function AdminParametresPage() {
   const handleSaveProfile = async () => {
     setSavingProfile(true)
     try {
-      const { data } = await api.patch(`/api/users/${user.id}`, form, {
+      const profilePayload = { ...form }
+      delete (profilePayload as Partial<typeof form>).email
+      const { data } = await api.patch(`/api/users/${user.id}`, profilePayload, {
         headers: { 'Content-Type': 'application/merge-patch+json' },
       })
       updateUser({ ...user, ...data })
@@ -70,6 +72,8 @@ export default function AdminParametresPage() {
       toast.success('Mot de passe modifie avec succes.')
       setShowPasswordModal(false)
       setPasswordForm({ current: '', new: '', confirm: '' })
+      await logout()
+      window.location.assign('/login')
     } catch {
       toast.error('Echec de la modification du mot de passe.')
     } finally {
@@ -105,7 +109,7 @@ export default function AdminParametresPage() {
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <Field label="Prenom" value={form.prenom} onChange={setFormField('prenom')} />
               <Field label="Nom" value={form.nom} onChange={setFormField('nom')} />
-              <Field label="Email" value={form.email} onChange={setFormField('email')} />
+              <Field label="Email" value={form.email} onChange={setFormField('email')} readOnly />
               <Field label="Telephone" value={form.telephone} onChange={setFormField('telephone')} />
             </div>
 
@@ -240,7 +244,7 @@ function Panel({ icon: Icon, title, description, children, iconTone = 'green', a
   )
 }
 
-function Field({ label, value, onChange, type = 'text' }: { label: string; value: string; onChange: (e: React.ChangeEvent<HTMLInputElement>) => void; type?: string }) {
+function Field({ label, value, onChange, type = 'text', readOnly = false }: { label: string; value: string; onChange: (e: React.ChangeEvent<HTMLInputElement>) => void; type?: string; readOnly?: boolean }) {
   return (
     <div>
       <label className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.18em] text-[#7a8578]">{label}</label>
@@ -248,7 +252,8 @@ function Field({ label, value, onChange, type = 'text' }: { label: string; value
         type={type}
         value={value || ''}
         onChange={onChange}
-        className="w-full rounded-2xl border border-[#dfe5db] bg-[#f8faf6] px-4 py-3 text-sm text-[#223023] outline-none transition focus:border-[#bfd0bd] focus:bg-white"
+        readOnly={readOnly}
+        className={`w-full rounded-2xl border border-[#dfe5db] bg-[#f8faf6] px-4 py-3 text-sm text-[#223023] outline-none transition focus:border-[#bfd0bd] focus:bg-white ${readOnly ? 'cursor-not-allowed opacity-65' : ''}`}
       />
     </div>
   )

@@ -11,7 +11,7 @@ const rawFetcher = async (url: string) => {
 }
 
 export function useConsultationCount() {
-  const { user, isMedecin } = useAuth()
+  const { user, isMedecin, token } = useAuth()
 
   // M1 corrigé : pas de refreshInterval. Le WebSocket ci-dessous déclenche déjà
   // mutate() sur les événements de consultation. On garde uniquement une
@@ -21,8 +21,6 @@ export function useConsultationCount() {
     rawFetcher,
     { revalidateOnFocus: true }
   )
-
-  const token = typeof window !== 'undefined' ? localStorage.getItem('medisecours_token') : null
 
   useWebSocket(user?.id || '', token || '', {
     onConsultationCreated: () => mutate(),

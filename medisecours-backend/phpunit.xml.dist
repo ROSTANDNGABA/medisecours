@@ -18,6 +18,7 @@
         <server name="JWT_PUBLIC_KEY" value="%kernel.project_dir%/config/jwt/public.pem"/>
         <server name="JWT_PASSPHRASE" value="916920f72e81bd2c31d27e20d394eacfb741daccfb4f27f79f5db74a3e589132"/>
         <server name="JWT_TTL" value="3600"/>
+        <server name="WS_PUBLISH_SECRET" value="test-websocket-publish-secret-32-characters"/>
         <server name="MAILER_DSN" value="null://null"/>
         <server name="MAILER_SENDER_EMAIL" value="noreply@test.medisecours.cm"/>
         <server name="MAILER_SENDER_NAME" value="MediSecours+ Test"/>

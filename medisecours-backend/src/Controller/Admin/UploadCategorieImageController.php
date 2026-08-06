@@ -62,7 +62,7 @@ class UploadCategorieImageController extends AbstractController
 
             $items = array_map(fn(MediaObject $m) => [
                 'id'           => $m->getId(),
-                'url'          => '/uploads/media/' . $m->getFilePath(),
+                'url'          => $m->getContentUrl(),
                 'originalName' => $m->getOriginalName(),
                 'filePath'     => $m->getFilePath(),
             ], $uploaded);

@@ -1,4 +1,3 @@
-// @ts-nocheck
 'use client'
 
 import { useMemo, useState } from 'react'
@@ -11,17 +10,27 @@ import EmptyState from '../../../components/ui/EmptyState'
 import Avatar from '../../../components/ui/Avatar'
 import { useToast } from '../../../components/ui/Toast'
 import { fetcher } from '../../../lib/fetcher'
+import type { Avis } from '../../../types/api'
+
+function patientName(patient: Avis['patient'] | undefined): string {
+  if (!patient || typeof patient === 'string') return 'Patient'
+  return [patient.prenom, patient.nom].filter(Boolean).join(' ').trim() || 'Patient'
+}
 
 export default function MedecinAvisPage() {
   const { user } = useAuth()
   const toast = useToast()
-  const { data: avis = [], isLoading } = useSWR(user?.id ? `/api/avis?medecin=${user.id}` : null, fetcher, { keepPreviousData: true })
-  const [reportTarget, setReportTarget] = useState(null)
+  const { data: avis = [], isLoading } = useSWR<Avis[]>(
+    user?.id ? `/api/avis?medecin=${user.id}` : null,
+    fetcher,
+    { keepPreviousData: true }
+  )
+  const [reportTarget, setReportTarget] = useState<Avis | null>(null)
   const [reportReason, setReportReason] = useState('')
   const [submittingReport, setSubmittingReport] = useState(false)
 
   const sorted = useMemo(
-    () => [...avis].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)),
+    () => [...avis].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()),
     [avis]
   )
 
@@ -30,7 +39,7 @@ export default function MedecinAvisPage() {
   const signales = avis.filter((a) => a.signale).length
 
   const distribution = useMemo(() => {
-    const dist = { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 }
+    const dist: Record<number, number> = { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 }
     avis.forEach((a) => { dist[a.note] = (dist[a.note] || 0) + 1 })
     return dist
   }, [avis])
@@ -39,17 +48,17 @@ export default function MedecinAvisPage() {
     if (!reportTarget) return
     setSubmittingReport(true)
     try {
-      await api.patch(`/api/avis/${reportTarget.id}`, { signale: true, raisonSignalement: reportReason }, { headers: { 'Content-Type': 'application/merge-patch+json' } })
+      await api.post(`/api/avis/${reportTarget.id}/signaler`, { raison: reportReason })
       const swrKey = `/api/avis?medecin=${user?.id}`
-      globalMutate(swrKey, (prev: any) => {
-        const arr = Array.isArray(prev) ? prev : []
-        return arr.map((x: any) => x.id === reportTarget.id ? { ...x, signale: true, raisonSignalement: reportReason } : x)
+      globalMutate<Avis[]>(swrKey, (prev) => {
+        const arr = prev ?? []
+        return arr.map((x) => (x.id === reportTarget.id ? { ...x, signale: true, raisonSignalement: reportReason } : x))
       }, { revalidate: false })
       toast.success('Avis signalé pour modération.')
       setReportTarget(null)
       setReportReason('')
     } catch {
-      toast.error("Échec du signalement.")
+      toast.error('Échec du signalement.')
     } finally {
       setSubmittingReport(false)
     }
@@ -66,7 +75,7 @@ export default function MedecinAvisPage() {
             <p className="font-display font-extrabold text-6xl text-primary-900 dark:text-sable">{noteMoyenne}<span className="text-2xl text-primary-300">/5</span></p>
             <div className="flex items-center justify-center gap-1 mt-2">
               {[1, 2, 3, 4, 5].map((i) => (
-                <Star key={i} className={`w-5 h-5 ${i <= Math.round(noteMoyenne) ? 'text-amber-400' : 'text-gray-200 dark:text-primary-700'}`} fill="currentColor" />
+                <Star key={i} className={`w-5 h-5 ${i <= Math.round(Number(noteMoyenne)) ? 'text-amber-400' : 'text-gray-200 dark:text-primary-700'}`} fill="currentColor" />
               ))}
             </div>
             <div className="flex gap-4 mt-3 text-xs text-primary-300 justify-center">
@@ -96,7 +105,9 @@ export default function MedecinAvisPage() {
       </div>
 
       {/* Reviews list */}
-      {sorted.length === 0 ? (
+      {isLoading ? (
+        <LoadingSpinner label="Chargement des avis…" />
+      ) : sorted.length === 0 ? (
         <EmptyState icon={Star} title="Aucun avis pour le moment" description="Les avis de vos patients apparaîtront ici." />
       ) : (
         <div className="space-y-3">
@@ -108,10 +119,10 @@ export default function MedecinAvisPage() {
                 </div>
               )}
               <div className="flex items-start gap-3">
-                <Avatar name={`${a.patient?.prenom || ''} ${a.patient?.nom || ''}`} />
+                <Avatar name={patientName(a.patient)} />
                 <div className="flex-1 min-w-0">
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <p className="text-sm font-semibold text-primary-900 dark:text-sable">{a.patient?.prenom} {a.patient?.nom}</p>
+                    <p className="text-sm font-semibold text-primary-900 dark:text-sable">{patientName(a.patient)}</p>
                     <p className="text-xs text-primary-300">
                       {new Date(a.createdAt).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}
                     </p>

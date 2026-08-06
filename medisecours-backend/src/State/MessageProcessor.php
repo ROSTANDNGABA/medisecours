@@ -13,8 +13,9 @@ use App\Entity\Message;
 use App\Entity\Patient;
 use App\Entity\User;
 use App\Message\WebSocketNotification;
+use App\Repository\ConversationRepository;
+use App\Service\NotificationService;
 use Doctrine\ORM\EntityManagerInterface;
-use Psr\Log\LoggerInterface;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
@@ -29,7 +30,8 @@ class MessageProcessor implements ProcessorInterface
         private readonly Security $security,
         private readonly EntityManagerInterface $em,
         private readonly MessageBusInterface $messageBus,
-        private readonly LoggerInterface $logger,
+        private readonly NotificationService $notificationService,
+        private readonly ConversationRepository $conversations,
     ) {
     }
 
@@ -40,6 +42,9 @@ class MessageProcessor implements ProcessorInterface
 
             if (!$user instanceof User) {
                 throw new AccessDeniedHttpException('Authentification requise.');
+            }
+            if (!$user->isActif()) {
+                throw new AccessDeniedHttpException('Votre compte ne peut pas envoyer de messages.');
             }
 
             $data->setExpediteur($user);
@@ -58,6 +63,31 @@ class MessageProcessor implements ProcessorInterface
                 throw new AccessDeniedHttpException('Vous ne participez pas à cette conversation.');
             }
 
+            if ($conversation->getParticipants()->count() !== 2) {
+                throw new BadRequestHttpException('Cette conversation ne respecte pas le format patient-médecin.');
+            }
+            $participants = $conversation->getParticipants()->toArray();
+            if (
+                count(array_filter($participants, static fn (User $participant): bool => $participant instanceof Patient)) !== 1
+                || count(array_filter($participants, static fn (User $participant): bool => $participant instanceof Medecin)) !== 1
+            ) {
+                throw new BadRequestHttpException('Une conversation doit associer un patient et un médecin.');
+            }
+
+            $media = $data->getMedia();
+            if (trim((string) $data->getContenu()) === '' && $media === null) {
+                throw new BadRequestHttpException('Un message doit contenir du texte ou un média.');
+            }
+
+            if ($media !== null && $media->getUploadedBy() !== $user && !$this->security->isGranted('ROLE_ADMIN')) {
+                throw new AccessDeniedHttpException('Vous ne pouvez pas joindre un média téléversé par un autre utilisateur.');
+            }
+
+            $parent = $data->getMessageParent();
+            if ($parent !== null && $parent->getConversation() !== $conversation) {
+                throw new BadRequestHttpException('Le message cité doit appartenir à la même conversation.');
+            }
+
             $data->setConversation($conversation);
             $data->setStatut(Message::STATUT_ENVOYE);
 
@@ -69,6 +99,17 @@ class MessageProcessor implements ProcessorInterface
         if ($result instanceof Message) {
             $conv = $result->getConversation();
             $conv?->setDernierMessage($result);
+            foreach ($conv?->getParticipants() ?? [] as $participant) {
+                if ($participant !== $result->getExpediteur()) {
+                    $this->notificationService->create(
+                        $participant,
+                        'message_received',
+                        'Nouveau message',
+                        'Vous avez reçu un nouveau message médical.',
+                        '/messages?conversation=' . $conv?->getId(),
+                    );
+                }
+            }
             $this->em->flush();
             $this->notifyWebSocket($result);
         }
@@ -81,7 +122,13 @@ class MessageProcessor implements ProcessorInterface
         $conv = $message->getConversation();
         if (!$conv) return;
 
-        $targetUserIds = array_map(fn($p) => (string) $p->getId(), $conv->getParticipants()->toArray());
+        $targetUserIds = array_values(array_map(
+            static fn (User $participant): string => (string) $participant->getId(),
+            array_filter(
+                $conv->getParticipants()->toArray(),
+                static fn (User $participant): bool => $participant !== $message->getExpediteur(),
+            ),
+        ));
 
         $this->messageBus->dispatch(new WebSocketNotification(
             event: 'new_message',
@@ -100,7 +147,7 @@ class MessageProcessor implements ProcessorInterface
                 'conversationId' => (string) $conv->getId(),
                 'media' => $message->getMedia() ? [
                     '@id' => '/api/media_objects/' . $message->getMedia()->getId(),
-                    'contentUrl' => '/uploads/media/' . $message->getMedia()->getFilePath(),
+                    'contentUrl' => '/api/media_objects/' . $message->getMedia()->getId() . '/download',
                     'originalName' => $message->getMedia()->getOriginalName(),
                     'mimeType' => $message->getMedia()->getMimeType(),
                     'size' => $message->getMedia()->getSize(),
@@ -124,43 +171,38 @@ class MessageProcessor implements ProcessorInterface
             throw new AccessDeniedHttpException('Vous ne participez pas à cette consultation.');
         }
 
-        return $this->findOrCreateConversation([$patient, $medecin]);
+        return $this->findOrCreateConversation($patient, $medecin);
     }
 
-    private function findOrCreateConversation(array $users): Conversation
+    private function findOrCreateConversation(Patient $patient, Medecin $doctor): Conversation
     {
-        $ids = array_map(fn(User $u) => (string) $u->getId(), $users);
-        sort($ids);
+        $pairKey = ConversationRepository::pairKey($patient, $doctor);
+        $this->conversations->acquirePairLock($pairKey);
 
-        $qb = $this->em->createQueryBuilder()
-            ->select('c')
-            ->from(Conversation::class, 'c')
-            ->join('c.participants', 'p')
-            ->groupBy('c.id')
-            ->having('COUNT(c.id) = :count')
-            ->setParameter('count', count($ids));
+        try {
+            $existing = $this->conversations->findOneBy(['pairKey' => $pairKey])
+                ?? $this->conversations->findExactParticipants($patient, $doctor);
 
-        foreach ($ids as $i => $id) {
-            $qb->andWhere("p.id IN (:id{$i})")
-               ->setParameter("id{$i}", $id);
-        }
+            if ($existing instanceof Conversation) {
+                if ($existing->getPairKey() === null) {
+                    $existing->setPairKey($pairKey);
+                    $this->em->flush();
+                }
 
-        $existing = $qb->getQuery()->getResult();
-
-        foreach ($existing as $conv) {
-            $convIds = array_map(fn(User $u) => (string) $u->getId(), $conv->getParticipants()->toArray());
-            sort($convIds);
-            if ($convIds === $ids) {
-                return $conv;
+                return $existing;
             }
-        }
 
-        $conversation = new Conversation();
-        foreach ($users as $u) {
-            $conversation->addParticipant($u);
-        }
-        $this->em->persist($conversation);
+            $conversation = new Conversation();
+            $conversation
+                ->addParticipant($patient)
+                ->addParticipant($doctor)
+                ->setPairKey($pairKey);
+            $this->em->persist($conversation);
+            $this->em->flush();
 
-        return $conversation;
+            return $conversation;
+        } finally {
+            $this->conversations->releasePairLock($pairKey);
+        }
     }
 }

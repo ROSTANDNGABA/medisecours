@@ -226,9 +226,10 @@ function IconButton({ children, onClick, tone = 'neutral' }: { children: ReactNo
   )
 }
 
-function imgUrl(path: string | null | undefined) {
+function imgUrl(image: any) {
+  const path = image?.contentUrl || image?.url || (image?.id ? `/api/media_objects/${image.id}/download` : null)
   if (!path) return undefined
-  return path.startsWith('http') ? path : `${API_BASE}/uploads/media/${path}`
+  return path.startsWith('http') ? path : `${API_BASE}${path.startsWith('/') ? path : `/${path}`}`
 }
 
 function ImageGallery({ endpoint, entityId, images, onMutate, entityType = 'maladies' }: {
@@ -286,7 +287,7 @@ function ImageGallery({ endpoint, entityId, images, onMutate, entityType = 'mala
           {imageList.map((img: any) => (
             <div key={img.id} className="group relative">
               <img
-                src={imgUrl(img.filePath)}
+                src={imgUrl(img)}
                 alt={img.originalName || ''}
                 className="h-16 w-16 rounded-xl border border-[#dfe5db] object-cover"
               />

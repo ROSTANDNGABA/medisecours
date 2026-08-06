@@ -7,6 +7,7 @@ namespace App\Controller;
 use App\Entity\Medecin;
 use App\Repository\AvisRepository;
 use Doctrine\ORM\EntityManagerInterface;
+use Doctrine\ORM\QueryBuilder;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -34,38 +35,78 @@ class MedecinPublicController extends AbstractController
         EntityManagerInterface $entityManager,
         AvisRepository $avisRepository
     ): JsonResponse {
-        $specialite = $request->query->get('specialite');
-        $page       = max(1, (int) $request->query->get('page', 1));
-        $limit      = min(50, max(1, (int) $request->query->get('limit', 30)));
-        $offset     = ($page - 1) * $limit;
+        $search = trim((string) $request->query->get('q', ''));
+        $specialite = trim((string) $request->query->get('specialite', ''));
+        $availableOnly = filter_var($request->query->get('disponible', false), FILTER_VALIDATE_BOOL);
+        $page = max(1, (int) $request->query->get('page', 1));
+        $limit = min(50, max(1, (int) $request->query->get('limit', 30)));
 
         $qb = $entityManager->createQueryBuilder()
             ->select('m')
             ->from(Medecin::class, 'm')
             ->where('m.estValide = true')
-            ->orderBy('m.nom', 'ASC')
-            ->setMaxResults($limit)
-            ->setFirstResult($offset);
+            ->andWhere('m.actif = true')
+            ->andWhere('m.banni = false');
 
-        if ($specialite) {
-            $qb->andWhere('LOWER(m.specialite) LIKE :specialite')
-               ->setParameter('specialite', '%' . strtolower($specialite) . '%');
+        if ($search !== '') {
+            $qb->andWhere(
+                'LOWER(m.nom) LIKE :search
+                OR LOWER(m.prenom) LIKE :search
+                OR LOWER(m.specialite) LIKE :search'
+            )->setParameter('search', '%' . mb_strtolower(mb_substr($search, 0, 100)) . '%');
         }
 
-        $medecins = $qb->getQuery()->getResult();
+        if ($specialite !== '') {
+            $qb->andWhere('LOWER(m.specialite) = :specialite')
+                ->setParameter('specialite', mb_strtolower($specialite));
+        }
 
-        $total = (int) $entityManager->createQueryBuilder()
-            ->select('COUNT(m.id)')
+        if ($availableOnly) {
+            $matchingDoctors = $qb
+                ->orderBy('m.nom', 'ASC')
+                ->addOrderBy('m.prenom', 'ASC')
+                ->getQuery()
+                ->getResult();
+            $matchingDoctors = array_values(array_filter(
+                $matchingDoctors,
+                static fn(Medecin $medecin): bool => $medecin->isDisponibleMaintenant()
+            ));
+            $total = count($matchingDoctors);
+            $totalPages = max(1, (int) ceil($total / $limit));
+            $page = min($page, $totalPages);
+            $medecins = array_slice($matchingDoctors, ($page - 1) * $limit, $limit);
+        } else {
+            $total = $this->countDoctors($qb);
+            $totalPages = max(1, (int) ceil($total / $limit));
+            $page = min($page, $totalPages);
+            $medecins = $qb
+                ->orderBy('m.nom', 'ASC')
+                ->addOrderBy('m.prenom', 'ASC')
+                ->setMaxResults($limit)
+                ->setFirstResult(($page - 1) * $limit)
+                ->getQuery()
+                ->getResult();
+        }
+
+        $specialites = $entityManager->createQueryBuilder()
+            ->select('DISTINCT m.specialite AS specialite')
             ->from(Medecin::class, 'm')
             ->where('m.estValide = true')
+            ->andWhere('m.actif = true')
+            ->andWhere('m.banni = false')
+            ->andWhere('m.specialite IS NOT NULL')
+            ->andWhere("m.specialite != ''")
+            ->orderBy('m.specialite', 'ASC')
             ->getQuery()
-            ->getSingleScalarResult();
+            ->getSingleColumnResult();
 
         return new JsonResponse([
             'hydra:member'     => array_map(fn(Medecin $m) => $this->serializePublic($m, $avisRepository), $medecins),
             'hydra:totalItems' => $total,
             'page'             => $page,
             'limit'            => $limit,
+            'totalPages'       => $totalPages,
+            'specialites'      => $specialites,
         ]);
     }
 
@@ -81,7 +122,7 @@ class MedecinPublicController extends AbstractController
     ): JsonResponse {
         $medecin = $entityManager->getRepository(Medecin::class)->find($id);
 
-        if (!$medecin || !$medecin->isEstValide()) {
+        if (!$medecin || !$medecin->isEstValide() || !$medecin->isActif() || $medecin->isBanni()) {
             return new JsonResponse(['error' => 'Médecin introuvable.'], 404);
         }
 
@@ -120,7 +161,22 @@ class MedecinPublicController extends AbstractController
             'isDisponibleMaintenant' => $medecin->isDisponibleMaintenant(),
             'photoProfil'           => $medecin->getPhotoProfil(),
             'noteMoyenne'           => $avisRepository->getNoteMoyenne($medecin),
+            'totalAvis'              => $avisRepository->countPublishedByMedecin($medecin),
+            'estValide'              => $medecin->isEstValide(),
             'roles'                 => $medecin->getRoles(),
         ];
+    }
+
+    private function countDoctors(QueryBuilder $queryBuilder): int
+    {
+        $countQueryBuilder = clone $queryBuilder;
+
+        return (int) $countQueryBuilder
+            ->resetDQLPart('orderBy')
+            ->select('COUNT(m.id)')
+            ->setMaxResults(null)
+            ->setFirstResult(0)
+            ->getQuery()
+            ->getSingleScalarResult();
     }
 }

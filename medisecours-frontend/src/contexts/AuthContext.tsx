@@ -1,66 +1,32 @@
 'use client'
 
-import { createContext, useContext, useCallback, useSyncExternalStore, type ReactNode } from 'react'
-import api from '../api/axios'
-import { setAuthCookie, clearAuthCookie } from '../lib/cookies'
-
-const AUTH_EVENT = 'medisecours-auth-change'
-
-function subscribeAuth(onStoreChange: () => void) {
-  if (typeof window === 'undefined') return () => {}
-  window.addEventListener('storage', onStoreChange)
-  window.addEventListener(AUTH_EVENT, onStoreChange)
-  return () => {
-    window.removeEventListener('storage', onStoreChange)
-    window.removeEventListener(AUTH_EVENT, onStoreChange)
-  }
-}
-
-function getTokenSnapshot() {
-  if (typeof window === 'undefined') return null
-  return localStorage.getItem('medisecours_token')
-}
-
-let cachedUserRaw: string | undefined = undefined
-let cachedUser: any = null
-
-function getUserSnapshot() {
-  if (typeof window === 'undefined') return null
-  const raw = localStorage.getItem('medisecours_user')
-  if (raw === cachedUserRaw) return cachedUser
-  cachedUserRaw = raw ?? undefined
-  if (!raw) {
-    cachedUser = null
-    return null
-  }
-  try {
-    cachedUser = JSON.parse(raw)
-  } catch {
-    cachedUser = null
-  }
-  return cachedUser
-}
-
-function notifyAuthChange() {
-  cachedUserRaw = undefined
-  if (typeof window !== 'undefined') {
-    window.dispatchEvent(new Event(AUTH_EVENT))
-  }
-}
+import { createContext, useContext, useCallback, useEffect, useState, type ReactNode } from 'react'
+import api, { refreshSession, setAccessToken } from '../api/axios'
 
 const AuthContext = createContext<any>(null)
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const token = useSyncExternalStore(subscribeAuth, getTokenSnapshot, () => null)
-  const user = useSyncExternalStore(subscribeAuth, getUserSnapshot, () => null)
-  const mounted = useSyncExternalStore(() => () => {}, () => true, () => false)
+  const [token, setToken] = useState<string | null>(null)
+  const [user, setUser] = useState<any>(null)
+  const [mounted, setMounted] = useState(false)
 
   const persist = useCallback((newToken: string, newUser: any) => {
-    localStorage.setItem('medisecours_token', newToken)
-    localStorage.setItem('medisecours_user', JSON.stringify(newUser))
-    setAuthCookie(newToken)
-    notifyAuthChange()
+    setAccessToken(newToken)
+    setToken(newToken)
+    setUser(newUser)
   }, [])
+
+  useEffect(() => {
+    let active = true
+    refreshSession()
+      .then((session) => {
+        if (active && session) persist(session.token, session.user)
+      })
+      .finally(() => {
+        if (active) setMounted(true)
+      })
+    return () => { active = false }
+  }, [persist])
 
   const login = useCallback(async (email: string, password: string) => {
     const { data } = await api.post('/api/auth/login', { email, password })
@@ -79,16 +45,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return data
   }, [])
 
-  const logout = useCallback(() => {
-    localStorage.removeItem('medisecours_token')
-    localStorage.removeItem('medisecours_user')
-    clearAuthCookie()
-    notifyAuthChange()
+  const logout = useCallback(async () => {
+    try {
+      await api.post('/api/auth/logout')
+    } finally {
+      setAccessToken(null)
+      setToken(null)
+      setUser(null)
+    }
   }, [])
 
   const updateUser = useCallback((newUser: any) => {
-    localStorage.setItem('medisecours_user', JSON.stringify(newUser))
-    notifyAuthChange()
+    setUser(newUser)
   }, [])
 
   const isAuthenticated = Boolean(token)

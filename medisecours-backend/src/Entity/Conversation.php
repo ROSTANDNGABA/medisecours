@@ -8,7 +8,7 @@ use ApiPlatform\Metadata\ApiResource;
 use ApiPlatform\Metadata\Get;
 use ApiPlatform\Metadata\GetCollection;
 use ApiPlatform\Metadata\Post;
-use ApiPlatform\Metadata\Delete;
+use App\State\ConversationProcessor;
 use App\Repository\ConversationRepository;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
@@ -20,8 +20,7 @@ use Symfony\Component\Serializer\Annotation\Groups;
     operations: [
         new GetCollection(security: "is_granted('ROLE_USER')"),
         new Get(security: "is_granted('ROLE_ADMIN') or object.getParticipants().contains(user)"),
-        new Post(security: "is_granted('ROLE_USER')"),
-        new Delete(security: "is_granted('ROLE_ADMIN') or object.getParticipants().contains(user)"),
+        new Post(security: "is_granted('ROLE_USER')", processor: ConversationProcessor::class),
     ],
     normalizationContext: ['groups' => ['conversation:read']],
     denormalizationContext: ['groups' => ['conversation:write']],
@@ -54,6 +53,9 @@ class Conversation
     #[ORM\JoinTable(name: 'conversation_participants')]
     #[Groups(['conversation:read', 'conversation:write'])]
     private Collection $participants;
+
+    #[ORM\Column(length: 73, nullable: true, unique: true)]
+    private ?string $pairKey = null;
 
     #[ORM\OneToMany(targetEntity: Message::class, mappedBy: 'conversation', cascade: ['remove'])]
     #[ORM\OrderBy(['createdAt' => 'ASC'])]
@@ -125,6 +127,18 @@ class Conversation
     public function removeParticipant(User $participant): static
     {
         $this->participants->removeElement($participant);
+        return $this;
+    }
+
+    public function getPairKey(): ?string
+    {
+        return $this->pairKey;
+    }
+
+    public function setPairKey(?string $pairKey): static
+    {
+        $this->pairKey = $pairKey;
+
         return $this;
     }
 

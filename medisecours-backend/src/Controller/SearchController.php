@@ -19,20 +19,54 @@ class SearchController extends AbstractController
     #[Route('', methods: ['GET'])]
     public function search(Request $request, EntityManagerInterface $em): JsonResponse
     {
+        $currentUser = $this->getUser();
+        if (!$currentUser instanceof User) {
+            throw $this->createAccessDeniedException();
+        }
+
         $q = trim($request->query->get('q', ''));
         if (strlen($q) < 2) {
             return $this->json([]);
         }
+        if (mb_strlen($q) > 100) {
+            return $this->json(['error' => 'La recherche ne peut pas dépasser 100 caractères.'], 422);
+        }
 
         $results = [];
+        $isAdmin = $this->isGranted('ROLE_ADMIN');
+        $isMedecin = $this->isGranted('ROLE_MEDECIN');
 
-        // Patients (via User discriminator 'patient')
+        // Les données personnelles sont limitées à la relation de soins.
         $patientRepo = $em->getRepository(User::class);
-        $patients = $patientRepo->createQueryBuilder('u')
+        $patientQuery = $patientRepo->createQueryBuilder('u')
             ->where("u INSTANCE OF App\Entity\Patient")
             ->andWhere('(LOWER(u.nom) LIKE :q OR LOWER(u.prenom) LIKE :q OR u.telephone LIKE :q OR LOWER(u.email) LIKE :q)')
             ->setParameter('q', '%' . mb_strtolower($q) . '%')
-            ->setMaxResults(5)
+            ->setMaxResults(5);
+
+        if (!$isAdmin && $isMedecin) {
+            $patientIds = $em->getRepository(Consultation::class)
+                ->createQueryBuilder('patientConsultation')
+                ->select('DISTINCT IDENTITY(patientConsultation.patient)')
+                ->where('patientConsultation.medecin = :currentUser')
+                ->setParameter('currentUser', $currentUser)
+                ->getQuery()
+                ->getSingleColumnResult();
+
+            if ($patientIds === []) {
+                $patientQuery->andWhere('1 = 0');
+            } else {
+                $patientQuery
+                    ->andWhere('u.id IN (:patientIds)')
+                    ->setParameter('patientIds', $patientIds);
+            }
+        } elseif (!$isAdmin) {
+            $patientQuery
+                ->andWhere('u = :currentUser')
+                ->setParameter('currentUser', $currentUser);
+        }
+
+        $patients = $patientQuery
             ->getQuery()
             ->getResult();
 
@@ -46,13 +80,24 @@ class SearchController extends AbstractController
             ], $patients);
         }
 
-        // Consultations
         $consultRepo = $em->getRepository(Consultation::class);
-        $consultations = $consultRepo->createQueryBuilder('c')
+        $consultationQuery = $consultRepo->createQueryBuilder('c')
             ->leftJoin('c.patient', 'p')
             ->where('LOWER(c.motif) LIKE :q OR LOWER(p.nom) LIKE :q OR LOWER(p.prenom) LIKE :q')
             ->setParameter('q', '%' . mb_strtolower($q) . '%')
-            ->setMaxResults(5)
+            ->setMaxResults(5);
+
+        if (!$isAdmin && $isMedecin) {
+            $consultationQuery
+                ->andWhere('c.medecin = :currentUser')
+                ->setParameter('currentUser', $currentUser);
+        } elseif (!$isAdmin) {
+            $consultationQuery
+                ->andWhere('c.patient = :currentUser')
+                ->setParameter('currentUser', $currentUser);
+        }
+
+        $consultations = $consultationQuery
             ->getQuery()
             ->getResult();
 
@@ -66,13 +111,22 @@ class SearchController extends AbstractController
             ], $consultations);
         }
 
-        // Messages
         $messageRepo = $em->getRepository(Message::class);
-        $messages = $messageRepo->createQueryBuilder('m')
+        $messageQuery = $messageRepo->createQueryBuilder('m')
             ->leftJoin('m.expediteur', 'e')
             ->where('LOWER(m.contenu) LIKE :q')
             ->setParameter('q', '%' . mb_strtolower($q) . '%')
-            ->setMaxResults(5)
+            ->setMaxResults(5);
+
+        if (!$isAdmin) {
+            $messageQuery
+                ->innerJoin('m.conversation', 'messageConversation')
+                ->innerJoin('messageConversation.participants', 'messageParticipant')
+                ->andWhere('messageParticipant = :currentUser')
+                ->setParameter('currentUser', $currentUser);
+        }
+
+        $messages = $messageQuery
             ->getQuery()
             ->getResult();
 

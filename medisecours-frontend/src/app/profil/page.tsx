@@ -243,8 +243,6 @@ export default function ProfilPage() {
   const toast = useToast()
   const fileRef = useRef<HTMLInputElement>(null)
   const syncedRef = useRef(false)
-  const userRef = useRef(user)
-  userRef.current = user
   const [editing, setEditing] = useState(false)
   const [saving, setSaving] = useState(false)
   const [uploading, setUploading] = useState(false)
@@ -253,17 +251,17 @@ export default function ProfilPage() {
   const [form, setForm] = useState<any>(() => formFromUser(user))
 
   useEffect(() => {
-    const id = userRef.current?.id
+    const id = user?.id
     if (!id || syncedRef.current) return
     syncedRef.current = true
     api
       .get(`/api/users/${id}`)
       .then(({ data }) => {
-        updateUser({ ...userRef.current, ...data })
+        updateUser(data)
         setForm(formFromUser(data))
       })
       .catch(() => {})
-  }, [user?.id])
+  }, [user?.id, updateUser])
 
   const set = (key: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
     setForm((f: any) => ({ ...f, [key]: e.target.value }))
@@ -302,17 +300,22 @@ export default function ProfilPage() {
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+      toast.error('Format non autorise. Utilisez une image JPEG, PNG ou WebP.')
+      e.target.value = ''
+      return
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('La photo ne doit pas depasser 5 Mo.')
+      e.target.value = ''
+      return
+    }
     setUploading(true)
     const formData = new FormData()
     formData.append('file', file)
     try {
-      const { data } = await api.post('/api/media_objects', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-        adapter: 'fetch',
-      })
-      const photoUrl = data.contentUrl || data['@id']
-      const { data: updated } = await api.patch(`/api/users/${user.id}`, { photoProfil: photoUrl }, { headers: { 'Content-Type': 'application/merge-patch+json' } })
-      updateUser({ ...user, ...updated })
+      const { data } = await api.post('/api/profile/photo', formData)
+      updateUser({ ...user, photoProfil: data.photoProfil })
       toast.success('Photo de profil mise à jour.')
     } catch {
       toast.error("Échec de l'envoi de la photo.")
@@ -382,7 +385,7 @@ export default function ProfilPage() {
                 >
                   <Camera className="h-4 w-4" />
                 </button>
-                <input ref={fileRef} type="file" accept="image/*" hidden onChange={handleUpload} />
+                <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" hidden onChange={handleUpload} />
               </div>
 
               <div className="min-w-0 flex-1">

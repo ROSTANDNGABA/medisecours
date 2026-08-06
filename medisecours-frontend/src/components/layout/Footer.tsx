@@ -1,57 +1,67 @@
 'use client'
 
 import Link from 'next/link'
-import { HeartPulse, ArrowRight, MapPin } from 'lucide-react'
+import Image from 'next/image'
+import { ArrowRight, MapPin } from 'lucide-react'
 import { useAuthContext } from '../../contexts/AuthContext'
 
 export default function Footer() {
   const { isAuthenticated } = useAuthContext()
 
   return (
-    <footer className="w-full bg-white dark:bg-[#111827] border-t border-slate-100 dark:border-white/5 mt-10">
-      <div className="max-w-7xl mx-auto px-6 py-12 sm:py-16 lg:py-20">
+    <footer className="mt-10 w-full min-w-0 overflow-x-clip border-t border-slate-100 bg-white pb-20 dark:border-white/5 dark:bg-[#111827] lg:pb-0">
+      <div className="mx-auto w-full min-w-0 max-w-7xl px-4 py-10 sm:px-6 sm:py-16 lg:py-20">
         
         {/* --- TOP SECTION: Main CTA --- */}
-        <div className="text-center mb-16 pb-16 border-b border-slate-100 dark:border-slate-800">
-          <h2 className="font-display font-extrabold text-3xl sm:text-4xl lg:text-5xl text-slate-900 dark:text-white tracking-tight mb-6">
+        <div className="mb-12 min-w-0 border-b border-slate-100 pb-12 text-center dark:border-slate-800 sm:mb-16 sm:pb-16">
+          <h2 className="mb-5 min-w-0 break-words font-display text-2xl font-extrabold leading-tight text-slate-900 sm:mb-6 sm:text-4xl lg:text-5xl dark:text-white">
             Chaque seconde compte.
             <br />
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-500 to-teal-500">
+            <span className="break-words bg-gradient-to-r from-emerald-500 to-teal-500 bg-clip-text text-transparent">
               Agissez maintenant.
             </span>
           </h2>
 
-          <p className="text-slate-500 dark:text-slate-400 text-base sm:text-lg max-w-2xl mx-auto mb-10 leading-relaxed">
+          <p className="mx-auto mb-8 max-w-2xl break-words text-sm leading-relaxed text-slate-500 sm:mb-10 sm:text-lg dark:text-slate-400">
             MediSecours+ met à votre disposition un réseau de médecins certifiés, des protocoles validés et une infrastructure temps réel pour vous accompagner dans les moments les plus critiques.
           </p>
 
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+          <div className="flex min-w-0 flex-col items-stretch justify-center gap-3 sm:flex-row sm:items-center sm:gap-4">
             <Link
               href={isAuthenticated ? '/patient/consultations' : '/register'}
-              className="group inline-flex items-center justify-center gap-2.5 px-8 py-4 rounded-full bg-slate-900 dark:bg-emerald-500 text-white font-bold text-sm hover:bg-slate-800 dark:hover:bg-emerald-600 transition-colors"
+              className="group inline-flex min-h-12 min-w-0 items-center justify-center gap-2.5 rounded-full bg-slate-900 px-5 py-3 text-sm font-bold text-white transition-colors hover:bg-slate-800 sm:px-8 sm:py-4 dark:bg-emerald-500 dark:hover:bg-emerald-600"
             >
-              {isAuthenticated ? 'Ouvrir une consultation' : 'Créer un compte gratuit'}
-              <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+              <span className="min-w-0 break-words">{isAuthenticated ? 'Ouvrir une consultation' : 'Créer un compte gratuit'}</span>
+              <ArrowRight className="h-4 w-4 shrink-0 transition-transform group-hover:translate-x-1" />
             </Link>
 
             <Link
               href="/centres"
-              className="group inline-flex items-center justify-center gap-2.5 px-8 py-4 rounded-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 font-semibold text-sm hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+              className="group inline-flex min-h-12 min-w-0 items-center justify-center gap-2.5 rounded-full border border-slate-200 bg-slate-50 px-5 py-3 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-100 sm:px-8 sm:py-4 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
             >
-              <MapPin className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-              Trouver un centre
+              <MapPin className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+              <span className="min-w-0 break-words">Trouver un centre</span>
             </Link>
           </div>
         </div>
 
         {/* --- BOTTOM SECTION: Newsletter & Links --- */}
-        <div className="flex flex-col xl:flex-row gap-12 xl:gap-32 mb-16">
+        <div className="mb-12 flex min-w-0 flex-col gap-10 sm:mb-16 sm:gap-12 xl:flex-row xl:gap-32">
            {/* Left Column: Logo + Newsletter */}
-           <div className="w-full xl:w-[380px] shrink-0">
+           <div className="w-full min-w-0 xl:w-[380px] xl:shrink-0">
              {/* Logo */}
-             <Link href="/" className="inline-flex items-center gap-2 font-display font-extrabold text-2xl text-slate-900 dark:text-white mb-8">
-               <HeartPulse className="w-6 h-6 text-emerald-500" />
-               MediSecours
+             <Link
+               href="/"
+               className="mb-8 inline-flex h-[86px] w-[230px] items-center justify-center overflow-hidden rounded-xl dark:bg-white/90 dark:shadow-[0_8px_24px_rgba(0,0,0,0.18)]"
+               aria-label="MediSecours - Accueil"
+             >
+               <Image
+                 src="/brand/medisecours-logo.png"
+                 alt="MediSecours"
+                 width={853}
+                 height={299}
+                 className="h-auto w-[222px] max-w-full object-contain"
+               />
              </Link>
              
              <p className="text-sm font-semibold text-slate-900 dark:text-white mb-4">
@@ -59,15 +69,15 @@ export default function Footer() {
              </p>
              
              {/* Newsletter Input */}
-             <form className="relative mb-5">
+             <form className="mb-5 grid min-w-0 gap-2 sm:relative sm:block">
                <input 
                  type="email" 
                  placeholder="Votre email" 
-                 className="w-full rounded-full bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 py-3.5 pl-5 pr-[110px] text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all text-slate-900 dark:text-white"
+                  className="min-h-12 w-full min-w-0 rounded-full border border-slate-200 bg-slate-50 py-3.5 pl-5 pr-5 text-sm text-slate-900 transition-all focus:outline-none focus:ring-2 focus:ring-emerald-500/50 sm:pr-[110px] dark:border-slate-700 dark:bg-slate-800/50 dark:text-white"
                />
                <button 
                  type="button" 
-                 className="absolute right-1.5 top-1.5 bottom-1.5 px-6 rounded-full bg-slate-900 dark:bg-emerald-500 text-white font-semibold text-sm hover:bg-slate-800 dark:hover:bg-emerald-600 transition-colors"
+                  className="min-h-11 w-full rounded-full bg-slate-900 px-6 text-sm font-semibold text-white transition-colors hover:bg-slate-800 sm:absolute sm:bottom-1.5 sm:right-1.5 sm:top-1.5 sm:min-h-0 sm:w-auto dark:bg-emerald-500 dark:hover:bg-emerald-600"
                >
                  Valider
                </button>
@@ -79,7 +89,7 @@ export default function Footer() {
            </div>
 
            {/* Right Columns: Links */}
-           <div className="flex-1 grid grid-cols-2 md:grid-cols-2 gap-8">
+            <div className="grid min-w-0 flex-1 grid-cols-1 gap-8 sm:grid-cols-2">
               {/* Col 1 */}
               <div>
                 <h4 className="text-sm font-medium text-slate-900 dark:text-white mb-6">Services</h4>
@@ -92,7 +102,7 @@ export default function Footer() {
               <div>
                 <h4 className="text-sm font-medium text-slate-900 dark:text-white mb-6">Apprendre</h4>
                 <ul className="space-y-4 text-sm text-slate-500 dark:text-slate-400">
-                  <li><Link href="/maladies" className="hover:text-emerald-500 transition-colors">Gestes de secours</Link></li>
+                  <li><Link href="/premiers-soins" className="hover:text-emerald-500 transition-colors">Gestes de secours</Link></li>
                   <li><Link href="/categories" className="hover:text-emerald-500 transition-colors">Catégories médicales</Link></li>
                 </ul>
               </div>

@@ -7,6 +7,8 @@ namespace App\Controller;
 use App\Entity\Medecin;
 use App\Entity\Patient;
 use App\Entity\User;
+use App\Service\EmailVerificationService;
+use App\Service\SessionService;
 use App\Service\UserSerializer;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -24,6 +26,8 @@ class AdminUserController extends AbstractController
 
     public function __construct(
         private readonly UserSerializer $userSerializer,
+        private readonly EmailVerificationService $emailVerificationService,
+        private readonly SessionService $sessionService,
     ) {
     }
 
@@ -126,6 +130,7 @@ class AdminUserController extends AbstractController
             return $this->jsonError('Corps JSON invalide.', Response::HTTP_BAD_REQUEST);
         }
 
+        $previousEmail = $user->getEmail();
         $validationError = $this->applyCommonFields($user, $data, true, $entityManager);
         if ($validationError !== null) {
             return $validationError;
@@ -143,6 +148,16 @@ class AdminUserController extends AbstractController
             if ($validationError !== null) {
                 return $validationError;
             }
+        }
+
+        if ($user->getEmail() !== $previousEmail) {
+            $user->setEmailVerified(false);
+            try {
+                $this->emailVerificationService->sendVerificationEmail($user);
+            } catch (\Throwable) {
+                // La modification reste enregistrée; l'envoi pourra être relancé.
+            }
+            $this->sessionService->revokeUserSessions($user);
         }
 
         $entityManager->flush();
@@ -176,14 +191,18 @@ class AdminUserController extends AbstractController
                 break;
             case 'desactiver':
                 $user->setActif(false);
+                $this->sessionService->revokeUserSessions($user);
                 $message = 'Utilisateur desactive avec succes.';
                 break;
             case 'bannir':
                 $user->setBanni(true);
+                $user->setActif(false);
+                $this->sessionService->revokeUserSessions($user);
                 $message = 'Utilisateur banni avec succes.';
                 break;
             case 'debannir':
                 $user->setBanni(false);
+                $user->setActif(true);
                 $message = 'Utilisateur debanni avec succes.';
                 break;
             default:

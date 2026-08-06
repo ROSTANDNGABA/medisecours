@@ -248,6 +248,7 @@ export default function CentresMap({
     <MapContainer
       center={CAMEROUN_CENTER}
       zoom={DEFAULT_ZOOM}
+      className="relative z-0"
       style={{ height: '100%', width: '100%' }}
       keyboard={true}
     >

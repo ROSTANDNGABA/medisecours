@@ -1,176 +1,455 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import Link from 'next/link'
-import { motion } from 'framer-motion'
-import { Stethoscope, Search, Star, MessageSquare, Clock } from 'lucide-react'
-import useSWR from 'swr'
 import Image from 'next/image'
-import { fetcher } from '../../lib/fetcher'
-import LoadingSpinner from '../../components/ui/LoadingSpinner'
-import EmptyState from '../../components/ui/EmptyState'
-import { useDebounce } from '../../hooks/useDebounce'
+import Link from 'next/link'
+import useSWR from 'swr'
+import {
+  ArrowRight,
+  CalendarDays,
+  CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
+  CircleAlert,
+  Clock3,
+  LoaderCircle,
+  MessageSquareText,
+  PhoneCall,
+  RotateCcw,
+  Search,
+  Star,
+  Stethoscope,
+  UserRoundSearch,
+} from 'lucide-react'
+import api from '@/api/axios'
+import { emergencyCallHref, EMERGENCY_NUMBER, EMERGENCY_NUMBER_LABEL } from '@/config/firstAid'
+import { useAuth } from '@/hooks/useAuth'
+import { useDebounce } from '@/hooks/useDebounce'
+import { resolveImgPath } from '@/lib/config'
+import CertifiedBadge from '@/components/ui/CertifiedBadge'
+import type { PublicMedecin, PublicMedecinListResponse } from '@/types/api'
 
-const SPECIALITES = [
-  'Toutes', 'Médecine générale', 'Pédiatrie', 'Cardiologie',
-  'Gynécologie', 'Chirurgie', 'Dermatologie', 'Ophtalmologie',
-  'Psychiatrie', 'Neurologie',
-]
+const ITEMS_PER_PAGE = 12
 
-const LIMIT = 12
+function initialsFor(medecin: PublicMedecin): string {
+  return `${medecin.prenom?.[0] ?? ''}${medecin.nom?.[0] ?? ''}`.toUpperCase() || 'DR'
+}
 
-function MedecinCard({ medecin, index }: { medecin: any; index: number }) {
-  const initiales = `${medecin.prenom?.[0] || ''}${medecin.nom?.[0] || ''}`.toUpperCase()
-  const note = medecin.noteMoyenne ?? 0
+function doctorName(medecin: PublicMedecin): string {
+  return `Dr ${medecin.prenom ?? ''} ${medecin.nom ?? ''}`.replace(/\s+/g, ' ').trim()
+}
+
+function Rating({ value, total }: { value: number; total: number }) {
+  return (
+    <div className="flex flex-wrap items-center gap-2" aria-label={total > 0 ? `Note ${value} sur 5` : 'Aucun avis'}>
+      <span className="flex items-center gap-0.5" aria-hidden="true">
+        {[1, 2, 3, 4, 5].map((star) => (
+          <Star
+            key={star}
+            className={`h-4 w-4 ${
+              star <= Math.round(value) ? 'fill-amber-400 text-amber-400' : 'text-slate-300 dark:text-slate-600'
+            }`}
+          />
+        ))}
+      </span>
+      <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">
+        {total > 0 ? `${value.toFixed(1)} (${total} avis)` : 'Aucun avis publié'}
+      </span>
+    </div>
+  )
+}
+
+function DoctorCard({
+  medecin,
+  contactHref,
+  contactLabel,
+}: {
+  medecin: PublicMedecin
+  contactHref: string
+  contactLabel: string
+}) {
+  const photo = medecin.photoProfil ? resolveImgPath(medecin.photoProfil) : null
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 12 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: index * 0.04 }}
-      className="rounded-2xl bg-white/80 dark:bg-primary-700/40 border border-white/50 dark:border-white/10 shadow-lg p-5 flex flex-col gap-3 hover:shadow-xl transition"
-    >
-      <div className="flex items-center gap-3">
-        <div className="w-12 h-12 rounded-full bg-primary-500 text-white flex items-center justify-center font-bold text-sm shrink-0 overflow-hidden">
-          {medecin.photoProfil
-            ? <Image src={medecin.photoProfil} alt="" width={48} height={48} className="w-full h-full object-cover" />
-            : initiales
-          }
+    <article className="flex min-h-[260px] flex-col border border-slate-200 bg-white p-5 dark:border-white/10 dark:bg-slate-900">
+      <div className="flex min-w-0 items-start gap-4">
+        <div className="relative flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden bg-emerald-100 text-base font-black text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-200">
+          {photo ? (
+            <Image
+              src={photo}
+              alt={`Photo de ${doctorName(medecin)}`}
+              width={64}
+              height={64}
+              unoptimized
+              className="h-full w-full object-cover"
+            />
+          ) : (
+            initialsFor(medecin)
+          )}
         </div>
-        <div className="min-w-0">
-          <p className="font-semibold text-primary-900 dark:text-sable truncate">
-            Dr {medecin.prenom} {medecin.nom}
-          </p>
-          <p className="text-xs text-primary-400 truncate">{medecin.specialite || 'Médecin'}</p>
+
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5">
+                <h2 className="break-words font-display text-lg font-bold text-slate-950 dark:text-white">
+                  {doctorName(medecin)}
+                </h2>
+                {medecin.estValide && <CertifiedBadge className="h-5 w-5" />}
+              </div>
+              <p className="mt-1 break-words text-sm font-semibold text-emerald-700 dark:text-emerald-300">
+                {medecin.specialite || 'Médecine générale'}
+              </p>
+            </div>
+            <span
+              className={`inline-flex shrink-0 items-center gap-1.5 px-2 py-1 text-[11px] font-bold ${
+                medecin.isDisponibleMaintenant
+                  ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-200'
+                  : 'bg-slate-100 text-slate-600 dark:bg-white/10 dark:text-slate-300'
+              }`}
+            >
+              <span
+                className={`h-2 w-2 rounded-full ${
+                  medecin.isDisponibleMaintenant ? 'bg-emerald-500' : 'bg-slate-400'
+                }`}
+                aria-hidden="true"
+              />
+              {medecin.isDisponibleMaintenant ? 'Disponible' : 'Selon horaires'}
+            </span>
+          </div>
+
+          <div className="mt-3">
+            <Rating value={medecin.noteMoyenne || 0} total={medecin.totalAvis || 0} />
+          </div>
         </div>
       </div>
 
-      <div className="flex items-center gap-1.5">
-        {[1, 2, 3, 4, 5].map((n) => (
-          <Star key={n} className={`w-3.5 h-3.5 ${n <= Math.round(note) ? 'text-amber-400 fill-amber-400' : 'text-primary-200'}`} />
-        ))}
-        <span className="text-xs text-primary-400 ml-1">{note > 0 ? note.toFixed(1) : 'Aucun avis'}</span>
+      <div className="mt-5 flex items-start gap-2 border-t border-slate-100 pt-4 text-sm text-slate-600 dark:border-white/10 dark:text-slate-300">
+        <Clock3 className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" aria-hidden="true" />
+        <p className="line-clamp-2 leading-6">
+          {medecin.disponibilitesLabel || medecin.disponibilitesTexte || 'Horaires non renseignés'}
+        </p>
       </div>
 
-      {medecin.disponibilitesTexte && (
-        <div className="flex items-center gap-1.5 text-xs text-primary-400">
-          <Clock className="w-3.5 h-3.5 shrink-0" />
-          <span className="truncate">{medecin.disponibilitesTexte}</span>
-        </div>
-      )}
-
-      <div className="flex gap-2 mt-auto pt-1">
-        <Link href={`/medecins/${medecin.id}`}
-          className="flex-1 text-center py-2 rounded-xl border border-primary-100 dark:border-white/10 text-xs font-semibold text-primary-700 dark:text-sable hover:bg-primary-100 dark:hover:bg-primary-900 transition">
+      <div className="mt-auto grid grid-cols-1 gap-2 pt-5 sm:grid-cols-2">
+        <Link
+          href={`/medecins/${medecin.id}`}
+          className="inline-flex min-h-11 items-center justify-center gap-2 border border-slate-300 px-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50 dark:border-white/15 dark:text-white dark:hover:bg-white/5"
+        >
           Voir le profil
+          <ArrowRight className="h-4 w-4" aria-hidden="true" />
         </Link>
-        <Link href={`/messages?medecin=${medecin.id}`}
-          className="flex-1 flex items-center justify-center gap-1 py-2 rounded-xl bg-mint-500 hover:bg-mint-700 text-white text-xs font-semibold transition">
-          <MessageSquare className="w-3.5 h-3.5" /> Contacter
+        <Link
+          href={contactHref}
+          className="inline-flex min-h-11 items-center justify-center gap-2 bg-emerald-700 px-3 text-center text-sm font-bold text-white transition hover:bg-emerald-600"
+        >
+          <MessageSquareText className="h-4 w-4" aria-hidden="true" />
+          {contactLabel}
         </Link>
       </div>
-    </motion.div>
+    </article>
   )
 }
 
 export default function MedecinsPage() {
-  const [search,     setSearch]     = useState('')
-  const [specialite, setSpecialite] = useState('Toutes')
-  const [page,       setPage]       = useState(1)
-
-  const debouncedSearch = useDebounce(search, 400)
+  const { mounted, isAuthenticated, isMedecin } = useAuth()
+  const [search, setSearch] = useState('')
+  const [specialite, setSpecialite] = useState('')
+  const [availableOnly, setAvailableOnly] = useState(false)
+  const [page, setPage] = useState(1)
+  const debouncedSearch = useDebounce(search.trim(), 350)
 
   const swrKey = useMemo(() => {
-    const params = new URLSearchParams({ page: String(page), limit: String(LIMIT) })
-    if (specialite !== 'Toutes') params.set('specialite', specialite)
+    const params = new URLSearchParams({
+      page: String(page),
+      limit: String(ITEMS_PER_PAGE),
+    })
+    if (debouncedSearch) params.set('q', debouncedSearch)
+    if (specialite) params.set('specialite', specialite)
+    if (availableOnly) params.set('disponible', '1')
+
     return `/api/medecins-publics?${params.toString()}`
-  }, [page, specialite])
+  }, [availableOnly, debouncedSearch, page, specialite])
 
-  const { data, isLoading } = useSWR(swrKey, fetcher, { keepPreviousData: true })
+  const { data, error, isLoading, mutate } = useSWR<PublicMedecinListResponse>(
+    swrKey,
+    async (url: string) => {
+      const response = await api.get(url)
+      return response.data as PublicMedecinListResponse
+    },
+    {
+      keepPreviousData: true,
+      revalidateOnFocus: false,
+    },
+  )
 
-  const rawList = useMemo(() => {
-    if (Array.isArray(data)) return data
-    if (Array.isArray(data?.['hydra:member'])) return data['hydra:member']
-    if (Array.isArray(data?.medecins)) return data.medecins
-    return []
-  }, [data])
+  const medecins = data?.['hydra:member'] ?? []
+  const total = data?.['hydra:totalItems'] ?? 0
+  const totalPages = data?.totalPages ?? 1
+  const specialites = data?.specialites ?? []
+  const hasFilters = search !== '' || specialite !== '' || availableOnly
 
-  const total = data?.['hydra:totalItems'] ?? rawList.length
+  const resetFilters = () => {
+    setSearch('')
+    setSpecialite('')
+    setAvailableOnly(false)
+    setPage(1)
+  }
 
-  const medecins = useMemo(() => {
-    if (!debouncedSearch) return rawList
-    const q = debouncedSearch.toLowerCase()
-    return rawList.filter((m: any) =>
-      m.nom?.toLowerCase().includes(q) ||
-      m.prenom?.toLowerCase().includes(q) ||
-      m.specialite?.toLowerCase().includes(q)
-    )
-  }, [rawList, debouncedSearch])
+  const changePage = (nextPage: number) => {
+    setPage(nextPage)
+    window.requestAnimationFrame(() => {
+      document.getElementById('doctor-directory')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    })
+  }
 
-  const totalPages = Math.max(1, Math.ceil(total / LIMIT))
+  const contactDestination = (medecin: PublicMedecin) => {
+    const messagesPath = `/messages?medecin=${encodeURIComponent(medecin.id)}`
+    if (!mounted || !isAuthenticated) {
+      return `/login?from=${encodeURIComponent(messagesPath)}`
+    }
+    if (isMedecin) return '/medecin'
+    return messagesPath
+  }
 
-  const handleSpecialite = (val: string) => { setSpecialite(val); setPage(1) }
-  const handleSearch     = (val: string) => { setSearch(val);     setPage(1) }
+  const contactLabel = !mounted || !isAuthenticated
+    ? 'Se connecter'
+    : isMedecin
+      ? 'Mon espace'
+      : 'Écrire'
 
   return (
-    <div className="max-w-6xl mx-auto px-6 py-10">
-      <div className="mb-8">
-        <h1 className="font-display font-bold text-3xl text-primary-900 dark:text-sable mb-1">
-          Nos médecins
-        </h1>
-        <p className="text-primary-300">
-          Consultez les profils de nos professionnels de santé vérifiés et contactez-les directement.
-        </p>
-      </div>
+    <main
+      id="doctor-directory"
+      className="scroll-mt-24 mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 sm:py-10"
+    >
+      <header className="border-b border-slate-200 pb-7 dark:border-white/10">
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-end">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-[0.16em] text-emerald-700 dark:text-emerald-300">
+              Mise en relation médicale
+            </p>
+            <h1 className="mt-2 font-display text-3xl font-bold text-slate-950 dark:text-white sm:text-4xl">
+              Trouver un médecin
+            </h1>
+            <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600 dark:text-slate-300">
+              Recherchez un professionnel par nom, spécialité ou disponibilité. Consultez son profil avant
+              d&apos;ouvrir une conversation pour demander un avis ou organiser une consultation.
+            </p>
+          </div>
 
-      <div className="flex flex-col sm:flex-row gap-3 mb-6">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-primary-300" />
-          <input
-            value={search}
-            onChange={(e) => handleSearch(e.target.value)}
-            placeholder="Rechercher par nom ou spécialité…"
-            className="w-full pl-10 pr-3 py-2.5 rounded-xl border border-primary-100 dark:border-white/10 bg-white/80 dark:bg-primary-900/40 focus:outline-none focus:ring-2 focus:ring-mint-500"
-          />
+          <div className="border border-red-200 bg-red-50 p-4 text-red-950 dark:border-red-500/25 dark:bg-red-500/10 dark:text-red-100">
+            <div className="flex gap-3">
+              <CircleAlert className="mt-0.5 h-5 w-5 shrink-0" aria-hidden="true" />
+              <div>
+                <p className="text-sm font-bold">Danger immédiat</p>
+                <p className="mt-1 text-xs leading-5">
+                  Ne perdez pas de temps à chercher une consultation en ligne. Contactez les urgences.
+                </p>
+                <a
+                  href={emergencyCallHref()}
+                  className="mt-3 inline-flex min-h-10 items-center gap-2 bg-red-600 px-3 text-xs font-bold text-white hover:bg-red-500"
+                >
+                  <PhoneCall className="h-4 w-4" aria-hidden="true" />
+                  {EMERGENCY_NUMBER_LABEL} : {EMERGENCY_NUMBER}
+                </a>
+              </div>
+            </div>
+          </div>
         </div>
-        <select
-          value={specialite}
-          onChange={(e) => handleSpecialite(e.target.value)}
-          className="px-4 py-2.5 rounded-xl border border-primary-100 dark:border-white/10 bg-white/80 dark:bg-primary-900/40 focus:outline-none focus:ring-2 focus:ring-mint-500 text-sm text-primary-700 dark:text-sable"
-        >
-          {SPECIALITES.map((s: string) => <option key={s} value={s}>{s}</option>)}
-        </select>
-      </div>
+      </header>
 
-      {isLoading ? (
-        <LoadingSpinner label="Chargement des médecins…" />
+      <section className="mt-6 border border-slate-200 bg-slate-50 p-4 dark:border-white/10 dark:bg-slate-900/60">
+        <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_260px_auto]">
+          <label className="flex min-h-12 items-center gap-3 border border-slate-300 bg-white px-4 dark:border-white/10 dark:bg-slate-900">
+            <Search className="h-5 w-5 shrink-0 text-slate-400" aria-hidden="true" />
+            <span className="sr-only">Rechercher un médecin</span>
+            <input
+              value={search}
+              onChange={(event) => {
+                setSearch(event.target.value)
+                setPage(1)
+              }}
+              placeholder="Nom du médecin ou spécialité"
+              className="min-w-0 flex-1 bg-transparent text-sm text-slate-950 outline-none placeholder:text-slate-400 dark:text-white"
+            />
+          </label>
+
+          <label className="min-w-0">
+            <span className="sr-only">Filtrer par spécialité</span>
+            <select
+              value={specialite}
+              onChange={(event) => {
+                setSpecialite(event.target.value)
+                setPage(1)
+              }}
+              className="min-h-12 w-full border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 outline-none focus:border-emerald-500 dark:border-white/10 dark:bg-slate-900 dark:text-white"
+            >
+              <option value="">Toutes les spécialités</option>
+              {specialites.map((item) => (
+                <option key={item} value={item}>{item}</option>
+              ))}
+            </select>
+          </label>
+
+          <label className="flex min-h-12 cursor-pointer items-center gap-3 border border-slate-300 bg-white px-4 dark:border-white/10 dark:bg-slate-900">
+            <input
+              type="checkbox"
+              checked={availableOnly}
+              onChange={(event) => {
+                setAvailableOnly(event.target.checked)
+                setPage(1)
+              }}
+              className="h-4 w-4 accent-emerald-700"
+            />
+            <span className="whitespace-nowrap text-sm font-bold text-slate-700 dark:text-white">
+              Disponible maintenant
+            </span>
+          </label>
+        </div>
+
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+          <p className="text-sm text-slate-600 dark:text-slate-300" role="status">
+            {isLoading && !data
+              ? 'Recherche des médecins...'
+              : `${total} professionnel${total > 1 ? 's' : ''} trouvé${total > 1 ? 's' : ''}`}
+          </p>
+          {hasFilters && (
+            <button
+              type="button"
+              onClick={resetFilters}
+              className="inline-flex min-h-10 items-center gap-2 px-2 text-sm font-bold text-emerald-700 hover:text-emerald-600 dark:text-emerald-300"
+            >
+              <RotateCcw className="h-4 w-4" aria-hidden="true" />
+              Réinitialiser les filtres
+            </button>
+          )}
+        </div>
+      </section>
+
+      {isLoading && !data ? (
+        <div className="flex min-h-[340px] items-center justify-center text-sm text-slate-500" role="status">
+          <LoaderCircle className="mr-3 h-5 w-5 animate-spin" aria-hidden="true" />
+          Chargement des médecins
+        </div>
+      ) : error ? (
+        <div className="mt-6 border border-red-200 bg-red-50 p-5 text-sm text-red-900" role="alert">
+          <p className="font-bold">Impossible de charger l’annuaire médical.</p>
+          <p className="mt-1">Vérifiez votre connexion, puis réessayez.</p>
+          <button
+            type="button"
+            onClick={() => mutate()}
+            className="mt-4 inline-flex min-h-10 items-center gap-2 bg-red-700 px-4 font-bold text-white hover:bg-red-600"
+          >
+            <RotateCcw className="h-4 w-4" aria-hidden="true" />
+            Réessayer
+          </button>
+        </div>
       ) : medecins.length === 0 ? (
-        <EmptyState icon={Stethoscope} title="Aucun médecin trouvé" description="Modifiez vos critères de recherche." />
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {medecins.map((med: any, i: number) => <MedecinCard key={med.id} medecin={med} index={i} />)}
+        <div className="mt-6 border border-slate-200 bg-white px-5 py-12 text-center dark:border-white/10 dark:bg-slate-900">
+          <UserRoundSearch className="mx-auto h-10 w-10 text-slate-400" aria-hidden="true" />
+          <h2 className="mt-4 font-display text-xl font-bold text-slate-950 dark:text-white">
+            Aucun médecin ne correspond à ces critères
+          </h2>
+          <p className="mx-auto mt-2 max-w-lg text-sm leading-6 text-slate-500 dark:text-slate-400">
+            Retirez un filtre ou recherchez une spécialité plus générale.
+          </p>
+          {hasFilters && (
+            <button
+              type="button"
+              onClick={resetFilters}
+              className="mt-5 inline-flex min-h-11 items-center gap-2 bg-slate-950 px-4 text-sm font-bold text-white dark:bg-white dark:text-slate-950"
+            >
+              <RotateCcw className="h-4 w-4" aria-hidden="true" />
+              Afficher tous les médecins
+            </button>
+          )}
         </div>
+      ) : (
+        <section className="mt-6" aria-labelledby="doctor-results-title">
+          <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <h2 id="doctor-results-title" className="font-display text-xl font-bold text-slate-950 dark:text-white">
+                Professionnels disponibles sur MediSecours
+              </h2>
+              <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">
+                Les horaires affichés sont indicatifs. Le médecin confirme la prise en charge dans la messagerie.
+              </p>
+            </div>
+            <span className="inline-flex items-center gap-2 text-xs font-semibold text-slate-500 dark:text-slate-400">
+              <CheckCircle2 className="h-4 w-4 text-[#1DA1F2]" aria-hidden="true" />
+              Profils médecins certifiés
+            </span>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {medecins.map((medecin) => (
+              <DoctorCard
+                key={medecin.id}
+                medecin={medecin}
+                contactHref={contactDestination(medecin)}
+                contactLabel={contactLabel}
+              />
+            ))}
+          </div>
+
+          {totalPages > 1 && (
+            <nav className="mt-7 flex flex-wrap items-center justify-center gap-2" aria-label="Pagination des médecins">
+              <button
+                type="button"
+                onClick={() => changePage(Math.max(1, page - 1))}
+                disabled={page <= 1}
+                className="inline-flex min-h-11 items-center gap-2 border border-slate-300 bg-white px-4 text-sm font-bold text-slate-700 disabled:cursor-not-allowed disabled:opacity-40 dark:border-white/10 dark:bg-slate-900 dark:text-white"
+              >
+                <ChevronLeft className="h-4 w-4" aria-hidden="true" />
+                Précédent
+              </button>
+              <span className="px-3 text-sm font-semibold text-slate-600 dark:text-slate-300">
+                Page {data?.page ?? page} sur {totalPages}
+              </span>
+              <button
+                type="button"
+                onClick={() => changePage(Math.min(totalPages, page + 1))}
+                disabled={page >= totalPages}
+                className="inline-flex min-h-11 items-center gap-2 border border-slate-300 bg-white px-4 text-sm font-bold text-slate-700 disabled:cursor-not-allowed disabled:opacity-40 dark:border-white/10 dark:bg-slate-900 dark:text-white"
+              >
+                Suivant
+                <ChevronRight className="h-4 w-4" aria-hidden="true" />
+              </button>
+            </nav>
+          )}
+        </section>
       )}
 
-      {totalPages > 1 && (
-        <div className="flex items-center justify-center gap-2 mt-8">
-          <button
-            onClick={() => setPage((p: number) => Math.max(1, p - 1))}
-            disabled={page === 1}
-            className="px-4 py-2 rounded-xl border border-primary-100 dark:border-white/10 text-sm disabled:opacity-40 hover:bg-primary-100 dark:hover:bg-primary-900 transition"
-          >
-            Précédent
-          </button>
-          <span className="text-sm text-primary-400">Page {page} / {totalPages}</span>
-          <button
-            onClick={() => setPage((p: number) => Math.min(totalPages, p + 1))}
-            disabled={page === totalPages}
-            className="px-4 py-2 rounded-xl border border-primary-100 dark:border-white/10 text-sm disabled:opacity-40 hover:bg-primary-100 dark:hover:bg-primary-900 transition"
-          >
-            Suivant
-          </button>
+      <section className="mt-10 grid gap-4 border-t border-slate-200 pt-8 dark:border-white/10 md:grid-cols-3">
+        <div className="flex gap-3">
+          <Stethoscope className="h-5 w-5 shrink-0 text-emerald-700 dark:text-emerald-300" aria-hidden="true" />
+          <div>
+            <h2 className="text-sm font-bold text-slate-950 dark:text-white">Consultez le profil</h2>
+            <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">
+              Vérifiez la spécialité, les horaires et les avis avant de prendre contact.
+            </p>
+          </div>
         </div>
-      )}
-    </div>
+        <div className="flex gap-3">
+          <MessageSquareText className="h-5 w-5 shrink-0 text-blue-700 dark:text-blue-300" aria-hidden="true" />
+          <div>
+            <h2 className="text-sm font-bold text-slate-950 dark:text-white">Expliquez votre demande</h2>
+            <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">
+              Décrivez vos symptômes, leur durée et le motif de votre prise de contact.
+            </p>
+          </div>
+        </div>
+        <div className="flex gap-3">
+          <CalendarDays className="h-5 w-5 shrink-0 text-violet-700 dark:text-violet-300" aria-hidden="true" />
+          <div>
+            <h2 className="text-sm font-bold text-slate-950 dark:text-white">Organisez la suite</h2>
+            <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">
+              Le rendez-vous, le rappel ou l’orientation vers un centre sont confirmés avec le professionnel.
+            </p>
+          </div>
+        </div>
+      </section>
+    </main>
   )
 }

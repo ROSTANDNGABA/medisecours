@@ -30,6 +30,8 @@ use ApiPlatform\Metadata\ApiFilter;
     'patient.prenom' => 'partial',
     'medecin.nom' => 'partial',
     'medecin.prenom' => 'partial',
+    'patient' => 'exact',
+    'medecin' => 'exact',
     'commentaire' => 'partial',
     'note' => 'exact',
 ])]

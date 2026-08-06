@@ -142,12 +142,13 @@ class Medecin extends User
     {
         if (!empty($this->disponibilites)) {
             $jours = ['lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi', 'dimanche'];
-            $sorted = usort($this->disponibilites, fn($a, $b) =>
+            $disponibilites = $this->disponibilites;
+            usort($disponibilites, fn($a, $b) =>
                 array_search($a['jour'], $jours) - array_search($b['jour'], $jours)
             );
             return implode(', ', array_map(
                 fn($d) => ucfirst($d['jour']) . ' ' . $d['debut'] . '-' . $d['fin'],
-                $this->disponibilites
+                $disponibilites
             ));
         }
 

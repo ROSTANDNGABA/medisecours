@@ -8,6 +8,7 @@ import {
   Bell,
   BookOpen,
   Building2,
+  ClipboardCheck,
   HeartPulse,
   HelpCircle,
   LayoutDashboard,
@@ -43,6 +44,7 @@ const NAV_GROUPS = [
     label: 'Contenu',
     items: [
       { href: '/admin/catalogue', label: 'Catalogue', icon: BookOpen },
+      { href: '/admin/protocoles', label: 'Protocoles cliniques', icon: ClipboardCheck },
       { href: '/admin/avis', label: 'Avis', icon: Star },
       { href: '/admin/parametres', label: 'Parametres', icon: Settings },
     ],
@@ -69,6 +71,10 @@ const PAGE_META: Record<string, { title: string; subtitle: string }> = {
   '/admin/catalogue': {
     title: 'Catalogue medical',
     subtitle: 'Organisation des ressources medicales',
+  },
+  '/admin/protocoles': {
+    title: 'Protocoles cliniques',
+    subtitle: 'Revue, validation externe et publication des premiers gestes',
   },
   '/admin/avis': {
     title: 'Avis et moderation',

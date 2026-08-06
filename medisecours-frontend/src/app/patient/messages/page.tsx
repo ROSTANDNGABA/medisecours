@@ -14,13 +14,13 @@ if (typeof document !== 'undefined') {
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
-import { ArrowLeft, Send, CheckCheck, Check, Plus, X, ExternalLink, Loader2, Paperclip, Mic, Square, FileText, ImageIcon, Video, Camera, Search, ChevronDown, Trash2 } from 'lucide-react'
+import { ArrowLeft, Send, CheckCheck, Check, Plus, X, ExternalLink, Loader2, Paperclip, Mic, Square, FileText, ImageIcon, Video, Camera, Search, ChevronDown } from 'lucide-react'
 import useSWR, { mutate as globalMutate } from 'swr'
 import api from '../../../api/axios'
 import { fetcher } from '../../../lib/fetcher'
 import { UNREAD_MESSAGES_KEY } from '../../../lib/keys'
 import { useAuth } from '../../../hooks/useAuth'
-import { useWebSocket } from '../../../hooks/useWebSocket'
+import { useNotification } from '../../../contexts/NotificationContext'
 
 import LoadingSpinner from '../../../components/ui/LoadingSpinner'
 import EmptyState from '../../../components/ui/EmptyState'
@@ -38,13 +38,18 @@ function idFromIri(value) {
   return value.split('/').pop()
 }
 function mediaUrl(path) {
-  if (!path || path.startsWith('http') || path.startsWith('blob:')) return path
-  return API_BASE + path
+  if (!path || path.startsWith('http') || path.startsWith('blob:') || path.startsWith('data:')) return path
+  if (path.startsWith('/api/')) return path
+  return API_BASE + (path.startsWith('/') ? path : `/${path}`)
 }
 function msgMediaUrl(m) {
   const media = m.media
-  if (!media || typeof media === 'string') return null
-  const path = media.contentUrl || (media.filePath ? '/uploads/media/' + media.filePath : null)
+  if (!media) return null
+  if (typeof media === 'string') {
+    const path = /^\/api\/media_objects\/[^/]+$/.test(media) ? `${media}/download` : media
+    return mediaUrl(path)
+  }
+  const path = media.contentUrl || (media.id ? `/api/media_objects/${media.id}/download` : null)
   return mediaUrl(path)
 }
 
@@ -77,21 +82,34 @@ function formatDuration(sec) {
 function isImageMime(m) { return m?.startsWith('image/') }
 function isVideoMime(m) { return m?.startsWith('video/') }
 function isAudioMime(m) { return m?.startsWith('audio/') }
+const MAX_MESSAGE_MEDIA_SIZE = 25 * 1024 * 1024
 
 function msgTypeFromMime(mime) {
   if (!mime) return 'FICHIER'
   if (isImageMime(mime)) return 'IMAGE'
-  if (isVideoMime(mime)) return 'IMAGE'
+  if (isVideoMime(mime)) return 'VIDEO'
   if (isAudioMime(mime)) return 'VOIX'
   return 'FICHIER'
 }
 
+function msgMediaKind(m) {
+  if (m?.typeMessage === 'VOIX') return 'VOIX'
+  if (m?.typeMessage === 'VIDEO') return 'VIDEO'
+  const mime = m?.media && typeof m.media === 'object' ? m.media.mimeType : null
+  if (isVideoMime(mime)) return 'VIDEO'
+  if (m?.typeMessage === 'IMAGE') return 'IMAGE'
+  if (isImageMime(mime)) return 'IMAGE'
+  if (isAudioMime(mime)) return 'VOIX'
+  return m?.typeMessage || 'TEXTE'
+}
+
 function lastMsgPreview(m) {
   if (!m) return ''
-  if (m.typeMessage === 'IMAGE') return '📷 Photo'
-  if (m.typeMessage === 'VOIX') return '🎤 Message vocal'
-  if (m.typeMessage === 'VIDEO') return '🎥 Vidéo'
-  if (m.typeMessage === 'FICHIER') return '📎 ' + (m.media?.originalName || 'Fichier')
+  const kind = msgMediaKind(m)
+  if (kind === 'IMAGE') return '📷 Photo'
+  if (kind === 'VOIX') return '🎤 Message vocal'
+  if (kind === 'VIDEO') return '🎥 Vidéo'
+  if (kind === 'FICHIER') return '📎 ' + (m.media?.originalName || 'Fichier')
   return m.contenu || ''
 }
 
@@ -111,6 +129,12 @@ export default function PatientMessagesPage() {
 
 function PatientMessagesContent() {
   const { user } = useAuth()
+  const {
+    setActiveConversationId,
+    subscribeToMessages,
+    subscribeToProfileChanges,
+    onlineUsers,
+  } = useNotification()
   const toast = useToast()
   const searchParams = useSearchParams()
   const preselectConv = searchParams.get('conversation')
@@ -123,7 +147,6 @@ function PatientMessagesContent() {
   const [allUsers, setAllUsers] = useState([])
   const [userSearch, setUserSearch] = useState('')
   const [loadingUsers, setLoadingUsers] = useState(false)
-  const [pendingMsgs, setPendingMsgs] = useState([])
   const [attachments, setAttachments] = useState([])
   const [showAttachMenu, setShowAttachMenu] = useState(false)
   const [recording, setRecording] = useState(false)
@@ -135,9 +158,8 @@ function PatientMessagesContent() {
   const [allLoadedMsgs, setAllLoadedMsgs] = useState([])
   const [loadingMore, setLoadingMore] = useState(false)
   const [hasMore, setHasMore] = useState(true)
-  const [onlineUsers, setOnlineUsers] = useState(new Set())
+  const [unreadCounts, setUnreadCounts] = useState(new Map())
   const bottomRef = useRef(null)
-  const topSentinelRef = useRef(null)
   const fileRef = useRef(null)
   const docRef = useRef(null)
   const cameraRef = useRef(null)
@@ -150,14 +172,35 @@ function PatientMessagesContent() {
   const loadingMoreRef = useRef(false)
   const hasMoreRef = useRef(true)
   const msgLoadingRef = useRef(false)
+  const initialPageReadyRef = useRef(false)
+  const olderPageMergeRef = useRef(false)
+  const scrollTimersRef = useRef([])
+
+  const scrollToLatestMessage = useCallback((behavior = 'smooth') => {
+    scrollTimersRef.current.forEach(timer => window.clearTimeout(timer))
+    scrollTimersRef.current = [0, 120, 400, 1000].map((delay) =>
+      window.setTimeout(() => {
+        const container = msgContainerRef.current
+        if (!container) return
+        container.scrollTo({
+          top: container.scrollHeight,
+          behavior: delay === 0 ? behavior : 'auto',
+        })
+      }, delay)
+    )
+  }, [])
+
+  useEffect(() => () => {
+    scrollTimersRef.current.forEach(timer => window.clearTimeout(timer))
+  }, [])
 
   const { data: convData, isLoading: convLoading, error: convError, mutate: mutateConvs } = useSWR('/api/conversations', fetcher, { revalidateOnFocus: false, keepPreviousData: true })
 
   const activeIdNum = activeId ? Number(activeId) : null
   const { data: msgData, isLoading: msgLoading, error: msgError, mutate: mutateMsgs } = useSWR(
-    activeIdNum ? `/api/messages?conversation=/api/conversations/${activeIdNum}&order[createdAt]=DESC&itemsPerPage=${MSGS_PER_PAGE}&page=${msgPage}` : null,
+    activeIdNum ? `/api/messages?conversation=/api/conversations/${activeIdNum}&order[createdAt]=DESC&order[id]=DESC&itemsPerPage=${MSGS_PER_PAGE}&page=${msgPage}` : null,
     fetcher,
-    { revalidateOnFocus: false, keepPreviousData: true }
+    { revalidateOnFocus: false }
   )
 
   // Keep refs in sync
@@ -185,77 +228,63 @@ function PatientMessagesContent() {
     }
   }, [activeId])
 
-  // Immediately wipe unread counter when the messages page opens
-  useEffect(() => {
-    globalMutate(UNREAD_MESSAGES_KEY, { unreadCount: 0 }, false)
-  }, [])
-
-  // Mark conversation as read + force SWR counter to 0 instantly when switching conversations
-  useEffect(() => {
-    if (!activeId) return
-    api.get('/api/messages', { params: { conversation: `/api/conversations/${activeId}`, itemsPerPage: 100, order: { createdAt: 'desc' } } })
-      .then((res) => {
-        const msgs = res.data?.['hydra:member'] ?? res.data?.member ?? (Array.isArray(res.data) ? res.data : [])
-        const toMark = msgs.filter((m) => m.statut !== 'LU' && idFromIri(m.expediteur) !== user?.id)
-        if (toMark.length === 0) return null
-        return Promise.all(toMark.map((m) =>
-          api.patch(m['@id'] || `/api/messages/${m.id}`, { statut: 'LU' }, { headers: { 'Content-Type': 'application/merge-patch+json' } })
-        ))
-      })
-      .then(() => {
-        globalMutate(UNREAD_MESSAGES_KEY, { unreadCount: 0 }, false)
-        globalMutate(UNREAD_MESSAGES_KEY)
-      })
-      .catch(() => {
-        globalMutate(UNREAD_MESSAGES_KEY)
-      })
-  }, [activeId])
-
   // Reset pagination when switching conversations
   useEffect(() => {
-    setMsgPage(1)
-    setAllLoadedMsgs([])
-    setHasMore(true)
-    setLoadingMore(false)
+    const timer = window.setTimeout(() => {
+      setMsgPage(1)
+      setAllLoadedMsgs([])
+      setHasMore(true)
+      setLoadingMore(false)
+      initialPageReadyRef.current = false
+    }, 0)
+    return () => window.clearTimeout(timer)
   }, [activeId])
 
   // Append newly fetched page to allLoadedMsgs
   useEffect(() => {
     if (!msgData) return
     const arr = Array.isArray(msgData) ? msgData : msgData['hydra:member'] || []
-    if (arr.length < MSGS_PER_PAGE) setHasMore(false)
+    if (arr.length < MSGS_PER_PAGE) {
+      window.setTimeout(() => setHasMore(false), 0)
+    }
 
     const container = msgContainerRef.current
     const prevScrollHeight = container ? container.scrollHeight : 0
 
-    if (msgPage === 1) {
-      setAllLoadedMsgs(arr)
-      setTimeout(() => {
-        bottomRef.current?.scrollIntoView({ behavior: 'auto' })
-      }, 100)
-    } else {
-      setAllLoadedMsgs(prev => {
-        const existingIds = new Set(prev.map(m => String(m.id ?? m['@id'])))
-        const newMsgs = arr.filter(m => !existingIds.has(String(m.id ?? m['@id'])))
-        return newMsgs.length > 0 ? [...prev, ...newMsgs] : prev
-      })
-    }
-    setLoadingMore(false)
+    window.setTimeout(() => {
+      if (msgPage === 1) {
+        setAllLoadedMsgs(arr)
+        setTimeout(() => {
+          scrollToLatestMessage('auto')
+          initialPageReadyRef.current = true
+        }, 100)
+      } else {
+        olderPageMergeRef.current = true
+        setAllLoadedMsgs(prev => {
+          const existingIds = new Set(prev.map(m => String(m.id ?? m['@id'])))
+          const newMsgs = arr.filter(m => !existingIds.has(String(m.id ?? m['@id'])))
+          return newMsgs.length > 0 ? [...prev, ...newMsgs] : prev
+        })
+      }
+      setLoadingMore(false)
+    }, 0)
 
     if (msgPage > 1 && container) {
-      requestAnimationFrame(() => {
-        const newScrollHeight = container.scrollHeight
-        container.scrollTop += newScrollHeight - prevScrollHeight
-      })
+      window.setTimeout(() => {
+        requestAnimationFrame(() => {
+          const newScrollHeight = container.scrollHeight
+          container.scrollTop += newScrollHeight - prevScrollHeight
+        })
+      }, 0)
     }
-  }, [msgData, msgPage])
+  }, [msgData, msgPage, scrollToLatestMessage])
 
   // Scroll to bottom on new conversation
   useEffect(() => {
     if (activeId) {
-      setTimeout(() => bottomRef.current?.scrollIntoView(), 50)
+      setTimeout(() => scrollToLatestMessage('auto'), 50)
     }
-  }, [activeId])
+  }, [activeId, scrollToLatestMessage])
 
   // Auto-scroll when new messages arrive
   const prevMsgCountRef = useRef(0)
@@ -263,46 +292,39 @@ function PatientMessagesContent() {
     const el = msgContainerRef.current
     if (!el) return
     const currentCount = allLoadedMsgs.length
+    if (olderPageMergeRef.current) {
+      olderPageMergeRef.current = false
+      prevMsgCountRef.current = currentCount
+      return
+    }
     if (currentCount <= prevMsgCountRef.current) {
       prevMsgCountRef.current = currentCount
       return
     }
     prevMsgCountRef.current = currentCount
-    setTimeout(() => {
-      bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-    }, 100)
-  }, [allLoadedMsgs.length])
+    scrollToLatestMessage('smooth')
+  }, [allLoadedMsgs.length, scrollToLatestMessage])
 
-  // IntersectionObserver for infinite scroll up
-  useEffect(() => {
-    const sentinel = topSentinelRef.current
-    if (!sentinel) return
-    const obs = new IntersectionObserver(([entry]) => {
-      if (entry.isIntersecting && hasMoreRef.current && !loadingMoreRef.current && !msgLoadingRef.current) {
-        loadingMoreRef.current = true
-        setLoadingMore(true)
-        setMsgPage(p => p + 1)
-      }
-    }, { threshold: 0.1 })
+  const handleMessagesScroll = () => {
+    const container = msgContainerRef.current
+    if (
+      !container ||
+      !initialPageReadyRef.current ||
+      container.scrollTop > 80 ||
+      !hasMoreRef.current ||
+      loadingMoreRef.current ||
+      msgLoadingRef.current
+    ) return
 
-    const interval = setInterval(() => {
-      if (!sentinel) return
-      const rect = sentinel.getBoundingClientRect()
-      if (rect.top >= 0 && rect.top <= window.innerHeight && hasMoreRef.current && !loadingMoreRef.current && !msgLoadingRef.current) {
-        loadingMoreRef.current = true
-        setLoadingMore(true)
-        setMsgPage(p => p + 1)
-      }
-    }, 1000)
+    loadingMoreRef.current = true
+    setLoadingMore(true)
+    setMsgPage(page => page + 1)
+  }
 
-    obs.observe(sentinel)
-    return () => {
-      obs.disconnect()
-      clearInterval(interval)
-    }
-  }, [activeId])
-
-  const conversations = Array.isArray(convData) ? convData : convData?.['hydra:member'] || []
+  const conversations = useMemo(
+    () => Array.isArray(convData) ? convData : convData?.['hydra:member'] || [],
+    [convData]
+  )
 
   // Auto-fetch missing participant user info
   useEffect(() => {
@@ -338,8 +360,7 @@ function PatientMessagesContent() {
   }, [conversations, allUsers])
 
   const mediaCache = useMemo(() => new Map(), [])
-  const [, bump] = useState(0)
-  const [unreadCounts, setUnreadCounts] = useState(new Map())
+  const [, bumpMediaCacheVersion] = useState(0)
 
   const activeMessagesRaw = allLoadedMsgs
 
@@ -350,20 +371,33 @@ function PatientMessagesContent() {
     let dead = false
     Promise.allSettled(pending.map(i => api.get(i).then(r => ({ i, d: r.data })))).then(rr => {
       if (dead) return
-      rr.forEach(r => { if (r.status === 'fulfilled') mediaCache.set(r.value.i, r.value.d) })
-      bump(n => n + 1)
+      let changed = false
+      rr.forEach(r => {
+        if (r.status === 'fulfilled') {
+          mediaCache.set(r.value.i, r.value.d)
+          changed = true
+        }
+      })
+      if (changed) bumpMediaCacheVersion(n => n + 1)
     })
     return () => { dead = true }
-  }, [msgData])
+  }, [activeMessagesRaw, mediaCache])
 
   useEffect(() => {
     if (convError || msgError) toast.error('Impossible de charger la messagerie.')
   }, [convError, msgError, toast])
 
-  const token = typeof window !== 'undefined' ? localStorage.getItem('medisecours_token') : null
+  useEffect(() => {
+    const unsubscribeMessages = subscribeToMessages((msg) => {
+      if (msg._type === 'message_read') {
+        setAllLoadedMsgs((prev) => prev.map((m) => sameMsg(m, msg) ? { ...m, statut: 'LU' } : m))
+        return
+      }
+      if (msg._type === 'message_delivered') {
+        setAllLoadedMsgs((prev) => prev.map((m) => sameMsg(m, msg) ? { ...m, statut: 'LIVRE' } : m))
+        return
+      }
 
-  const { subscribe, unsubscribe } = useWebSocket(user?.id, token, {
-    onNewMessage: (msg) => {
       const currentActiveId = activeIdRef.current
       if (String(idFromIri(msg.expediteur)) === String(user?.id)) return
 
@@ -389,9 +423,10 @@ function PatientMessagesContent() {
           if (prev.some(m => sameMsg(m, msg))) return prev
           return [msg, ...prev]
         })
+        scrollToLatestMessage('smooth')
 
         const activeIdNum = Number(currentActiveId)
-        const msgKey = `/api/messages?conversation=/api/conversations/${activeIdNum}&order[createdAt]=DESC&itemsPerPage=${MSGS_PER_PAGE}&page=1`
+        const msgKey = `/api/messages?conversation=/api/conversations/${activeIdNum}&order[createdAt]=DESC&order[id]=DESC&itemsPerPage=${MSGS_PER_PAGE}&page=1`
         globalMutate(msgKey, (currentCache) => {
           const arr = Array.isArray(currentCache) ? currentCache : (currentCache?.['hydra:member'] || [])
           if (arr.some(m => String(m.id ?? m['@id']) === String(msg.id ?? msg['@id']))) return currentCache
@@ -399,7 +434,9 @@ function PatientMessagesContent() {
           return Array.isArray(currentCache) ? newArr : { ...currentCache, 'hydra:member': newArr }
         }, { revalidate: false })
 
-        api.patch(msg['@id'] || `/api/messages/${msg.id}`, { statut: 'LU' }, { headers: { 'Content-Type': 'application/merge-patch+json' } }).catch(() => {})
+        api.patch(`/api/conversations/${convId}/read`)
+          .then(() => globalMutate(UNREAD_MESSAGES_KEY))
+          .catch(() => {})
 
         // Optimistic update without network revalidation
         mutateConvs((current) => {
@@ -409,17 +446,9 @@ function PatientMessagesContent() {
           return Array.isArray(current) ? newArr : { ...current, 'hydra:member': newArr }
         }, { revalidate: false })
       }
-    },
-    onMessageRead: (msg) => {
-      setAllLoadedMsgs((prev) => prev.map((m) => sameMsg(m, msg) ? { ...m, statut: 'LU' } : m))
-    },
-    onUserOnline: (data) => {
-      if (data?.userId) setOnlineUsers(prev => new Set(prev).add(String(data.userId)))
-    },
-    onUserOffline: (data) => {
-      if (data?.userId) setOnlineUsers(prev => { const next = new Set(prev); next.delete(String(data.userId)); return next })
-    },
-    onProfilePhotoChanged: (data) => {
+    })
+
+    const unsubscribeProfiles = subscribeToProfileChanges((data) => {
       if (!data?.userId || !('photoProfil' in data)) return
       setAllUsers(prev => {
         const idx = prev.findIndex(u => String(u.id) === String(data.userId))
@@ -428,34 +457,40 @@ function PatientMessagesContent() {
         updated[idx] = { ...updated[idx], photoProfil: data.photoProfil }
         return updated
       })
-    },
-  })
+    })
+
+    return () => {
+      unsubscribeMessages()
+      unsubscribeProfiles()
+    }
+  }, [subscribeToMessages, subscribeToProfileChanges, mutateConvs, scrollToLatestMessage, user?.id])
 
   useEffect(() => {
-    if (activeId) {
-      subscribe(activeId)
-      const t = setTimeout(() => {
-        setUnreadCounts(prev => {
-          const next = new Map(prev)
-          next.set(activeId, 0)
-          return next
-        })
-      }, 0)
-      return () => { clearTimeout(t); unsubscribe(activeId) }
+    setActiveConversationId(activeId)
+    if (!activeId) return
+
+    const t = setTimeout(() => {
+      setUnreadCounts(prev => {
+        const next = new Map(prev)
+        next.set(activeId, 0)
+        return next
+      })
+    }, 0)
+
+    return () => {
+      clearTimeout(t)
+      setActiveConversationId(null)
     }
-  }, [activeId])
+  }, [activeId, setActiveConversationId])
 
-  const resolvedMessages = useMemo(() => {
-    return activeMessagesRaw.map(m => {
-      if (m.media && typeof m.media === 'string' && /\/(media_objects|media)\//.test(m.media)) {
-        const cached = mediaCache.get(m.media)
-        if (cached) return { ...m, media: cached }
-      }
-      return m
-    })
-  }, [activeMessagesRaw, bump])
+  const resolvedMessages = activeMessagesRaw.map(m => {
+    if (m.media && typeof m.media === 'string' && /\/(media_objects|media)\//.test(m.media)) {
+      const cached = mediaCache.get(m.media)
+      if (cached) return { ...m, media: cached }
+    }
+    return m
+  })
 
-  const readAttempted = useRef(new Set())
 
   const userInfoMap = useMemo(() => {
     const map = new Map()
@@ -490,26 +525,13 @@ function PatientMessagesContent() {
         dernierMessage: lastMsg,
       })
     }
-    // Append pending messages
-    for (const p of pendingMsgs) {
-      const convId = idFromIri(p.conversation) || p.conversation
-      const existing = map.get(String(convId))
-      if (existing && String(convId) === activeId) {
-        existing.messages = [...existing.messages, p]
-      }
-    }
     return map
-  }, [conversations, user, pendingMsgs, activeId, unreadCounts])
+  }, [conversations, user, unreadCounts])
 
   const activeConv = convMap.get(activeId)
 
   const dedupedMessages = useMemo(() => {
     const msgs = [...resolvedMessages]
-    if (activeConv) {
-      for (const p of activeConv.messages) {
-        if (!msgs.some(m => sameMsg(m, p))) msgs.push(p)
-      }
-    }
     msgs.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt))
     const seen = new Set()
     return msgs.filter(m => {
@@ -518,23 +540,22 @@ function PatientMessagesContent() {
       seen.add(key)
       return true
     })
-  }, [resolvedMessages, activeConv])
-
-  const markAsRead = useCallback(async (msg) => {
-    if (!msg['@id']) return
-    const msgId = msg.id ?? msg['@id']
-    if (msg.statut === 'LU' || idFromIri(msg.expediteur) === user?.id) return
-    if (readAttempted.current.has(msgId)) return
-    readAttempted.current.add(msgId)
-    setAllLoadedMsgs(prev => prev.map(m => m.id === msg.id ? { ...m, statut: 'LU' } : m))
-    api.patch(msg['@id'], { statut: 'LU' }, { headers: { 'Content-Type': 'application/merge-patch+json' } })
-      .then(() => globalMutate(UNREAD_MESSAGES_KEY))
-      .catch(() => {})
-  }, [user?.id])
+  }, [resolvedMessages])
 
   useEffect(() => {
-    dedupedMessages.forEach(markAsRead)
-  }, [dedupedMessages, markAsRead])
+    if (!activeId || !dedupedMessages.some((msg) =>
+      msg.statut !== 'LU' && idFromIri(msg.expediteur) !== user?.id
+    )) return
+
+    api.patch(`/api/conversations/${activeId}/read`)
+      .then(() => {
+        setAllLoadedMsgs((messages) => messages.map((msg) =>
+          idFromIri(msg.expediteur) === user?.id ? msg : { ...msg, statut: 'LU' }
+        ))
+        globalMutate(UNREAD_MESSAGES_KEY)
+      })
+      .catch(() => globalMutate(UNREAD_MESSAGES_KEY))
+  }, [activeId, dedupedMessages, user?.id])
 
   function convLastTime(c) {
     return c.dernierMessage?.createdAt ?? ''
@@ -553,7 +574,7 @@ function PatientMessagesContent() {
       const lb = convLastTime(b)
       return String(lb).localeCompare(String(la))
     })
-  }, [convMap, convSearch])
+  }, [convMap, convSearch, getUserInfo])
 
   const openNewConversation = () => {
     setShowNew(true)
@@ -598,27 +619,14 @@ function PatientMessagesContent() {
     return String(conv.id)
   }
 
-  const deleteConversation = async (idToDelete) => {
-    if (!confirm('Êtes-vous sûr de vouloir supprimer cette discussion ? Toutes les données seront perdues.')) return
-    try {
-      await api.delete(`/api/conversations/${idToDelete}`)
-      toast.success('Discussion supprimée.')
-      mutateConvs()
-      if (String(activeId) === String(idToDelete)) {
-        setActiveId(null)
-      }
-    } catch {
-      toast.error('Erreur lors de la suppression de la discussion.')
-    }
-  }
-
   const preselectStarted = useRef(false)
   useEffect(() => {
     if (!preselectConv || convLoading || !user || preselectStarted.current) return
     preselectStarted.current = true
     const convId = Number(preselectConv)
     if (!convId) return
-    setActiveId(String(convId))
+    const timer = window.setTimeout(() => setActiveId(String(convId)), 0)
+    return () => window.clearTimeout(timer)
   }, [preselectConv, convLoading, user])
 
   function handleAttach(type) {
@@ -633,7 +641,11 @@ function PatientMessagesContent() {
     const files = Array.from(e.target.files || [])
     e.target.value = ''
     for (const f of files) {
-      const preview = isImageMime(f.type) ? URL.createObjectURL(f) : null
+      if (f.size > MAX_MESSAGE_MEDIA_SIZE) {
+        toast.error(`${f.name} dépasse la limite de 25 Mo.`)
+        continue
+      }
+      const preview = (isImageMime(f.type) || isVideoMime(f.type) || isAudioMime(f.type)) ? URL.createObjectURL(f) : null
       setAttachments((prev) => [...prev, { id: crypto.randomUUID?.() || Date.now() + '-' + Math.random(), file: f, preview, name: f.name, size: f.size, mime: f.type }])
     }
   }
@@ -657,7 +669,7 @@ function PatientMessagesContent() {
       mr.onstop = () => {
         const blob = new Blob(chunks, { type: mr.mimeType })
         setRecordingBlob(blob)
-        setAttachments((prev) => [...prev, { id: crypto.randomUUID?.() || Date.now() + '-' + Math.random(), file: blob, preview: null, name: 'Message vocal.webm', size: blob.size, mime: mr.mimeType }])
+        setAttachments((prev) => [...prev, { id: crypto.randomUUID?.() || Date.now() + '-' + Math.random(), file: blob, preview: URL.createObjectURL(blob), name: 'Message vocal.webm', size: blob.size, mime: mr.mimeType }])
         stream.getTracks().forEach((t) => t.stop())
       }
       recorderRef.current = mr
@@ -694,13 +706,15 @@ function PatientMessagesContent() {
 
     const optimisticConvMutate = (content: string) => {
       mutateConvs((prev: any) => {
-        const arr = Array.isArray(prev) ? prev : []
-        return arr.map((c: any) => {
+        if (!prev) return prev
+        const arr = Array.isArray(prev) ? prev : prev?.['hydra:member'] || []
+        const next = arr.map((c: any) => {
           if (String(c.id) === String(currentActiveId)) {
             return { ...c, dernierMessage: { contenu: content.slice(0, 80), createdAt: new Date().toISOString(), expediteur: { id: user?.id } } }
           }
           return c
         })
+        return Array.isArray(prev) ? next : { ...prev, 'hydra:member': next }
       }, { revalidate: false })
     }
 
@@ -742,7 +756,7 @@ function PatientMessagesContent() {
         const results = await Promise.all(bodies)
         const created = results.map((r, i) => {
           const d = r.data
-          return d.media && typeof d.media === 'string' && uploads[i] ? { ...d, media: uploads[i] } : d
+          return uploads[i] ? { ...d, media: uploads[i] } : d
         })
         setAllLoadedMsgs(prev => {
           let updated = [...prev]
@@ -753,9 +767,16 @@ function PatientMessagesContent() {
           }
           return updated
         })
-        mutateConvs()
-      } catch {
-        toast.error("Échec de l'envoi du message.")
+        const msgKey = `/api/messages?conversation=/api/conversations/${Number(currentActiveId)}&order[createdAt]=DESC&order[id]=DESC&itemsPerPage=${MSGS_PER_PAGE}&page=1`
+        globalMutate(msgKey, (currentCache) => {
+          const arr = Array.isArray(currentCache) ? currentCache : (currentCache?.['hydra:member'] || [])
+          const createdIds = new Set(created.map(m => String(m.id ?? m['@id'])))
+          const next = [...created, ...arr.filter(m => !createdIds.has(String(m.id ?? m['@id'])))]
+          if (!currentCache || Array.isArray(currentCache)) return next
+          return { ...currentCache, 'hydra:member': next }
+        }, { revalidate: false })
+      } catch (error) {
+        toast.error(error?.response?.data?.error || error?.response?.data?.detail || "Échec de l'envoi du média.")
         const tempIds = new Set(pending.map(a => a.tempId))
         setAllLoadedMsgs(prev => prev.filter(m => !tempIds.has(m.id)))
       } finally {
@@ -791,7 +812,6 @@ function PatientMessagesContent() {
         }
         return prev.some(m => sameMsg(m, created)) ? prev : [created, ...prev]
       })
-      mutateConvs()
     } catch {
       setAllLoadedMsgs(prev => prev.filter(m => m.id !== tempId))
       toast.error("Échec de l'envoi du message.")
@@ -801,7 +821,7 @@ function PatientMessagesContent() {
   }
 
   return (
-    <div className="h-[calc(100dvh_-_140px_-_env(safe-area-inset-bottom,0px))] lg:h-[calc(100dvh_-_96px)] w-full bg-gradient-to-br from-blue-50 to-blue-100 overflow-hidden lg:p-4">
+    <div className="h-[calc(100dvh_-_140px_-_env(safe-area-inset-bottom,0px))] xl:h-[calc(100dvh_-_96px)] w-full bg-gradient-to-br from-blue-50 to-blue-100 overflow-hidden lg:p-4">
       <div className="h-full max-w-7xl mx-auto bg-white lg:rounded-[12px] lg:shadow-xl overflow-hidden relative flex flex-col">
         {/* ── Panels container ── */}
         <div className="relative flex flex-1 min-h-0">
@@ -922,16 +942,13 @@ function PatientMessagesContent() {
                   <Link href="/patient/consultations" className="text-[11px] font-semibold text-[#2196F3] hover:text-blue-700 inline-flex items-center gap-1 shrink-0 transition-colors bg-blue-50 px-2 py-1 rounded-md">
                     Consultations <ExternalLink className="w-3 h-3" />
                   </Link>
-                  <button onClick={() => deleteConversation(activeConv.id)} className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors" title="Supprimer la discussion">
-                    <Trash2 className="w-4 h-4" />
-                  </button>
                 </div>
               </div>
 
               {/* Messages Area */}
-              <div ref={msgContainerRef} className="flex-1 overflow-y-auto min-h-0 px-6 py-5">
-                {hasMore && (
-                  <div ref={topSentinelRef} className="flex justify-center py-4">
+              <div ref={msgContainerRef} onScroll={handleMessagesScroll} className="flex-1 overflow-y-auto min-h-0 px-6 py-5">
+                {loadingMore && (
+                  <div className="flex justify-center py-4">
                     <Loader2 className="w-5 h-5 animate-spin text-gray-400" />
                   </div>
                 )}
@@ -943,6 +960,8 @@ function PatientMessagesContent() {
                 )}
                 {dedupedMessages.map((m, idx) => {
                   const mine = idFromIri(m.expediteur) === user?.id
+                  const mediaKind = msgMediaKind(m)
+                  const isLatest = idx === dedupedMessages.length - 1
                   const prevSameSender = idx > 0 && idFromIri(dedupedMessages[idx - 1].expediteur) === idFromIri(m.expediteur)
                   const convInfo = getUserInfo(activeConv.other)
                   const name = convInfo ? `${convInfo.prenom || ''} ${convInfo.nom || ''}`.trim() : 'Médecin'
@@ -956,20 +975,26 @@ function PatientMessagesContent() {
                       {!mine && prevSameSender && <div className="w-[44px] mr-2 shrink-0" />}
                       <div style={msgAnim} className={`max-w-[70%] ${mine ? 'order-1' : ''}`}>
                         {/* Image */}
-                        {m.typeMessage === 'IMAGE' && msgMediaUrl(m) && (
+                        {mediaKind === 'IMAGE' && msgMediaUrl(m) && (
                           <div className={`overflow-hidden mb-1 ${m.contenu ? 'rounded-t-[18px]' : 'rounded-[18px]'} shadow-sm bg-white`}>
-                            <img src={msgMediaUrl(m)} alt="" className="w-full max-h-64 object-cover cursor-pointer hover:opacity-95 transition-opacity" onClick={(e) => { e.stopPropagation(); window.open(msgMediaUrl(m), '_blank') }} />
+                            <img src={msgMediaUrl(m)} alt="" className="w-full max-h-64 object-cover cursor-pointer hover:opacity-95 transition-opacity" onLoad={isLatest ? () => scrollToLatestMessage('auto') : undefined} onClick={(e) => { e.stopPropagation(); window.open(msgMediaUrl(m), '_blank') }} />
+                          </div>
+                        )}
+                        {/* Video */}
+                        {mediaKind === 'VIDEO' && msgMediaUrl(m) && (
+                          <div className={`overflow-hidden mb-1 ${m.contenu ? 'rounded-t-[18px]' : 'rounded-[18px]'} bg-black shadow-sm`}>
+                            <video controls playsInline preload="metadata" src={msgMediaUrl(m)} onLoadedMetadata={isLatest ? () => scrollToLatestMessage('auto') : undefined} className="w-full max-h-72 bg-black" />
                           </div>
                         )}
                         {/* Voice */}
-                        {m.typeMessage === 'VOIX' && msgMediaUrl(m) && (
+                        {mediaKind === 'VOIX' && msgMediaUrl(m) && (
                           <div className={`px-4 py-3 shadow-sm ${mine ? 'bg-[#2196F3]' : 'bg-[#EDEDED]'} ${m.contenu ? 'rounded-t-[18px]' : 'rounded-[18px]'} ${mine ? 'text-white rounded-br-[4px]' : 'rounded-bl-[4px]'}`}>
-                            <audio controls src={msgMediaUrl(m)} className="w-full h-10" />
+                            <audio controls src={msgMediaUrl(m)} onLoadedMetadata={isLatest ? () => scrollToLatestMessage('auto') : undefined} className="w-full h-10" />
                             {m.dureeVoix > 0 && <p className={`text-[10px] mt-1 ${mine ? 'text-white/70' : 'text-gray-500'}`}>{formatDuration(m.dureeVoix)}</p>}
                           </div>
                         )}
                         {/* File */}
-                        {m.typeMessage === 'FICHIER' && m.media && (
+                        {mediaKind === 'FICHIER' && m.media && (
                           <a href={msgMediaUrl(m)} target="_blank" rel="noopener noreferrer" className={`flex items-center gap-3 p-4 shadow-sm hover:opacity-80 transition-opacity ${mine ? 'bg-[#2196F3] text-white' : 'bg-white'} ${m.contenu ? 'rounded-t-[18px]' : 'rounded-[18px]'} ${mine ? 'rounded-br-[4px]' : 'rounded-bl-[4px]'}`}>
                             <div className={`p-2 rounded-lg ${mine ? 'bg-white/20' : 'bg-gray-100'}`}>
                               <FileText className={`w-5 h-5 ${mine ? 'text-white' : 'text-[#212121]'}`} />
@@ -1015,11 +1040,14 @@ function PatientMessagesContent() {
                   <div className="flex gap-2 p-3 overflow-x-auto border-b border-gray-200">
                     {attachments.map((att) => (
                       <div key={att.id} className="relative shrink-0 w-16 h-16 rounded-xl overflow-hidden bg-gray-100 ring-1 ring-gray-200">
-                        {att.preview ? (
+                        {att.preview && isImageMime(att.mime) ? (
                           <img src={att.preview} alt="" className="w-full h-full object-cover" />
+                        ) : att.preview && isVideoMime(att.mime) ? (
+                          <video src={att.preview} muted playsInline preload="metadata" className="w-full h-full object-cover bg-black" />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center">
-                            {isImageMime(att.mime) ? <ImageIcon className="w-5 h-5 text-gray-400" /> :
+                            {isVideoMime(att.mime) ? <Video className="w-5 h-5 text-gray-400" /> :
+                             isImageMime(att.mime) ? <ImageIcon className="w-5 h-5 text-gray-400" /> :
                              isAudioMime(att.mime) ? <Mic className="w-5 h-5 text-gray-400" /> :
                              <FileText className="w-5 h-5 text-gray-400" />}
                           </div>
@@ -1091,7 +1119,7 @@ function PatientMessagesContent() {
                 </div>
               </div>
               <input ref={cameraRef} type="file" accept="image/*" capture="environment" hidden onChange={(e) => handleFilePick(e, false)} />
-              <input ref={fileRef} type="file" accept="image/*,video/mp4,video/webm,video/ogg" multiple hidden onChange={(e) => handleFilePick(e, true)} />
+              <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp,video/mp4,video/webm,video/ogg,video/quicktime" multiple hidden onChange={(e) => handleFilePick(e, true)} />
               <input ref={docRef} type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.zip,.rar,.7z" multiple hidden onChange={(e) => handleFilePick(e, true)} />
             </>
           ) : (

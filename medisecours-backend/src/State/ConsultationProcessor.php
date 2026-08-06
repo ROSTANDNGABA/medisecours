@@ -3,12 +3,14 @@
 namespace App\State;
 
 use ApiPlatform\Metadata\Operation;
+use ApiPlatform\Metadata\Post;
 use ApiPlatform\State\ProcessorInterface;
 use App\Entity\Consultation;
 use App\Entity\Medecin;
 use App\Entity\Patient;
 use App\Message\WebSocketNotification;
 use App\Service\ConsultationEmailService;
+use App\Service\NotificationService;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\SecurityBundle\Security;
@@ -26,6 +28,7 @@ class ConsultationProcessor implements ProcessorInterface
         private readonly MessageBusInterface $messageBus,
         private readonly ConsultationEmailService $emailService,
         private readonly LoggerInterface $logger,
+        private readonly NotificationService $notificationService,
     ) {
     }
 
@@ -38,17 +41,15 @@ class ConsultationProcessor implements ProcessorInterface
         $user = $this->security->getUser();
         $originalStatut = $this->em->getUnitOfWork()->getOriginalEntityData($data)['statut'] ?? null;
 
-        // Création — le patient est l'utilisateur connecté
-        if ($data->getPatient() === null) {
+        if ($operation instanceof Post) {
             if (!$user instanceof Patient) {
                 throw new AccessDeniedHttpException('Seul un patient peut creer une consultation.');
             }
             $data->setPatient($user);
-        }
-
-        // Prise en charge — le médecin devient le responsable de la consultation
-        if ($data->getMedecin() === null && $user instanceof Medecin && $data->getStatut() === Consultation::STATUT_EN_COURS) {
-            $data->setMedecin($user);
+            $data->setMedecin(null);
+            $data->setStatut(Consultation::STATUT_OUVERTE);
+        } else {
+            $this->assertAllowedUpdate($data, $user, $originalStatut);
         }
 
         $result = $this->persistProcessor->process($data, $operation, $uriVariables, $context);
@@ -58,6 +59,44 @@ class ConsultationProcessor implements ProcessorInterface
         }
 
         return $result;
+    }
+
+    private function assertAllowedUpdate(Consultation $consultation, mixed $user, ?string $originalStatut): void
+    {
+        if (!$user instanceof Patient && !$user instanceof Medecin) {
+            throw new AccessDeniedHttpException('Seul un patient ou un médecin peut modifier une consultation.');
+        }
+
+        if ($user instanceof Patient) {
+            if ($consultation->getPatient() !== $user) {
+                throw new AccessDeniedHttpException('Vous ne pouvez modifier que vos propres consultations.');
+            }
+            if ($consultation->getMedecin() !== null || $consultation->getStatut() !== Consultation::STATUT_ANNULEE) {
+                throw new AccessDeniedHttpException('Un patient peut uniquement annuler une consultation non prise en charge.');
+            }
+            if ($originalStatut !== Consultation::STATUT_OUVERTE) {
+                throw new AccessDeniedHttpException('Seule une consultation ouverte peut être annulée par le patient.');
+            }
+
+            return;
+        }
+
+        if ($consultation->getMedecin() === null) {
+            if ($originalStatut !== Consultation::STATUT_OUVERTE || $consultation->getStatut() !== Consultation::STATUT_EN_COURS) {
+                throw new AccessDeniedHttpException('Un médecin peut uniquement prendre en charge une consultation ouverte.');
+            }
+            $consultation->setMedecin($user);
+
+            return;
+        }
+
+        if ($consultation->getMedecin() !== $user) {
+            throw new AccessDeniedHttpException('Vous ne pouvez modifier que les consultations dont vous êtes responsable.');
+        }
+
+        if ($originalStatut !== Consultation::STATUT_EN_COURS || !in_array($consultation->getStatut(), [Consultation::STATUT_EN_COURS, Consultation::STATUT_TERMINEE], true)) {
+            throw new AccessDeniedHttpException('Transition de consultation non autorisée.');
+        }
     }
 
     private function notifyStatusChange(Consultation $consultation, ?string $originalStatut): void
@@ -73,6 +112,16 @@ class ConsultationProcessor implements ProcessorInterface
         }
 
         if ($statut === Consultation::STATUT_EN_COURS && $originalStatut === Consultation::STATUT_OUVERTE) {
+            if ($consultation->getPatient()) {
+                $this->notificationService->create(
+                    $consultation->getPatient(),
+                    'consultation_accepted',
+                    'Consultation prise en charge',
+                    'Un médecin a pris votre demande en charge.',
+                    '/patient/consultations',
+                );
+                $this->em->flush();
+            }
             $this->logger->info('Dispatch consultation_accepted', ['id' => $consultation->getId()]);
             $this->messageBus->dispatch(new WebSocketNotification(
                 event: 'consultation_accepted',
@@ -81,6 +130,16 @@ class ConsultationProcessor implements ProcessorInterface
         }
 
         if ($statut === Consultation::STATUT_TERMINEE) {
+            if ($consultation->getPatient()) {
+                $this->notificationService->create(
+                    $consultation->getPatient(),
+                    'consultation_closed',
+                    'Consultation terminée',
+                    'Votre consultation est terminée. Consultez son historique pour les informations de suivi.',
+                    '/patient/consultations',
+                );
+                $this->em->flush();
+            }
             $this->logger->info('Dispatch consultation_closed', ['id' => $consultation->getId()]);
             $this->messageBus->dispatch(new WebSocketNotification(
                 event: 'consultation_closed',

@@ -2,13 +2,14 @@
 
 import { useEffect, useRef, useCallback } from 'react'
 
-const WS_URL = process.env.NEXT_PUBLIC_WS_URL || 'ws://127.0.0.1:8081'
+const WS_URL = process.env.NEXT_PUBLIC_WS_URL || 'ws://127.0.0.1:8081/ws'
 const MAX_BACKOFF = 30000
 const PING_INTERVAL = 30000
 const PONG_TIMEOUT = 10000
 
 export function useWebSocket(userId: string, token: string, handlers: {
   onNewMessage?: (msg: any) => void
+  onMessageDelivered?: (msg: any) => void
   onMessageRead?: (msg: any) => void
   onUserOnline?: (data: any) => void
   onUserOffline?: (data: any) => void
@@ -19,9 +20,7 @@ export function useWebSocket(userId: string, token: string, handlers: {
 }, role?: string) {
   const wsRef = useRef<WebSocket | null>(null)
   const attemptRef = useRef(0)
-  const closedRef = useRef(false)
   const handlersRef = useRef(handlers)
-  const pendingRef = useRef<any[]>([])
   const pingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const pongTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const authenticatedRef = useRef(false)
@@ -51,45 +50,30 @@ export function useWebSocket(userId: string, token: string, handlers: {
     if (pongTimeoutRef.current) { clearTimeout(pongTimeoutRef.current); pongTimeoutRef.current = null }
   }, [])
 
-  const flush = useCallback(() => {
-    const ws = wsRef.current
-    if (!ws || ws.readyState !== WebSocket.OPEN) return
-    const queue = pendingRef.current
-    pendingRef.current = []
-    queue.forEach(({ type, conversationId }) => {
-      ws.send(JSON.stringify({ type, conversationId }))
-    })
-  }, [])
-
-  const send = useCallback((type: string, conversationId: string) => {
-    const ws = wsRef.current
-    if (ws && ws.readyState === WebSocket.OPEN && authenticatedRef.current) {
-      ws.send(JSON.stringify({ type, conversationId }))
-    } else {
-      pendingRef.current.push({ type, conversationId })
-    }
-  }, [])
-
-  const subscribe = useCallback((conversationId: string) => send('subscribe', conversationId), [send])
-  const unsubscribe = useCallback((conversationId: string) => send('unsubscribe', conversationId), [send])
+  const subscribe = useCallback((_conversationId: string) => {}, [])
+  const unsubscribe = useCallback((_conversationId: string) => {}, [])
 
   useEffect(() => {
     if (!userId || !token) return
 
-    closedRef.current = false
+    let disposed = false
     attemptRef.current = 0
-    pendingRef.current = []
     authenticatedRef.current = false
     clearTimers()
 
     const connect = () => {
+      if (disposed) return
+
       const ws = new WebSocket(WS_URL)
       wsRef.current = ws
 
       ws.onopen = () => {
+        if (disposed) {
+          ws.close()
+          return
+        }
         attemptRef.current = 0
-        // Send auth message with userId so Node server registers the correct database ID
-        ws.send(JSON.stringify({ type: 'auth', token, userId: String(userId) }))
+        ws.send(JSON.stringify({ type: 'auth', token }))
       }
 
       ws.onmessage = (event) => {
@@ -100,7 +84,6 @@ export function useWebSocket(userId: string, token: string, handlers: {
           if (parsed.type === 'auth_ok') {
             authenticatedRef.current = true
             startPing(ws)
-            flush()
             return
           }
 
@@ -115,6 +98,7 @@ export function useWebSocket(userId: string, token: string, handlers: {
           const { event: evt, payload } = parsed
           const h = handlersRef.current
           if (evt === 'new_message' && h.onNewMessage) h.onNewMessage(payload)
+          if (evt === 'message_delivered' && h.onMessageDelivered) h.onMessageDelivered(payload)
           if (evt === 'message_read' && h.onMessageRead) h.onMessageRead(payload)
           if (evt === 'user_online' && h.onUserOnline) h.onUserOnline(payload)
           if (evt === 'user_offline' && h.onUserOffline) h.onUserOffline(payload)
@@ -128,24 +112,26 @@ export function useWebSocket(userId: string, token: string, handlers: {
       ws.onclose = (event) => {
         clearTimers()
         authenticatedRef.current = false
-        if (closedRef.current) return
+        if (disposed) return
         // Do not retry if auth failed (code 4003)
         if (event.code === 4003) return
         const backoff = Math.min(1000 * Math.pow(2, attemptRef.current), MAX_BACKOFF)
         attemptRef.current++
-        setTimeout(connect, backoff)
+        setTimeout(() => {
+          if (!disposed) connect()
+        }, backoff)
       }
     }
 
     connect()
 
     return () => {
-      closedRef.current = true
+      disposed = true
       clearTimers()
       wsRef.current?.close()
       wsRef.current = null
     }
-  }, [userId, token, startPing, handlePong, clearTimers, flush])
+  }, [userId, token, startPing, handlePong, clearTimers])
 
   return { subscribe, unsubscribe }
 }

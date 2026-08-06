@@ -8,6 +8,8 @@ use ApiPlatform\Metadata\Operation;
 use App\Entity\Consultation;
 use App\Entity\Conversation;
 use App\Entity\Message;
+use App\Entity\Notification;
+use App\Entity\Prescription;
 use Doctrine\ORM\QueryBuilder;
 use Symfony\Bundle\SecurityBundle\Security;
 
@@ -19,7 +21,7 @@ class CurrentUserExtension implements QueryCollectionExtensionInterface
 
     public function applyToCollection(QueryBuilder $queryBuilder, QueryNameGeneratorInterface $queryNameGenerator, string $resourceClass, ?Operation $operation = null, array $context = []): void
     {
-        if (!in_array($resourceClass, [Message::class, Conversation::class, Consultation::class], true)) {
+        if (!in_array($resourceClass, [Message::class, Conversation::class, Consultation::class, Notification::class, Prescription::class], true)) {
             return;
         }
 
@@ -44,6 +46,22 @@ class CurrentUserExtension implements QueryCollectionExtensionInterface
         if (Conversation::class === $resourceClass) {
             $queryBuilder
                 ->andWhere(sprintf(':current_user MEMBER OF %s.participants', $rootAlias))
+                ->setParameter('current_user', $user);
+
+            return;
+        }
+
+        if (Prescription::class === $resourceClass) {
+            $queryBuilder
+                ->andWhere(sprintf('%s.patient = :current_user OR %s.medecin = :current_user', $rootAlias, $rootAlias))
+                ->setParameter('current_user', $user);
+
+            return;
+        }
+
+        if (Notification::class === $resourceClass) {
+            $queryBuilder
+                ->andWhere(sprintf('%s.recipient = :current_user', $rootAlias))
                 ->setParameter('current_user', $user);
 
             return;

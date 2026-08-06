@@ -23,16 +23,18 @@ use Symfony\Component\Validator\Constraints as Assert;
 use App\Entity\MediaObject;
 
 #[ORM\Entity(repositoryClass: MaladieRepository::class)]
+#[ORM\Index(name: 'idx_maladie_patient_catalogue', columns: ['patient_visible', 'patient_priority'])]
 #[ApiResource(
     operations: [
-        new GetCollection(),
+        new GetCollection(security: "is_granted('ROLE_ADMIN') or is_granted('ROLE_MEDECIN')"),
         // Endpoint de recherche full-text PostgreSQL (multi-colonnes, multi-mots)
         new GetCollection(
             uriTemplate: '/maladies/search',
             provider: MaladieSearchProvider::class,
+            security: "is_granted('ROLE_ADMIN') or is_granted('ROLE_MEDECIN')",
             description: 'Recherche full-text sur nom, symptômes, description et causes.'
         ),
-        new Get(),
+        new Get(security: "is_granted('ROLE_ADMIN') or is_granted('ROLE_MEDECIN')"),
         new Post(security: "is_granted('ROLE_ADMIN')"),
         new Patch(security: "is_granted('ROLE_ADMIN')"),
         new Delete(security: "is_granted('ROLE_ADMIN')")
@@ -137,6 +139,15 @@ class Maladie
     #[Groups(['maladie:read', 'maladie:write'])]
     private ?string $imageUrl = null;
 
+    #[ORM\Column(options: ['default' => false])]
+    #[Groups(['maladie:read', 'maladie:write'])]
+    private bool $patientVisible = false;
+
+    #[ORM\Column(nullable: true)]
+    #[Assert\Positive]
+    #[Groups(['maladie:read', 'maladie:write'])]
+    private ?int $patientPriority = null;
+
     /**
      * @var Collection<int, PremierSoin>
      */
@@ -151,11 +162,19 @@ class Maladie
     #[Groups(['maladie:read', 'maladie:write'])]
     private Collection $images;
 
+    /**
+     * @var Collection<int, MaladieSymptome>
+     */
+    #[ORM\OneToMany(targetEntity: MaladieSymptome::class, mappedBy: 'maladie', cascade: ['persist', 'remove'], orphanRemoval: true)]
+    #[Groups(['maladie:read'])]
+    private Collection $symptomesStructures;
+
     public function __construct()
     {
         $this->createdAt = new \DateTimeImmutable();
         $this->premiersSoins = new ArrayCollection();
         $this->images = new ArrayCollection();
+        $this->symptomesStructures = new ArrayCollection();
     }
 
     public function getId(): ?int
@@ -343,6 +362,30 @@ class Maladie
         return $this;
     }
 
+    public function isPatientVisible(): bool
+    {
+        return $this->patientVisible;
+    }
+
+    public function setPatientVisible(bool $patientVisible): static
+    {
+        $this->patientVisible = $patientVisible;
+
+        return $this;
+    }
+
+    public function getPatientPriority(): ?int
+    {
+        return $this->patientPriority;
+    }
+
+    public function setPatientPriority(?int $patientPriority): static
+    {
+        $this->patientPriority = $patientPriority;
+
+        return $this;
+    }
+
     /**
      * @return Collection<int, PremierSoin>
      */
@@ -394,6 +437,32 @@ class Maladie
     {
         if ($this->images->removeElement($image) && $image->getMaladie() === $this) {
             $image->setMaladie(null);
+        }
+
+        return $this;
+    }
+    /**
+     * @return Collection<int, MaladieSymptome>
+     */
+    public function getSymptomesStructures(): Collection
+    {
+        return $this->symptomesStructures;
+    }
+
+    public function addSymptomeStructure(MaladieSymptome $symptomeStructure): static
+    {
+        if (!$this->symptomesStructures->contains($symptomeStructure)) {
+            $this->symptomesStructures->add($symptomeStructure);
+            $symptomeStructure->setMaladie($this);
+        }
+
+        return $this;
+    }
+
+    public function removeSymptomeStructure(MaladieSymptome $symptomeStructure): static
+    {
+        if ($this->symptomesStructures->removeElement($symptomeStructure) && $symptomeStructure->getMaladie() === $this) {
+            $symptomeStructure->setMaladie(null);
         }
 
         return $this;

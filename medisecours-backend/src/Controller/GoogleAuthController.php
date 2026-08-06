@@ -8,6 +8,7 @@ use App\Entity\Medecin;
 use App\Entity\Patient;
 use App\Entity\User;
 use App\Service\UserSerializer;
+use App\Service\SessionService;
 use Composer\CaBundle\CaBundle;
 use Doctrine\ORM\EntityManagerInterface;
 use Google_Client;
@@ -41,6 +42,7 @@ class GoogleAuthController extends AbstractController
         Request $request,
         EntityManagerInterface $entityManager,
         JWTTokenManagerInterface $jwtManager,
+        SessionService $sessionService,
         UserPasswordHasherInterface $passwordHasher,
         LoggerInterface $logger,
         #[Autowire(env: 'APP_ENV')] string $appEnv,
@@ -175,9 +177,17 @@ class GoogleAuthController extends AbstractController
             ], Response::HTTP_FORBIDDEN);
         }
 
-        return new JsonResponse([
-            'token' => $jwtManager->create($user),
+        $jwt = $jwtManager->create($user);
+        $refresh = $sessionService->createRefreshSession($user);
+        $entityManager->flush();
+
+        $response = new JsonResponse([
+            'token' => $jwt,
             'user'  => $this->userSerializer->serialize($user),
         ]);
+        $response->headers->setCookie($sessionService->accessCookie($jwt));
+        $response->headers->setCookie($refresh['cookie']);
+
+        return $response;
     }
 }

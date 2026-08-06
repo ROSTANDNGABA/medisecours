@@ -9,14 +9,7 @@ import { useAuth } from '../../hooks/useAuth'
 import { useToast } from '../../components/ui/Toast'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import EmptyState from '../../components/ui/EmptyState'
-import Avatar from '../../components/ui/Avatar'
 import api from '../../api/axios'
-
-function idFromIri(value) {
-  if (!value) return null
-  if (typeof value === 'object') return value.id
-  return value.split('/').pop()
-}
 
 function timeAgo(dateString) {
   if (!dateString) return ''
@@ -41,38 +34,35 @@ export default function NotificationsPage() {
   const { user, mounted } = useAuth()
   const router = useRouter()
   const toast = useToast()
-  const [messages, setMessages] = useState([])
+  const [notifications, setNotifications] = useState([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     if (!mounted || !user) return
-    api.get('/api/messages').then(r => {
+    api.get('/api/notifications').then(r => {
       const raw = r.data?.['hydra:member'] ?? r.data?.member ?? r.data
-      setMessages(Array.isArray(raw) ? raw : [])
+      setNotifications(Array.isArray(raw) ? raw : [])
     }).catch(() => toast.error('Impossible de charger les notifications.'))
     .finally(() => setLoading(false))
   }, [mounted, user, toast])
 
-  const notifications = useMemo(() => {
+  const notificationItems = useMemo(() => {
     const items = []
-    for (const m of messages) {
-      if (idFromIri(m.expediteur) === user?.id) continue
-      const sender = typeof m.expediteur === 'object' ? m.expediteur : null
+    for (const notification of notifications) {
       items.push({
-        id: `msg-${m.id}`,
-        title: 'Nouveau message',
-        description: m.contenu?.slice(0, 100) || 'Message reçu',
-        time: m.createdAt,
-        unread: m.statut !== 'LU',
-        link: '/messages',
-        sender,
+        id: notification.id,
+        title: notification.title,
+        description: notification.body || '',
+        time: notification.createdAt,
+        unread: !notification.readAt,
+        link: notification.link || '/notifications',
       })
     }
     items.sort((a, b) => new Date(b.time) - new Date(a.time))
     return items
-  }, [messages, user?.id])
+  }, [notifications])
 
-  const unreadCount = useMemo(() => notifications.filter(n => n.unread).length, [notifications])
+  const unreadCount = useMemo(() => notificationItems.filter(n => n.unread).length, [notificationItems])
 
   if (!mounted || loading) return (
     <div className="flex min-h-[60vh] items-center justify-center">
@@ -98,17 +88,29 @@ export default function NotificationsPage() {
         </div>
       </motion.div>
 
-      {notifications.length === 0 ? (
+      {notificationItems.length === 0 ? (
         <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15, type: 'spring', damping: 20, stiffness: 300 }}>
           <EmptyState icon={Bell} title="Aucune notification" description="Vous serez notifié des nouveaux messages de vos médecins ici." />
         </motion.div>
       ) : (
         <motion.div variants={stagger} initial="initial" animate="animate" className="space-y-1.5">
           <AnimatePresence mode="popLayout">
-            {notifications.map(n => (
+            {notificationItems.map(n => (
               <motion.div key={n.id} layout variants={itemFade} exit={{ opacity: 0, scale: 0.95, y: -8, transition: { duration: 0.15 } }}>
                 <button
-                  onClick={() => router.push(n.link)}
+                  onClick={async () => {
+                    if (n.unread) {
+                      try {
+                        await api.patch(`/api/notifications/${n.id}`, { readAt: new Date().toISOString() }, {
+                          headers: { 'Content-Type': 'application/merge-patch+json' },
+                        })
+                        setNotifications((current: any[]) => current.map((item) => item.id === n.id ? { ...item, readAt: new Date().toISOString() } : item))
+                      } catch {
+                        toast.error('Impossible de marquer la notification comme lue.')
+                      }
+                    }
+                    router.push(n.link)
+                  }}
                   className={`group relative flex w-full items-start gap-4 rounded-2xl p-4 text-left transition-all active:scale-[0.98] ${
                     n.unread ? 'bg-[#F0F4FF] shadow-sm shadow-blue-500/5' : 'bg-white hover:bg-[#F9FAFB]'
                   }`}
@@ -126,12 +128,6 @@ export default function NotificationsPage() {
                         {timeAgo(n.time)}
                       </span>
                     </div>
-                    {n.sender && (
-                      <div className="mt-1.5 flex items-center gap-2">
-                        <Avatar name={`${n.sender?.prenom || ''} ${n.sender?.nom || ''}`} size="sm" />
-                        <span className="text-xs font-medium text-[#6B7280]">Dr. {n.sender?.prenom} {n.sender?.nom}</span>
-                      </div>
-                    )}
                     <p className="mt-1 text-xs leading-relaxed text-[#9CA3AF] line-clamp-2">{n.description || 'Message reçu'}</p>
                   </div>
                   <ArrowRight className="mt-2 h-4 w-4 shrink-0 text-[#D1D5DB] transition group-hover:text-[#3B6EF8] group-hover:translate-x-0.5" style={{ transition: 'color 0.2s, transform 0.2s' }} />

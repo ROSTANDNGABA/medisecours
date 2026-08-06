@@ -31,7 +31,7 @@ const INFO_FIELDS = [
 ]
 
 function imgUrl(img) {
-  const path = img?.url || `/uploads/media/${img?.filePath || ''}`
+  const path = img?.contentUrl || img?.url || (img?.id ? `/api/media_objects/${img.id}/download` : '')
   return path.startsWith('http') ? path : `${API_BASE}${path}`
 }
 

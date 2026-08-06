@@ -21,7 +21,10 @@ use Symfony\Component\Validator\Constraints as Assert;
         new GetCollection(security: "is_granted('ROLE_MEDECIN') or is_granted('ROLE_PATIENT')"),
         new Get(security: "is_granted('ROLE_ADMIN') or object.getMedecin() == user or object.getPatient() == user"),
         new Post(security: "is_granted('ROLE_MEDECIN')", processor: \App\State\PrescriptionProcessor::class),
-        new Patch(security: "is_granted('ROLE_MEDECIN') and object.getMedecin() == user"),
+        new Patch(
+            security: "is_granted('ROLE_MEDECIN') and object.getMedecin() == user",
+            processor: \App\State\PrescriptionProcessor::class
+        ),
     ],
     normalizationContext: ['groups' => ['prescription:read']],
     denormalizationContext: ['groups' => ['prescription:write']],

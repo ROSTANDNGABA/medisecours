@@ -74,6 +74,45 @@ export interface Medecin extends Utilisateur {
   disponibilitesTexte?: string | null
 }
 
+export interface PublicMedecin {
+  id: string
+  nom: string | null
+  prenom: string | null
+  specialite: string | null
+  disponibilites: CreneauDisponibilite[] | null
+  disponibilitesTexte: string | null
+  disponibilitesLabel: string
+  isDisponibleMaintenant: boolean
+  photoProfil: string | null
+  noteMoyenne: number
+  totalAvis: number
+  estValide?: boolean
+}
+
+export interface PublicMedecinListResponse {
+  'hydra:member': PublicMedecin[]
+  'hydra:totalItems': number
+  page: number
+  limit: number
+  totalPages: number
+  specialites: string[]
+}
+
+export interface PublicMedecinAvis {
+  id: number
+  note: number
+  commentaire: string | null
+  createdAt: string
+  patient: {
+    prenom: string | null
+    nom: string | null
+  }
+}
+
+export interface PublicMedecinDetail extends PublicMedecin {
+  avis: PublicMedecinAvis[]
+}
+
 /* ------------------------------------------------------------------ */
 /* Consultation                                                       */
 /* ------------------------------------------------------------------ */

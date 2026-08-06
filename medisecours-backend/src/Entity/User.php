@@ -4,7 +4,6 @@ namespace App\Entity;
 use ApiPlatform\Metadata\ApiResource;
 use ApiPlatform\Metadata\Get;
 use ApiPlatform\Metadata\GetCollection;
-use ApiPlatform\Metadata\Post;
 use ApiPlatform\Metadata\Patch;
 
 use App\Repository\UserRepository;
@@ -40,8 +39,6 @@ use Gedmo\Mapping\Annotation as Gedmo;
         ),
         // GET /api/users/{id} — l'utilisateur peut voir son propre profil, admin voit tout
         new Get(security: "is_granted('ROLE_ADMIN') or object == user"),
-        // POST /api/users — inscription publique via API Platform (route legacy, préférer /api/auth/register)
-        new Post(processor: \App\State\UserPasswordHasherProcessor::class),
         // PATCH /api/users/{id} — modification du profil, uniquement par le propriétaire ou admin
         new Patch(
             security: "is_granted('ROLE_ADMIN') or object == user",
@@ -67,7 +64,7 @@ abstract class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[ORM\Column(length: 180)]
     #[Assert\NotBlank(message: 'L\'email est obligatoire')]
     #[Assert\Email(message: 'L\'email n\'est pas valide')]
-    #[Groups(['user:read', 'user:write'])]
+    #[Groups(['user:read'])]
     private ?string $email = null;
 
     /**
@@ -87,7 +84,6 @@ abstract class User implements UserInterface, PasswordAuthenticatedUserInterface
         pattern: '/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{8,}$/',
         message: 'Le mot de passe doit contenir au moins une majuscule, une minuscule, un chiffre et un caractère spécial.'
     )]
-    #[Groups(['user:write'])]
     private ?string $password = null;
 
     /**
@@ -105,6 +101,9 @@ abstract class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[ORM\Column(length: 100, nullable: true, unique: true)]
     private ?string $emailVerificationToken = null;
 
+    #[ORM\Column(nullable: true)]
+    private ?\DateTimeImmutable $emailVerificationTokenExpiresAt = null;
+
     /**
      * Token de réinitialisation de mot de passe.
      */
@@ -119,13 +118,13 @@ abstract class User implements UserInterface, PasswordAuthenticatedUserInterface
 
     #[ORM\Column(length: 255, nullable: true)]
     #[Assert\Length(min: 2, max: 255, minMessage: 'Le nom doit contenir au moins {{ limit }} caractères', maxMessage: 'Le nom ne peut pas dépasser {{ limit }} caractères')]
-    #[Groups(['user:read', 'user:search', 'user:write', 'consultation:read', 'message:read', 'conversation:read'])]
+    #[Groups(['user:read', 'user:search', 'user:write', 'consultation:read', 'message:read', 'conversation:read', 'avis:read'])]
     #[Gedmo\Versioned]
     private ?string $nom = null;
 
     #[ORM\Column(length: 255, nullable: true)]
     #[Assert\Length(min: 2, max: 255, minMessage: 'Le prénom doit contenir au moins {{ limit }} caractères', maxMessage: 'Le prénom ne peut pas dépasser {{ limit }} caractères')]
-    #[Groups(['user:read', 'user:search', 'user:write', 'consultation:read', 'message:read', 'conversation:read'])]
+    #[Groups(['user:read', 'user:search', 'user:write', 'consultation:read', 'message:read', 'conversation:read', 'avis:read'])]
     #[Gedmo\Versioned]
     private ?string $prenom = null;
 
@@ -134,7 +133,7 @@ abstract class User implements UserInterface, PasswordAuthenticatedUserInterface
         pattern: '/^\+237\s?[26]\d{8}$/',
         message: 'Format camerounais attendu : +237 6XXXXXXXX ou +237 2XXXXXXXX'
     )]
-    #[Groups(['user:read', 'user:write', 'consultation:read', 'message:read', 'conversation:read'])]
+    #[Groups(['user:read', 'user:write'])]
     private ?string $telephone = null;
 
     #[ORM\Column(length: 255, nullable: true)]
@@ -143,7 +142,7 @@ abstract class User implements UserInterface, PasswordAuthenticatedUserInterface
     private ?string $quartier = null;
 
     #[ORM\Column(length: 255, nullable: true)]
-    #[Groups(['user:read', 'user:search', 'user:write', 'consultation:read', 'conversation:read'])]
+    #[Groups(['user:read', 'user:search', 'consultation:read', 'conversation:read'])]
     private ?string $photoProfil = null;
 
     #[ORM\Column]
@@ -430,6 +429,18 @@ abstract class User implements UserInterface, PasswordAuthenticatedUserInterface
     public function setEmailVerificationToken(?string $emailVerificationToken): static
     {
         $this->emailVerificationToken = $emailVerificationToken;
+
+        return $this;
+    }
+
+    public function getEmailVerificationTokenExpiresAt(): ?\DateTimeImmutable
+    {
+        return $this->emailVerificationTokenExpiresAt;
+    }
+
+    public function setEmailVerificationTokenExpiresAt(?\DateTimeImmutable $expiresAt): static
+    {
+        $this->emailVerificationTokenExpiresAt = $expiresAt;
 
         return $this;
     }

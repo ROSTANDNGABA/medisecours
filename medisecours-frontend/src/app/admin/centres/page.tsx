@@ -17,7 +17,7 @@ import { useToast } from '../../../components/ui/Toast'
 import { API_BASE } from '../../../lib/config'
 
 function imgUrl(img: any) {
-  const path = img?.url || `/uploads/media/${img?.filePath || ''}`
+  const path = img?.contentUrl || img?.url || (img?.id ? `/api/media_objects/${img.id}/download` : '')
   return path.startsWith('http') ? path : `${API_BASE}${path}`
 }
 

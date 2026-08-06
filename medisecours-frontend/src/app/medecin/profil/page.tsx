@@ -9,6 +9,7 @@ import { useAuth } from '../../../hooks/useAuth'
 import { imgUrl } from '../../../lib/config'
 import { useToast } from '../../../components/ui/Toast'
 import Avatar from '../../../components/ui/Avatar'
+import CertifiedBadge from '../../../components/ui/CertifiedBadge'
 import LoadingSpinner from '../../../components/ui/LoadingSpinner'
 import { CONVERSATIONS_KEY } from '../../../lib/keys'
 
@@ -26,6 +27,7 @@ export default function MedecinProfilPage() {
   const { user, updateUser } = useAuth()
   const toast = useToast()
   const fileRef = useRef(null)
+  const initializedProfileId = useRef(null)
   const [saving, setSaving] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [avis, setAvis] = useState([])
@@ -41,6 +43,33 @@ export default function MedecinProfilPage() {
     specialite: user?.specialite || '',
   })
   const [dispo, setDispo] = useState(Array.isArray(user?.disponibilites) ? user.disponibilites : [])
+
+  useEffect(() => {
+    if (!user?.id) return
+    if (initializedProfileId.current === user.id) return
+
+    const timer = window.setTimeout(() => {
+      initializedProfileId.current = user.id
+      setForm({
+        prenom: user.prenom || '',
+        nom: user.nom || '',
+        email: user.email || '',
+        telephone: user.telephone || '',
+        specialite: user.specialite || '',
+      })
+      setDispo(Array.isArray(user.disponibilites) ? user.disponibilites : [])
+    }, 0)
+
+    return () => window.clearTimeout(timer)
+  }, [
+    user?.id,
+    user?.prenom,
+    user?.nom,
+    user?.email,
+    user?.telephone,
+    user?.specialite,
+    user?.disponibilites,
+  ])
 
   useEffect(() => {
     if (!user?.id) return
@@ -81,12 +110,26 @@ export default function MedecinProfilPage() {
   }
 
   const handleSave = async () => {
+    const invalidSlot = dispo.find((slot) => !slot.debut || !slot.fin || slot.debut >= slot.fin)
+    if (invalidSlot) {
+      toast.error(`Vérifiez les horaires du ${invalidSlot.jour} : l’heure de fin doit suivre l’heure de début.`)
+      return
+    }
+
     setSaving(true)
     try {
-      const { data } = await api.patch(`/api/users/${user.id}`, { ...form, disponibilites: dispo }, { headers: { 'Content-Type': 'application/merge-patch+json' } })
+      const profilePayload = { ...form }
+      delete profilePayload.email
+      const { data } = await api.patch(`/api/users/${user.id}`, { ...profilePayload, disponibilites: dispo }, { headers: { 'Content-Type': 'application/merge-patch+json' } })
       updateUser({ ...user, ...data })
+      globalMutate((key) => typeof key === 'string' && key.startsWith('/api/medecins-publics'))
       toast.success('Profil mis à jour.')
-    } catch {
+    } catch (error) {
+      const serverMessage = error?.response?.data?.detail || error?.response?.data?.message
+      if (serverMessage) {
+        toast.error(serverMessage)
+        return
+      }
       toast.error('Échec de la mise à jour du profil.')
     } finally {
       setSaving(false)
@@ -96,25 +139,32 @@ export default function MedecinProfilPage() {
   const handleUpload = async (e) => {
     const file = e.target.files?.[0]
     if (!file) return
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+      toast.error('Format non autorise. Utilisez une image JPEG, PNG ou WebP.')
+      e.target.value = ''
+      return
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('La photo ne doit pas depasser 5 Mo.')
+      e.target.value = ''
+      return
+    }
     setUploading(true)
     try {
       const formData = new FormData()
       formData.append('file', file)
-      // Use the working upload endpoint (dedicated controller, not API Platform deserialization)
-      const { data } = await api.post('/api/messages/media/upload', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      })
-      const photoUrl = data.contentUrl || data['@id']
-      const { data: updated } = await api.patch(`/api/users/${user.id}`, { photoProfil: photoUrl }, { headers: { 'Content-Type': 'application/merge-patch+json' } })
-      const nextUser = { ...user, ...updated }
+      const { data } = await api.post('/api/profile/photo', formData)
+      const nextUser = { ...user, photoProfil: data.photoProfil }
       updateUser(nextUser)
       globalMutate(CONVERSATIONS_KEY)
+      globalMutate((key) => typeof key === 'string' && key.startsWith('/api/medecins-publics'))
       toast.success('Photo de profil mise à jour.')
     } catch (err) {
       console.error('Upload error:', err?.response?.data || err)
       toast.error("Échec de l'envoi de la photo.")
     } finally {
       setUploading(false)
+      if (e.target) e.target.value = ''
     }
   }
 
@@ -139,9 +189,12 @@ export default function MedecinProfilPage() {
               >
                 <Camera className="w-3.5 h-3.5" />
               </button>
-              <input ref={fileRef} type="file" accept="image/*" hidden onChange={handleUpload} />
+              <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" hidden onChange={handleUpload} />
             </div>
-            <h2 className="font-display font-bold text-lg text-primary-900 dark:text-sable">Dr. {user.prenom} {user.nom}</h2>
+            <div className="flex items-center justify-center gap-2">
+              <h2 className="font-display font-bold text-lg text-primary-900 dark:text-sable">Dr. {user.prenom} {user.nom}</h2>
+              {user.estValide && <CertifiedBadge className="h-5 w-5" />}
+            </div>
             <span className="inline-block mt-1 mb-3 text-xs font-semibold px-2.5 py-1 rounded-full bg-mint-100 text-mint-700">{user.specialite}</span>
 
             <div className="mb-4">
@@ -183,7 +236,7 @@ export default function MedecinProfilPage() {
             <div className="grid grid-cols-2 gap-4">
               <Field label="Prénom" value={form.prenom} onChange={set('prenom')} />
               <Field label="Nom" value={form.nom} onChange={set('nom')} />
-              <Field label="Email" value={form.email} onChange={set('email')} />
+              <Field label="Email" value={form.email} onChange={set('email')} readOnly />
               <Field label="Téléphone" value={form.telephone} onChange={set('telephone')} />
             </div>
           </div>

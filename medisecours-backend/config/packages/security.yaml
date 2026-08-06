@@ -31,18 +31,33 @@ security:
         - { path: ^/api/auth/verify-email,     methods: [GET],  roles: PUBLIC_ACCESS }
         - { path: ^/api/auth/forgot-password,  methods: [POST], roles: PUBLIC_ACCESS }
         - { path: ^/api/auth/reset-password,   methods: [POST], roles: PUBLIC_ACCESS }
+        - { path: ^/api/auth/resend-verification, methods: [POST], roles: PUBLIC_ACCESS }
+        - { path: ^/api/auth/refresh,          methods: [POST], roles: PUBLIC_ACCESS }
+        - { path: ^/api/auth/logout,           methods: [POST], roles: PUBLIC_ACCESS }
 
         # ── Route legacy désactivée (retourne 410) ────────────────────────────
         - { path: ^/api/login, methods: [POST], roles: PUBLIC_ACCESS }
 
-        # ── Création de compte via API Platform (route alternative) ──────────
-        - { path: ^/api/users, methods: [POST], roles: PUBLIC_ACCESS }
-
         # ── Lecture publique du catalogue et des centres ─────────────────────
         # (visiteurs non connectés peuvent consulter maladies, catégories, centres, premiers soins, avis)
-        - { path: ^/api/(categories|maladies|centre_de_santes|premier_soins|avis), methods: [GET], roles: PUBLIC_ACCESS }
+        - { path: ^/api/centres_de_santes/proches$, methods: [GET], roles: PUBLIC_ACCESS }
+        - { path: ^/api/(categories|centre_de_santes|premier_soins|avis), methods: [GET], roles: PUBLIC_ACCESS }
+        - { path: ^/api/protocole_premiers_gestes, methods: [GET], roles: PUBLIC_ACCESS }
+        - { path: ^/api/public/conditions, methods: [GET], roles: PUBLIC_ACCESS }
+        # API publique dédiée aux premiers gestes (liste, détail, catégories, recherche)
+        - { path: ^/api/public/first-aid-protocols, methods: [GET], roles: PUBLIC_ACCESS }
         # Profils publics des médecins validés (sans données personnelles)
         - { path: ^/api/medecins-publics, methods: [GET], roles: PUBLIC_ACCESS }
+        # Le controleur autorise les medias publics et protege lui-meme les fichiers prives.
+        - { path: ^/api/media_objects/[0-9]+/download$, methods: [GET], roles: PUBLIC_ACCESS }
+
+        # Recherche externe encyclopédique
+        # Triage symptomatique guide
+        - { path: ^/api/maladies/triage, methods: [POST], roles: PUBLIC_ACCESS }
+        - { path: ^/api/orientation/symptomes, methods: [POST], roles: PUBLIC_ACCESS }
+        - { path: ^/api/symptomes, methods: [GET], roles: PUBLIC_ACCESS }
+
+        - { path: ^/api/search-external, methods: [GET], roles: PUBLIC_ACCESS }
 
         # Santé API (monitoring)
         - { path: ^/api/health, methods: [GET], roles: PUBLIC_ACCESS }

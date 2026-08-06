@@ -9,6 +9,7 @@ use ApiPlatform\State\ProviderInterface;
 use App\Repository\MaladieRepository;
 use Symfony\Component\HttpFoundation\RequestStack;
 use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
+use Symfony\Bundle\SecurityBundle\Security;
 
 /**
  * Provider pour la recherche full-text des maladies.
@@ -25,7 +26,8 @@ class MaladieSearchProvider implements ProviderInterface
 {
     public function __construct(
         private readonly MaladieRepository $repository,
-        private readonly RequestStack $requestStack
+        private readonly RequestStack $requestStack,
+        private readonly Security $security,
     ) {
     }
 
@@ -38,10 +40,33 @@ class MaladieSearchProvider implements ProviderInterface
         $limit  = min(50, max(1, (int) $request->query->get('limit', 30)));
         $offset = ($page - 1) * $limit;
 
+        $categorie = $request->query->get('categorie');
+        $categorieId = null;
+        if (is_string($categorie) && $categorie !== '') {
+            $categorieId = ctype_digit($categorie) ? (int) $categorie : (int) basename($categorie);
+            $categorieId = $categorieId > 0 ? $categorieId : null;
+        }
+
+        $urgence = $request->query->has('urgence')
+            ? filter_var($request->query->get('urgence'), FILTER_VALIDATE_BOOL, FILTER_NULL_ON_FAILURE)
+            : null;
+        $contagieux = $request->query->has('contagieux')
+            ? filter_var($request->query->get('contagieux'), FILTER_VALIDATE_BOOL, FILTER_NULL_ON_FAILURE)
+            : null;
         if (mb_strlen(trim($q)) < 2) {
             throw new BadRequestHttpException('Le terme de recherche doit contenir au moins 2 caractères.');
         }
 
-        return $this->repository->searchFullText($q, $limit, $offset);
+        $patientOnly = !$this->security->isGranted('ROLE_ADMIN') && !$this->security->isGranted('ROLE_MEDECIN');
+
+        return $this->repository->searchFullText(
+            $q,
+            $limit,
+            $offset,
+            $categorieId,
+            $urgence,
+            $contagieux,
+            $patientOnly
+        );
     }
 }

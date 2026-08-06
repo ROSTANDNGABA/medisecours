@@ -39,3 +39,35 @@ export const updateCentre = (id: number, data: Record<string, unknown>) => {
 export const deleteCentre = (id: number) => {
   return api.delete(`/api/centre_de_santes/${id}`)
 }
+
+export const getAdminProtocols = (params?: {
+  page?: number
+  itemsPerPage?: number
+  q?: string
+  status?: 'BROUILLON' | 'EN_REVUE' | 'PUBLIE' | 'RETIRE'
+}) => {
+  return api.get('/api/admin/protocoles', { params })
+}
+
+export const updateProtocolStatus = (
+  id: number,
+  data: {
+    statut: 'BROUILLON' | 'EN_REVUE' | 'PUBLIE' | 'RETIRE'
+    sourceClinique?: string
+    commentaire?: string
+  }
+) => {
+  return api.patch(`/api/admin/protocoles/${id}/statut`, data)
+}
+
+export const getProtocolVersions = (slug: string) => {
+  return api.get(`/api/admin/protocoles/versions/by-slug/${encodeURIComponent(slug)}`)
+}
+
+export const createNextProtocolVersion = (id: number) => {
+  return api.post(`/api/admin/protocoles/${id}/versions`)
+}
+
+export const getProtocolObservability = () => {
+  return api.get('/api/admin/protocoles/observabilite')
+}

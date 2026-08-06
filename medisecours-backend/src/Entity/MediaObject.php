@@ -21,10 +21,10 @@ use Vich\UploaderBundle\Mapping\Annotation as Vich;
 #[Vich\Uploadable]
 #[ApiResource(
     operations: [
-        new GetCollection(),
-        new Get(),
+        new GetCollection(security: "is_granted('ROLE_ADMIN')"),
+        new Get(security: "object.isPublic() or is_granted('ROLE_ADMIN') or object.getUploadedBy() == user"),
         new Post(
-            security: "is_granted('ROLE_USER')",
+            security: "is_granted('ROLE_ADMIN')",
             processor: MediaObjectProcessor::class,
             inputFormats: [
                 'json' => ['application/json'],
@@ -93,6 +93,9 @@ class MediaObject
     #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
     #[Groups(['media:write', 'media:read'])]
     private ?Maladie $maladie = null;
+
+    #[ORM\Column(type: 'boolean', options: ['default' => true])]
+    private bool $isPublic = true;
 
     public function __construct()
     {
@@ -165,7 +168,19 @@ class MediaObject
     #[Groups(['media:read', 'centre_sante:read', 'categorie:read', 'maladie:read', 'message:read', 'conversation:read'])]
     public function getContentUrl(): ?string
     {
-        return $this->filePath ? '/uploads/media/' . $this->filePath : null;
+        return $this->filePath ? '/api/media_objects/' . $this->id . '/download' : null;
+    }
+
+    public function isPublic(): bool
+    {
+        return $this->isPublic;
+    }
+
+    public function setIsPublic(bool $isPublic): static
+    {
+        $this->isPublic = $isPublic;
+
+        return $this;
     }
 
     public function setSize(?int $size): static

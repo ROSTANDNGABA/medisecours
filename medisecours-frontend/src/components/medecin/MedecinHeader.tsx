@@ -4,6 +4,7 @@ import { useState, useRef, useEffect, useCallback } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import { Search, ChevronDown, User, Loader2, Stethoscope, Building2, Activity, MessageCircle, Bell, MessageSquare, Clock, LogOut } from 'lucide-react'
 import Avatar from '../ui/Avatar'
+import CertifiedBadge from '../ui/CertifiedBadge'
 import { useAuth } from '../../hooks/useAuth'
 import api from '../../api/axios'
 import { imgUrl } from '../../lib/config'
@@ -324,9 +325,12 @@ export default function MedecinHeader() {
         >
           <Avatar name={`${user?.prenom || ''} ${user?.nom || ''}`} size="sm" src={photoUrl} />
           <div className="hidden text-left sm:block">
-            <p className="text-sm font-semibold text-[#0F2C52]">
-              Dr. {user?.prenom} {user?.nom}
-            </p>
+            <div className="flex items-center gap-1.5">
+              <p className="text-sm font-semibold text-[#0F2C52]">
+                Dr. {user?.prenom} {user?.nom}
+              </p>
+              {user?.estValide && <CertifiedBadge className="h-4 w-4" />}
+            </div>
             <p className="text-xs text-[#6B7280]">Médecin</p>
           </div>
           <ChevronDown className="hidden h-4 w-4 text-[#6B7280] sm:block" />
@@ -334,7 +338,10 @@ export default function MedecinHeader() {
         {profileOpen && (
           <div className="absolute right-0 top-full mt-2 w-52 rounded-xl border border-[#E5E7EB] bg-white shadow-lg overflow-hidden">
             <div className="border-b border-[#E5E7EB] px-4 py-3 sm:hidden">
-              <p className="text-sm font-semibold text-[#0F2C52]">Dr. {user?.prenom} {user?.nom}</p>
+              <div className="flex items-center gap-1.5">
+                <p className="text-sm font-semibold text-[#0F2C52]">Dr. {user?.prenom} {user?.nom}</p>
+                {user?.estValide && <CertifiedBadge className="h-4 w-4" />}
+              </div>
               <p className="text-xs text-[#6B7280]">Médecin</p>
             </div>
             <button
