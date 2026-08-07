@@ -28,6 +28,12 @@ chown -R www-data:www-data var/
 php bin/console cache:clear --env=prod --no-debug
 php bin/console cache:warmup --env=prod --no-debug
 
+# Cache generation runs as root in the container. Restore runtime ownership
+# before PHP-FPM starts so VichUploader can update its metadata cache.
+mkdir -p var/cache/prod/vich_uploader var/log var/uploads/media
+chown -R www-data:www-data var/cache var/log var/uploads
+chmod -R 775 var/cache var/log var/uploads
+
 echo "==> Running database migrations..."
 migration_attempt=1
 until php bin/console doctrine:migrations:migrate --no-interaction --allow-no-migration --env=prod; do
