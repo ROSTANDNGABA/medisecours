@@ -1,5 +1,5 @@
 # ── Stage 1 : Build ──────────────────────────────────────────────────────────
-FROM php:8.2-fpm-alpine AS builder
+FROM php:8.3-fpm-alpine AS builder
 
 # Extensions PHP requises
 RUN apk add --no-cache \
@@ -51,7 +51,7 @@ COPY . .
 RUN composer dump-autoload --optimize --no-dev
 
 # ── Stage 2 : Production ─────────────────────────────────────────────────────
-FROM php:8.2-fpm-alpine AS production
+FROM php:8.3-fpm-alpine AS production
 
 RUN apk add --no-cache \
     nginx \
