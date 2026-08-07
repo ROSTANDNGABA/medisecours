@@ -33,6 +33,8 @@ final class SecurityHardeningTest extends KernelTestCase
         self::assertNotNull($routes->get('api_public_conditions'));
         self::assertNotNull($routes->get('api_public_condition_detail'));
         self::assertNotNull($routes->get('api_patient_symptom_orientation'));
+        self::assertNotNull($routes->get('api_root'));
+        self::assertNotNull($routes->get('api_health'));
     }
 
     public function testAdminUserRoutesAreNotDuplicated(): void

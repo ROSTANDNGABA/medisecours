@@ -15,6 +15,16 @@ use Symfony\Component\Routing\Annotation\Route;
  */
 class HealthController extends AbstractController
 {
+    #[Route('/', name: 'api_root', methods: ['GET'])]
+    public function index(): JsonResponse
+    {
+        return new JsonResponse([
+            'name' => 'MediSecours API',
+            'status' => 'online',
+            'health' => '/api/health',
+        ]);
+    }
+
     #[Route('/api/health', name: 'api_health', methods: ['GET'])]
     public function health(EntityManagerInterface $entityManager): JsonResponse
     {
