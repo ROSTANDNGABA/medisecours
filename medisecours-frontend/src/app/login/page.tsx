@@ -9,16 +9,11 @@ import AuthLayout from '../../components/auth/AuthLayout'
 import { useAuth } from '../../hooks/useAuth'
 import { useToast } from '../../components/ui/Toast'
 import api from '../../api/axios'
+import { destinationForUser } from '../../lib/auth-routing'
 
 type FieldErrors = {
   email?: string
   password?: string
-}
-
-function destinationFor(user: { roles?: string[] }, requestedPath: string) {
-  if (user.roles?.includes('ROLE_ADMIN')) return '/admin'
-  if (user.roles?.includes('ROLE_MEDECIN')) return '/medecin'
-  return requestedPath
 }
 
 export default function LoginPage() {
@@ -47,7 +42,7 @@ function LoginForm() {
 
   useEffect(() => {
     if (mounted && isAuthenticated && user) {
-      router.replace(destinationFor(user, from))
+      router.replace(destinationForUser(user, from))
     }
   }, [from, isAuthenticated, mounted, router, user])
 
@@ -75,7 +70,7 @@ function LoginForm() {
     try {
       const loggedUser = await login(email.trim().toLowerCase(), password)
       toast.success('Connexion réussie. Bienvenue !')
-      router.push(destinationFor(loggedUser, from))
+      router.push(destinationForUser(loggedUser, from))
     } catch (error: any) {
       const status = error.response?.status
       const serverMessage = error.response?.data?.error || error.response?.data?.message
@@ -130,7 +125,7 @@ function LoginForm() {
     try {
       const loggedUser = await loginWithGoogle(credentialResponse.credential)
       toast.success('Connexion Google réussie.')
-      router.push(destinationFor(loggedUser, from))
+      router.push(destinationForUser(loggedUser, from))
     } catch (error: any) {
       const status = error.response?.status
       const message = error.response?.data?.error || error.response?.data?.message

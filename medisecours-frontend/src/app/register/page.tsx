@@ -25,6 +25,7 @@ import {
 import AuthLayout from '../../components/auth/AuthLayout'
 import { useAuth } from '../../hooks/useAuth'
 import { useToast } from '../../components/ui/Toast'
+import { destinationForUser } from '../../lib/auth-routing'
 
 type AccountType = 'patient' | 'medecin'
 
@@ -256,9 +257,9 @@ export default function RegisterPage() {
 
     setLoading(true)
     try {
-      await loginWithGoogle(credentialResponse.credential)
-      toast.success('Votre compte patient Google est prêt.')
-      router.push('/')
+      const loggedUser = await loginWithGoogle(credentialResponse.credential)
+      toast.success('Connexion Google réussie.')
+      router.push(destinationForUser(loggedUser))
     } catch (error: any) {
       const message = error.response?.data?.error || error.response?.data?.message
       toast.error(message || 'L’inscription avec Google a échoué.')

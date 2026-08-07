@@ -14,12 +14,16 @@ mkdir -p config/jwt
 if [ -n "${JWT_PRIVATE_KEY_BASE64:-}" ] && [ -n "${JWT_PUBLIC_KEY_BASE64:-}" ]; then
     printf '%s' "$JWT_PRIVATE_KEY_BASE64" | base64 -d > config/jwt/private.pem
     printf '%s' "$JWT_PUBLIC_KEY_BASE64" | base64 -d > config/jwt/public.pem
-    chmod 600 config/jwt/private.pem
-    chmod 644 config/jwt/public.pem
 elif [ ! -s config/jwt/private.pem ] || [ ! -s config/jwt/public.pem ]; then
     echo "ERROR: JWT_PRIVATE_KEY_BASE64 and JWT_PUBLIC_KEY_BASE64 are required."
     exit 1
 fi
+
+# PHP-FPM signs access tokens as www-data. Keep the private key restricted to
+# that runtime user instead of leaving it readable only by root.
+chown www-data:www-data config/jwt/private.pem config/jwt/public.pem
+chmod 600 config/jwt/private.pem
+chmod 644 config/jwt/public.pem
 
 # /app/var/uploads may be backed by a Render persistent disk.
 mkdir -p var/cache var/log var/uploads/media
