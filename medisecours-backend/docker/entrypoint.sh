@@ -42,20 +42,6 @@ if [ -z "$private_fp" ] || [ "$private_fp" != "$public_fp" ]; then
 fi
 echo "==> JWT keys validated (private + public match, passphrase OK)."
 
-# TEMP-DIAG: SMTP connectivity probe (removed after diagnosis)
-echo "==> SMTP connectivity probe (Brevo)..."
-for port in 587 465 2525; do
-    if php -r '
-        $port = (int) $argv[1];
-        $t = @stream_socket_client("tcp://smtp-relay.brevo.com:{$port}", $errno, $errstr, 5);
-        if ($t) { echo "OK\n"; fclose($t); } else { echo "FAIL {$errstr}\n"; }
-    ' "$port" 2>/dev/null | grep -q '^OK'; then
-        echo "  smtp-relay.brevo.com:${port} -> reachable"
-    else
-        echo "  smtp-relay.brevo.com:${port} -> NOT reachable"
-    fi
-done
-
 # PHP-FPM signs access tokens as www-data. Keep the private key restricted to
 # that runtime user instead of leaving it readable only by root.
 chown www-data:www-data config/jwt/private.pem config/jwt/public.pem
