@@ -19,6 +19,29 @@ elif [ ! -s config/jwt/private.pem ] || [ ! -s config/jwt/public.pem ]; then
     exit 1
 fi
 
+# Strict validation BEFORE boot: a bad key or passphrase currently produces a
+# silent runtime 500 on login (JWTEncodeFailureException). Reject it here with
+# a clear message instead.
+JWT_PASSPHRASE="${JWT_PASSPHRASE:-}"
+if ! openssl pkey -in config/jwt/private.pem -passin "pass:${JWT_PASSPHRASE}" -noout 2>/dev/null; then
+    echo "ERROR: JWT private key is invalid or JWT_PASSPHRASE does not match it."
+    echo "       Check that JWT_PRIVATE_KEY_BASE64 (decoded) is a real private.pem and"
+    echo "       that JWT_PASSPHRASE equals the passphrase used to generate the key."
+    exit 1
+fi
+if ! openssl pkey -pubin -in config/jwt/public.pem -noout 2>/dev/null; then
+    echo "ERROR: JWT public key is invalid. Check JWT_PUBLIC_KEY_BASE64 (decoded)."
+    exit 1
+fi
+private_fp="$(openssl pkey -in config/jwt/private.pem -passin "pass:${JWT_PASSPHRASE}" -pubout 2>/dev/null | openssl pkey -pubin -outform DER 2>/dev/null | openssl sha1 -r 2>/dev/null | cut -d' ' -f1)"
+public_fp="$(openssl pkey -pubin -in config/jwt/public.pem -outform DER 2>/dev/null | openssl sha1 -r 2>/dev/null | cut -d' ' -f1)"
+if [ -z "$private_fp" ] || [ "$private_fp" != "$public_fp" ]; then
+    echo "ERROR: JWT public key does not match the private key."
+    echo "       JWT_PUBLIC_KEY_BASE64 must be the public.pem paired with JWT_PRIVATE_KEY_BASE64."
+    exit 1
+fi
+echo "==> JWT keys validated (private + public match, passphrase OK)."
+
 # PHP-FPM signs access tokens as www-data. Keep the private key restricted to
 # that runtime user instead of leaving it readable only by root.
 chown www-data:www-data config/jwt/private.pem config/jwt/public.pem
