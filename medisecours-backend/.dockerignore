@@ -1,6 +1,8 @@
 .git
 .gitignore
 .env
+.env.dev
+.env.test
 .env.local
 .env.prod
 .env.*.local
