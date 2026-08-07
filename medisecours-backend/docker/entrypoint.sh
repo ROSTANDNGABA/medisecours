@@ -41,14 +41,39 @@ until php bin/console doctrine:migrations:migrate --no-interaction --allow-no-mi
     sleep 5
 done
 
+echo "==> Starting PHP-FPM and Nginx..."
+"$@" &
+server_pid=$!
+
+stop_server() {
+    kill -TERM "$server_pid" 2>/dev/null || true
+    wait "$server_pid" 2>/dev/null || true
+}
+
+trap stop_server INT TERM
+
+# Make the HTTP port available to Render before the potentially long initial
+# catalogue import. The import remains blocking for this entrypoint: if it
+# fails, the web server is stopped and the deployment fails.
+sleep 1
+if ! kill -0 "$server_pid" 2>/dev/null; then
+    echo "ERROR: Web services stopped before becoming ready."
+    wait "$server_pid"
+    exit 1
+fi
+
 if [ "${BOOTSTRAP_REFERENCE_DATA:-1}" = "1" ]; then
     echo "==> Loading versioned medical reference data..."
-    php bin/console app:bootstrap-reference-data \
+    if ! php bin/console app:bootstrap-reference-data \
         --no-interaction \
-        --catalog-version="${REFERENCE_DATA_VERSION:-2026-08-07.1}"
+        --catalog-version="${REFERENCE_DATA_VERSION:-2026-08-07.1}"; then
+        echo "ERROR: Reference data bootstrap failed."
+        stop_server
+        exit 1
+    fi
 else
     echo "==> Reference data bootstrap disabled."
 fi
 
-echo "==> Ready. Starting services..."
-exec "$@"
+echo "==> Ready. Reference data is available."
+wait "$server_pid"
