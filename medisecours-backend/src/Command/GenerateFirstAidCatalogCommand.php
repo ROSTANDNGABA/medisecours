@@ -20,6 +20,7 @@ use Symfony\Component\Console\Output\OutputInterface;
 )]
 final class GenerateFirstAidCatalogCommand extends Command
 {
+    private const BATCH_SIZE = 25;
     private const IFRC_SOURCE = 'IFRC, International first aid, resuscitation and education guidelines 2025, https://www.ifrc.org/document/ifrc-international-first-aid-resuscitation-and-education-guidelines-2025';
     private const WHO_BEC_SOURCE = 'OMS/CICR, Basic Emergency Care, 2018, https://www.who.int/publications/i/item/9789241513081';
     private const ERC_BLS_SOURCE = 'European Resuscitation Council Guidelines 2025, Adult Basic Life Support, https://www.erc.edu/science-research/guidelines/guidelines-2025/';
@@ -286,6 +287,7 @@ final class GenerateFirstAidCatalogCommand extends Command
         $created = 0;
         $skipped = 0;
         $updated = 0;
+        $processed = 0;
 
         foreach ($topics as $masterSlug => $metadata) {
             foreach (self::VARIANTS as $variantKey => $variant) {
@@ -321,9 +323,18 @@ final class GenerateFirstAidCatalogCommand extends Command
                             )
                         );
                         ++$updated;
+                        ++$processed;
+                        if (($processed % self::BATCH_SIZE) === 0) {
+                            $this->entityManager->flush();
+                            $this->entityManager->clear();
+                        }
                         continue;
                     }
                     ++$skipped;
+                    ++$processed;
+                    if (($processed % self::BATCH_SIZE) === 0) {
+                        $this->entityManager->clear();
+                    }
                     continue;
                 }
 
@@ -357,6 +368,12 @@ final class GenerateFirstAidCatalogCommand extends Command
 
                 $this->entityManager->persist($protocol);
                 ++$created;
+                ++$processed;
+
+                if (($processed % self::BATCH_SIZE) === 0) {
+                    $this->entityManager->flush();
+                    $this->entityManager->clear();
+                }
             }
         }
 

@@ -4,8 +4,7 @@ declare(strict_types=1);
 
 namespace App\Command;
 
-use App\Entity\Maladie;
-use Doctrine\ORM\EntityManagerInterface;
+use Doctrine\DBAL\Connection;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
@@ -19,59 +18,54 @@ final class BuildPatientDiseaseCatalogCommand extends Command
 {
     private const TARGET_SIZE = 200;
 
-    public function __construct(private readonly EntityManagerInterface $entityManager)
+    public function __construct(private readonly Connection $connection)
     {
         parent::__construct();
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
-        /** @var Maladie[] $maladies */
-        $maladies = $this->entityManager->getRepository(Maladie::class)
-            ->createQueryBuilder('m')
-            ->leftJoin('m.symptomesStructures', 'ms')->addSelect('ms')
-            ->leftJoin('m.premiersSoins', 'ps')->addSelect('ps')
-            ->orderBy('m.id', 'ASC')
-            ->getQuery()
-            ->getResult();
-
-        if (count($maladies) < self::TARGET_SIZE) {
-            $output->writeln(sprintf('<error>Seulement %d maladies disponibles. Il en faut au moins %d.</error>', count($maladies), self::TARGET_SIZE));
+        $diseaseCount = (int) $this->connection->fetchOne('SELECT COUNT(*) FROM maladie');
+        if ($diseaseCount < self::TARGET_SIZE) {
+            $output->writeln(sprintf('<error>Seulement %d maladies disponibles. Il en faut au moins %d.</error>', $diseaseCount, self::TARGET_SIZE));
             return Command::FAILURE;
         }
 
-        $ranked = array_map(static function (Maladie $maladie): array {
-            $score = 0;
-            $score += $maladie->getSymptomesStructures()->count() > 0 ? 40 : 0;
-            $score += $maladie->getPremiersSoins()->count() > 0 ? 25 : 0;
-            $score += trim((string) $maladie->getSymptomes()) !== '' ? 15 : 0;
-            $score += trim((string) $maladie->getDescription()) !== '' ? 10 : 0;
-            $score += trim((string) $maladie->getCauses()) !== '' ? 5 : 0;
-            $score += $maladie->isIsAccident() ? 5 : 0;
-
-            return ['maladie' => $maladie, 'score' => $score];
-        }, $maladies);
-
-        usort($ranked, static function (array $a, array $b): int {
-            $score = $b['score'] <=> $a['score'];
-            return $score !== 0 ? $score : (($a['maladie']->getId() ?? 0) <=> ($b['maladie']->getId() ?? 0));
-        });
-
-        foreach ($maladies as $maladie) {
-            $maladie
-                ->setPatientVisible(false)
-                ->setPatientPriority(null);
-        }
-
-        foreach (array_slice($ranked, 0, self::TARGET_SIZE) as $index => $row) {
-            /** @var Maladie $maladie */
-            $maladie = $row['maladie'];
-            $maladie
-                ->setPatientVisible(true)
-                ->setPatientPriority($index + 1);
-        }
-
-        $this->entityManager->flush();
+        $this->connection->executeStatement(
+            'UPDATE maladie SET patient_visible = FALSE, patient_priority = NULL'
+        );
+        $this->connection->executeStatement(
+            <<<'SQL'
+                WITH scored AS (
+                    SELECT
+                        m.id,
+                        (
+                            CASE WHEN EXISTS (SELECT 1 FROM maladie_symptome ms WHERE ms.maladie_id = m.id) THEN 40 ELSE 0 END
+                            + CASE WHEN EXISTS (SELECT 1 FROM premier_soin ps WHERE ps.maladie_id = m.id) THEN 25 ELSE 0 END
+                            + CASE WHEN NULLIF(BTRIM(m.symptomes), '') IS NOT NULL THEN 15 ELSE 0 END
+                            + CASE WHEN NULLIF(BTRIM(m.description), '') IS NOT NULL THEN 10 ELSE 0 END
+                            + CASE WHEN NULLIF(BTRIM(m.causes), '') IS NOT NULL THEN 5 ELSE 0 END
+                            + CASE WHEN m.is_accident = TRUE THEN 5 ELSE 0 END
+                        ) AS score
+                    FROM maladie m
+                ),
+                ranked AS (
+                    SELECT
+                        s.id,
+                        ROW_NUMBER() OVER (
+                            ORDER BY s.score DESC, s.id ASC
+                        ) AS priority
+                    FROM scored s
+                    ORDER BY s.score DESC, s.id ASC
+                    LIMIT 200
+                )
+                UPDATE maladie m
+                SET patient_visible = TRUE,
+                    patient_priority = ranked.priority
+                FROM ranked
+                WHERE m.id = ranked.id
+            SQL
+        );
         $output->writeln('<info>200 fiches sont maintenant visibles dans le catalogue patient.</info>');
         $output->writeln('<comment>Cette selection repose sur la qualite et la completude des donnees disponibles.</comment>');
 

@@ -22,6 +22,7 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 )]
 final class BuildSymptomIndexCommand extends Command
 {
+    private const BATCH_SIZE = 25;
     private const SYNONYMS = [
         'fievre' => ['temperature elevee', 'fièvre', 'etat febrile'],
         'maux de tete' => ['mal de tete', 'cephalee', 'céphalée'],
@@ -49,10 +50,20 @@ final class BuildSymptomIndexCommand extends Command
         $createdSymptoms = 0;
         $createdLinks = 0;
 
-        /** @var Maladie[] $maladies */
-        $maladies = $this->maladieRepository->findAll();
+        $processed = 0;
+        $symptomCache = [];
+        /** @var iterable<Maladie> $maladies */
+        $maladies = $this->maladieRepository->createQueryBuilder('m')
+            ->orderBy('m.id', 'ASC')
+            ->getQuery()
+            ->toIterable();
         foreach ($maladies as $maladie) {
             if ($maladie->getSymptomesStructures()->count() > 0) {
+                ++$processed;
+                if (($processed % self::BATCH_SIZE) === 0) {
+                    $this->entityManager->clear();
+                    $symptomCache = [];
+                }
                 continue;
             }
 
@@ -63,7 +74,7 @@ final class BuildSymptomIndexCommand extends Command
                     continue;
                 }
 
-                $symptom = $this->symptomeRepository->findOneBy(['slug' => $slug]);
+                $symptom = $symptomCache[$slug] ?? $this->symptomeRepository->findOneBy(['slug' => $slug]);
                 if (!$symptom) {
                     $symptom = (new Symptome())
                         ->setNom($term)
@@ -73,6 +84,7 @@ final class BuildSymptomIndexCommand extends Command
                     $this->entityManager->persist($symptom);
                     ++$createdSymptoms;
                 }
+                $symptomCache[$slug] = $symptom;
 
                 $link = (new MaladieSymptome())
                     ->setMaladie($maladie)
@@ -84,6 +96,13 @@ final class BuildSymptomIndexCommand extends Command
                 $maladie->addSymptomeStructure($link);
                 $this->entityManager->persist($link);
                 ++$createdLinks;
+            }
+
+            ++$processed;
+            if (($processed % self::BATCH_SIZE) === 0) {
+                $this->entityManager->flush();
+                $this->entityManager->clear();
+                $symptomCache = [];
             }
         }
 

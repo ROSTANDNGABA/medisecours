@@ -20,6 +20,7 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 class LoadMaladiesFromJsonCommand extends Command
 {
     private const JSON_PATH = __DIR__ . '/../../data/maladies.json';
+    private const BATCH_SIZE = 25;
 
     public function __construct(
         private readonly EntityManagerInterface $entityManager,
@@ -109,6 +110,12 @@ class LoadMaladiesFromJsonCommand extends Command
             }
 
             $categoriesCount[$catName] = ($categoriesCount[$catName] ?? 0) + 1;
+
+            if (!$dryRun && (($imported + $updated) % self::BATCH_SIZE) === 0) {
+                $this->entityManager->flush();
+                $this->entityManager->clear();
+                $categoryCache = [];
+            }
         }
 
         if (!$dryRun) {

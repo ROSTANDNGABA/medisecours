@@ -41,5 +41,14 @@ until php bin/console doctrine:migrations:migrate --no-interaction --allow-no-mi
     sleep 5
 done
 
+if [ "${BOOTSTRAP_REFERENCE_DATA:-1}" = "1" ]; then
+    echo "==> Loading versioned medical reference data..."
+    php bin/console app:bootstrap-reference-data \
+        --no-interaction \
+        --catalog-version="${REFERENCE_DATA_VERSION:-2026-08-07.1}"
+else
+    echo "==> Reference data bootstrap disabled."
+fi
+
 echo "==> Ready. Starting services..."
 exec "$@"

@@ -151,7 +151,7 @@ class Maladie
     /**
      * @var Collection<int, PremierSoin>
      */
-    #[ORM\OneToMany(targetEntity: PremierSoin::class, mappedBy: 'maladie', cascade: ['persist', 'remove'])]
+    #[ORM\OneToMany(targetEntity: PremierSoin::class, mappedBy: 'maladie', cascade: ['persist', 'remove'], orphanRemoval: true)]
     #[Groups(['maladie:read'])]
     private Collection $premiersSoins;
 
