@@ -408,7 +408,7 @@ composer install
 Configurer `.env` ou `.env.local` :
 
 ```dotenv
-DATABASE_URL="postgresql://postgres:albert123@127.0.0.1:5432/medisecours_db?serverVersion=18&charset=utf8"
+DATABASE_URL="postgresql://postgres:your_local_password@127.0.0.1:5432/medisecours_db?serverVersion=18&charset=utf8"
 
 JWT_SECRET_KEY=%kernel.project_dir%/config/jwt/private.pem
 JWT_PUBLIC_KEY=%kernel.project_dir%/config/jwt/public.pem
