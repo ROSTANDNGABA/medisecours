@@ -8,7 +8,7 @@ use Doctrine\ORM\Mapping as ORM;
 
 #[ORM\Entity(readOnly: true)]
 #[ORM\Table(name: 'reference_data_version')]
-final class ReferenceDataVersion
+class ReferenceDataVersion
 {
     #[ORM\Id]
     #[ORM\Column(length: 100)]
