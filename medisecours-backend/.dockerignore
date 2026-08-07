@@ -1,5 +1,6 @@
 .git
 .gitignore
+.env
 .env.local
 .env.prod
 .env.*.local

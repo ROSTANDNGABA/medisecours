@@ -48,6 +48,13 @@ RUN composer install \
 
 COPY . .
 
+# Symfony Runtime requires a readable base .env file. Production values are
+# injected by Render and take precedence over these non-secret defaults.
+RUN printf '%s\n' \
+        'APP_ENV=prod' \
+        'APP_DEBUG=0' \
+    > .env
+
 RUN composer dump-autoload --optimize --no-dev
 
 # ── Stage 2 : Production ─────────────────────────────────────────────────────
