@@ -74,6 +74,17 @@ until php bin/console doctrine:migrations:migrate --no-interaction --allow-no-mi
     sleep 5
 done
 
+# One-off admin bootstrap: if CREATE_ADMIN_EMAIL / CREATE_ADMIN_PASSWORD are
+# set, create or update the admin account (idempotent, CLI-created emails are
+# marked verified). Unset these env vars in Render once done.
+if [ -n "${CREATE_ADMIN_EMAIL:-}" ] && [ -n "${CREATE_ADMIN_PASSWORD:-}" ]; then
+    echo "==> Creating/updating admin account..."
+    php bin/console app:create-admin "${CREATE_ADMIN_EMAIL}" "${CREATE_ADMIN_PASSWORD}" --no-interaction || {
+        echo "ERROR: app:create-admin failed."
+        exit 1
+    }
+fi
+
 echo "==> Starting PHP-FPM and Nginx..."
 "$@" &
 server_pid=$!
