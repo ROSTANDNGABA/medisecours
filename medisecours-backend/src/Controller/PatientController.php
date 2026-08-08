@@ -2,9 +2,9 @@
 
 namespace App\Controller;
 
-use App\Entity\User;
+use App\Entity\Medecin;
+use App\Repository\UserRepository;
 use App\Service\UserSerializer;
-use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -14,26 +14,27 @@ use Symfony\Component\Routing\Annotation\Route;
 class PatientController extends AbstractController
 {
     #[Route('', methods: ['GET'])]
-    public function index(Request $request, EntityManagerInterface $em, UserSerializer $userSerializer): JsonResponse
+    public function index(
+        Request $request,
+        UserRepository $userRepository,
+        UserSerializer $userSerializer
+    ): JsonResponse
     {
         $this->denyAccessUnlessGranted('ROLE_MEDECIN');
 
-        $qb = $em->getRepository(User::class)->createQueryBuilder('u')
-            ->where("u INSTANCE OF App\Entity\Patient")
-            ->andWhere('u.actif = :actif')
-            ->setParameter('actif', true)
-            ->orderBy('u.nom', 'ASC')
-            ->addOrderBy('u.prenom', 'ASC');
-
-        $search = $request->query->get('search');
-        if ($search && strlen(trim($search)) >= 2) {
-            $qb->andWhere('(LOWER(u.nom) LIKE :q OR LOWER(u.prenom) LIKE :q OR LOWER(u.email) LIKE :q OR u.telephone LIKE :q)')
-               ->setParameter('q', '%' . mb_strtolower(trim($search)) . '%');
+        $medecin = $this->getUser();
+        if (!$medecin instanceof Medecin) {
+            throw $this->createAccessDeniedException('Accès réservé aux médecins.');
         }
 
-        $patients = $qb->getQuery()->getResult();
-
-        $data = array_map(fn($u) => $userSerializer->serialize($u), $patients);
+        $patients = $userRepository->findActivePatientsForMedecin(
+            $medecin,
+            $request->query->getString('search')
+        );
+        $data = array_map(
+            static fn($patient) => $userSerializer->serialize($patient),
+            $patients
+        );
 
         return $this->json($data);
     }

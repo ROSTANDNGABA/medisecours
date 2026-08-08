@@ -3,7 +3,7 @@
 
 import { useState, useMemo } from 'react'
 import useSWR from 'swr'
-import { FileText, Save, Printer, CheckCircle2, ChevronRight, Search, Stethoscope, User, Calendar } from 'lucide-react'
+import { ArrowLeft, FileText, Save, Printer, CheckCircle2, ChevronRight, Search, Stethoscope, User } from 'lucide-react'
 import api from '../../../api/axios'
 import { fetcher } from '../../../lib/fetcher'
 import { useAuth } from '../../../hooks/useAuth'
@@ -121,16 +121,20 @@ export default function MedecinRapportsPage() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
-      <div className="mb-6">
-        <h2 className="font-display font-bold text-2xl text-[#0F2C52]">Rapports de consultation</h2>
+    <div className="flex h-[calc(100dvh-4rem)] min-h-0 flex-col overflow-hidden">
+      <div className={`mx-auto w-full max-w-7xl shrink-0 px-4 pb-4 pt-5 sm:px-6 lg:pb-6 lg:pt-8 ${
+        selectedId ? 'hidden lg:block' : 'block'
+      }`}>
+        <h2 className="font-display text-xl font-bold text-[#0F2C52] sm:text-2xl">Rapports de consultation</h2>
         <p className="mt-1 text-sm text-[#6B7280]">Rédigez vos comptes-rendus médicaux pour chaque consultation.</p>
       </div>
 
-      <div className="flex flex-col lg:flex-row gap-6">
+      <div className="mx-auto flex min-h-0 w-full max-w-7xl flex-1 lg:gap-6 lg:px-6 lg:pb-8">
         {/* Left panel — consultation list */}
-        <div className="w-full lg:w-[380px] shrink-0">
-          <div className="rounded-2xl border border-[#E5E7EB] bg-white overflow-hidden">
+        <div className={`h-full w-full shrink-0 lg:w-[380px] ${
+          selectedId ? 'hidden lg:block' : 'block'
+        }`}>
+          <div className="flex h-full flex-col overflow-hidden border-y border-[#E5E7EB] bg-white lg:rounded-2xl lg:border">
             <div className="border-b border-[#E5E7EB] px-4 py-3">
               <div className="relative">
                 <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#9CA3AF]" />
@@ -143,7 +147,7 @@ export default function MedecinRapportsPage() {
                 />
               </div>
             </div>
-            <div className="max-h-[calc(100vh-300px)] overflow-y-auto">
+            <div className="min-h-0 flex-1 overflow-y-auto">
               {filtered.length === 0 ? (
                 <EmptyState icon={Stethoscope} title="Aucune consultation" description="Pas encore de consultations à traiter." />
               ) : (
@@ -185,7 +189,9 @@ export default function MedecinRapportsPage() {
         </div>
 
         {/* Right panel — report editor */}
-        <div className="flex-1 min-w-0">
+        <div className={`min-w-0 flex-1 overflow-y-auto ${
+          selectedId ? 'block' : 'hidden lg:block'
+        }`}>
           {!selected ? (
             <div className="rounded-2xl border border-[#E5E7EB] bg-white flex flex-col items-center justify-center py-20 px-6">
               <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-[#F3F4F6] mb-4">
@@ -197,24 +203,45 @@ export default function MedecinRapportsPage() {
               </p>
             </div>
           ) : (
-            <div className="rounded-2xl border border-[#E5E7EB] bg-white overflow-hidden">
+            <>
+              <div className="sticky top-0 z-20 flex items-center gap-3 border-b border-[#E5E7EB] bg-white px-4 py-3 lg:hidden">
+                <button
+                  type="button"
+                  onClick={() => setSelectedId(null)}
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-[#6B7280] transition hover:bg-[#F3F4F6]"
+                  aria-label="Retour à la liste des rapports"
+                >
+                  <ArrowLeft className="h-5 w-5" />
+                </button>
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#3B6EF8]/10">
+                  <FileText className="h-4 w-4 text-[#3B6EF8]" />
+                </div>
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-bold text-[#0F2C52]">
+                    {selected.patient?.prenom || ''} {selected.patient?.nom || ''}
+                  </p>
+                  <p className="text-[11px] text-[#9CA3AF]">Compte-rendu médical</p>
+                </div>
+              </div>
+
+              <div className="overflow-hidden border-y border-[#E5E7EB] bg-white lg:rounded-2xl lg:border">
               {/* Patient info header */}
-              <div className="border-b border-[#E5E7EB] px-6 py-4 bg-[#F8FAFF]">
-                <div className="flex items-center justify-between flex-wrap gap-3">
-                  <div className="flex items-center gap-3">
+              <div className="border-b border-[#E5E7EB] bg-[#F8FAFF] px-4 py-4 sm:px-6">
+                <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+                  <div className="flex min-w-0 items-center gap-3">
                     <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#3B6EF8]/10">
                       <User className="h-5 w-5 text-[#3B6EF8]" />
                     </div>
-                    <div>
-                      <p className="text-sm font-bold text-[#0F2C52]">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-bold text-[#0F2C52]">
                         {selected.patient?.prenom || ''} {selected.patient?.nom || ''}
                       </p>
-                      <p className="text-xs text-[#6B7280]">
+                      <p className="break-words text-xs text-[#6B7280]">
                         Consultation du {formatDate(selected.createdAt)} {selected.motif ? `· ${selected.motif}` : ''}
                       </p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-semibold ${
                       selected.statut === 'TERMINEE' ? 'bg-emerald-100 text-emerald-700' :
                       selected.statut === 'EN_COURS' ? 'bg-amber-100 text-amber-700' :
@@ -232,7 +259,7 @@ export default function MedecinRapportsPage() {
               </div>
 
               {/* Form */}
-              <div className="px-6 py-5 space-y-5">
+              <div className="space-y-5 px-4 py-5 sm:px-6">
                 <div>
                   <label className="block text-sm font-semibold text-[#0F2C52] mb-1.5">
                     Observations cliniques
@@ -261,19 +288,19 @@ export default function MedecinRapportsPage() {
               </div>
 
               {/* Action bar */}
-              <div className="border-t border-[#E5E7EB] px-6 py-4 flex items-center justify-between bg-[#FAFBFC]">
-                <div className="flex items-center gap-2">
+              <div className="sticky bottom-0 flex flex-col gap-3 border-t border-[#E5E7EB] bg-[#FAFBFC] px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+                <div className="flex min-h-5 items-center gap-2">
                   {saved && (
                     <span className="flex items-center gap-1.5 text-sm text-emerald-600 font-medium">
                       <CheckCircle2 className="h-4 w-4" /> Sauvegardé
                     </span>
                   )}
                 </div>
-                <div className="flex items-center gap-3">
+                <div className="grid grid-cols-1 gap-2 sm:flex sm:items-center sm:gap-3">
                   <button
                     onClick={handlePrint}
                     disabled={!selected.compteRendu && !observations.trim() && !conclusions.trim()}
-                    className="inline-flex items-center gap-2 rounded-xl border border-[#E5E7EB] bg-white px-4 py-2 text-sm font-medium text-[#374151] transition hover:bg-[#F3F4F6] disabled:opacity-40 disabled:cursor-not-allowed"
+                    className="inline-flex items-center justify-center gap-2 rounded-xl border border-[#E5E7EB] bg-white px-4 py-2.5 text-sm font-medium text-[#374151] transition hover:bg-[#F3F4F6] disabled:cursor-not-allowed disabled:opacity-40"
                   >
                     <Printer className="h-4 w-4" />
                     Imprimer
@@ -281,7 +308,7 @@ export default function MedecinRapportsPage() {
                   <button
                     onClick={handleSave}
                     disabled={saving || (!observations.trim() && !conclusions.trim())}
-                    className="inline-flex items-center gap-2 rounded-xl bg-[#3B6EF8] px-5 py-2 text-sm font-semibold text-white transition hover:bg-[#2D5CD8] disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#3B6EF8] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-[#2D5CD8] disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     {saving ? (
                       <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
@@ -293,6 +320,7 @@ export default function MedecinRapportsPage() {
                 </div>
               </div>
             </div>
+            </>
           )}
         </div>
       </div>

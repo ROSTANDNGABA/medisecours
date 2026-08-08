@@ -3,7 +3,7 @@
 
 import { useMemo, useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { Search, Phone, Mail, MessageSquare, Stethoscope, Droplets, AlertTriangle, ChevronRight, Calendar, Clock, User, Shield, HeartPulse, FileText } from 'lucide-react'
+import { ArrowLeft, Search, Phone, Mail, MessageSquare, Stethoscope, Droplets, AlertTriangle, ChevronRight, Calendar, Clock, User, Shield, HeartPulse, FileText, RefreshCw } from 'lucide-react'
 import useSWR from 'swr'
 import { useAuth } from '../../../hooks/useAuth'
 import LoadingSpinner from '../../../components/ui/LoadingSpinner'
@@ -20,12 +20,33 @@ import { idStrFromRelation } from '../../../types/api'
 export default function MedecinPatientsPage() {
   const { user } = useAuth()
   const router = useRouter()
-  // M3 corrigé : clés SWR centralisées (cache mutualisé avec les autres pages).
-  const { data: patients = [], isLoading } = useSWR(PATIENTS_KEY, fetcher, { keepPreviousData: true })
-  const { data: consultations = [] } = useSWR(CONSULTATIONS_KEY, fetcher)
+  const doctorId = user?.id ? String(user.id) : null
+  // Le scope utilisateur empêche SWR de réutiliser les données d'un autre médecin.
+  const patientScopeKey = doctorId
+    ? `${PATIENTS_KEY}?scope=${encodeURIComponent(doctorId)}`
+    : null
+  const consultationScopeKey = doctorId
+    ? `${CONSULTATIONS_KEY}?scope=${encodeURIComponent(doctorId)}`
+    : null
+  const {
+    data: patients = [],
+    isLoading,
+    error: patientsError,
+    mutate: reloadPatients,
+  } = useSWR(patientScopeKey, fetcher, { keepPreviousData: false })
+  const { data: consultations = [] } = useSWR(consultationScopeKey, fetcher, {
+    keepPreviousData: false,
+  })
   const [search, setSearch] = useState('')
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const listRef = useRef<HTMLDivElement>(null)
+
+  const doctorConsultations = useMemo(() => {
+    if (!doctorId) return []
+    return consultations.filter(
+      (consultation) => idStrFromRelation(consultation.medecin) === doctorId
+    )
+  }, [consultations, doctorId])
 
   const filteredPatients = useMemo(() => {
     if (!search.trim()) return patients
@@ -44,19 +65,17 @@ export default function MedecinPatientsPage() {
 
   const patientConsults = useMemo(() => {
     if (!selectedPatient) return []
-    return consultations
+    return doctorConsultations
       .filter((c) => idStrFromRelation(c.patient) === String(selectedPatient.id))
       .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime())
-  }, [consultations, selectedPatient])
-
-  const lastConsult = patientConsults[0] || null
-
-
+  }, [doctorConsultations, selectedPatient])
 
   return (
-    <div className="flex h-[calc(100vh-4rem)]">
+    <div className="flex h-[calc(100dvh-4rem)] min-h-0 overflow-hidden">
       {/* ── Left Panel: Patient List ── */}
-      <div className="w-[340px] shrink-0 border-r border-[#E5E7EB] bg-white flex flex-col">
+      <div className={`w-full lg:w-[340px] shrink-0 border-r border-[#E5E7EB] bg-white flex-col ${
+        selectedId ? 'hidden lg:flex' : 'flex'
+      }`}>
         <div className="p-4 border-b border-[#E5E7EB]">
           <h2 className="text-sm font-bold text-[#0F2C52] mb-3">Patients</h2>
           <div className="relative">
@@ -70,7 +89,27 @@ export default function MedecinPatientsPage() {
           </div>
         </div>
         <div ref={listRef} className="flex-1 overflow-y-auto">
-          {filteredPatients.length === 0 ? (
+          {patientsError ? (
+            <div className="flex h-full flex-col items-center justify-center px-6 text-center">
+              <AlertTriangle className="mb-3 h-10 w-10 text-amber-500" />
+              <p className="text-sm font-semibold text-[#374151]">Chargement impossible</p>
+              <p className="mt-1 text-xs text-[#9CA3AF]">
+                La liste de vos patients n&apos;a pas pu être récupérée.
+              </p>
+              <button
+                type="button"
+                onClick={() => reloadPatients()}
+                className="mt-4 inline-flex items-center gap-2 rounded-lg bg-[#3B6EF8] px-3 py-2 text-xs font-semibold text-white hover:bg-[#2D5BD4]"
+              >
+                <RefreshCw className="h-3.5 w-3.5" />
+                Réessayer
+              </button>
+            </div>
+          ) : isLoading ? (
+            <div className="flex h-full items-center justify-center px-6">
+              <LoadingSpinner label="Chargement des patients…" />
+            </div>
+          ) : filteredPatients.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full text-center px-6">
               <User className="h-10 w-10 text-[#D1D5DB] mb-3" />
               <p className="text-sm font-medium text-[#6B7280]">
@@ -82,7 +121,9 @@ export default function MedecinPatientsPage() {
             </div>
           ) : (
             filteredPatients.map((p) => {
-              const consCount = consultations.filter((c) => idStrFromRelation(c.patient) === String(p.id)).length
+              const consCount = doctorConsultations.filter(
+                (c) => idStrFromRelation(c.patient) === String(p.id)
+              ).length
               return (
                 <button
                   key={p.id}
@@ -119,11 +160,36 @@ export default function MedecinPatientsPage() {
       </div>
 
       {/* ── Right Panel: Patient Profile ── */}
-      <div className="flex-1 bg-[#F8F9FD] overflow-y-auto">
+      <div className={`min-w-0 flex-1 bg-[#F8F9FD] overflow-y-auto ${
+        selectedId ? 'block' : 'hidden lg:block'
+      }`}>
         {selectedPatient ? (
-          <div className="p-6 max-w-4xl mx-auto space-y-5">
+          <>
+            <div className="sticky top-0 z-20 flex items-center gap-3 border-b border-[#E5E7EB] bg-white px-4 py-3 lg:hidden">
+              <button
+                type="button"
+                onClick={() => setSelectedId(null)}
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-[#6B7280] transition hover:bg-[#F3F4F6]"
+                aria-label="Retour à la liste des patients"
+              >
+                <ArrowLeft className="h-5 w-5" />
+              </button>
+              <Avatar
+                name={`${selectedPatient.prenom || ''} ${selectedPatient.nom || ''}`.trim()}
+                size="sm"
+                src={imgUrl(selectedPatient.photoProfil)}
+              />
+              <div className="min-w-0">
+                <p className="truncate text-sm font-bold text-[#0F2C52]">
+                  {selectedPatient.prenom} {selectedPatient.nom}
+                </p>
+                <p className="text-[11px] text-[#9CA3AF]">Dossier patient</p>
+              </div>
+            </div>
+
+            <div className="mx-auto max-w-4xl space-y-4 p-4 sm:space-y-5 sm:p-6">
             {/* Profile Header */}
-            <div className="rounded-2xl bg-white p-5 shadow-[0_2px_12px_rgba(0,0,0,0.06)] flex items-start gap-5">
+            <div className="flex flex-col items-start gap-4 rounded-2xl bg-white p-4 shadow-[0_2px_12px_rgba(0,0,0,0.06)] sm:flex-row sm:gap-5 sm:p-5">
               <div className="shrink-0">
                 <Avatar
                   name={`${selectedPatient.prenom || ''} ${selectedPatient.nom || ''}`.trim()}
@@ -132,26 +198,27 @@ export default function MedecinPatientsPage() {
                 />
               </div>
               <div className="flex-1 min-w-0">
-                <div className="flex items-start justify-between gap-4">
+                <div className="flex min-w-0 items-start justify-between gap-4">
                   <div>
-                    <h1 className="text-xl font-bold text-[#0F2C52]">
+                    <h1 className="break-words text-lg font-bold text-[#0F2C52] sm:text-xl">
                       {selectedPatient.prenom} {selectedPatient.nom}
                     </h1>
                     <p className="text-sm text-[#6B7280] mt-0.5">Patient · {selectedPatient.quartier || 'Adresse non renseignée'}</p>
                   </div>
                 </div>
-                <div className="flex flex-wrap items-center gap-4 mt-3">
+                <div className="mt-3 flex flex-col items-stretch gap-2 sm:flex-row sm:flex-wrap sm:items-center">
                   {selectedPatient.telephone && (
-                    <a href={`tel:${selectedPatient.telephone}`} className="flex items-center gap-1.5 text-xs text-[#374151] bg-[#F3F4F6] rounded-lg px-3 py-1.5 hover:bg-[#E5E7EB] transition">
+                    <a href={`tel:${selectedPatient.telephone}`} className="flex min-w-0 items-center gap-1.5 rounded-lg bg-[#F3F4F6] px-3 py-2 text-xs text-[#374151] transition hover:bg-[#E5E7EB]">
                       <Phone className="h-3.5 w-3.5 text-[#3B6EF8]" /> {selectedPatient.telephone}
                     </a>
                   )}
                   {selectedPatient.email && (
-                    <span className="flex items-center gap-1.5 text-xs text-[#374151] bg-[#F3F4F6] rounded-lg px-3 py-1.5">
-                      <Mail className="h-3.5 w-3.5 text-[#9CA3AF]" /> {selectedPatient.email}
+                    <span className="flex min-w-0 items-center gap-1.5 rounded-lg bg-[#F3F4F6] px-3 py-2 text-xs text-[#374151]">
+                      <Mail className="h-3.5 w-3.5 shrink-0 text-[#9CA3AF]" />
+                      <span className="truncate">{selectedPatient.email}</span>
                     </span>
                   )}
-                  <span className="flex items-center gap-1.5 text-xs text-[#374151] bg-[#F3F4F6] rounded-lg px-3 py-1.5">
+                  <span className="flex items-center gap-1.5 rounded-lg bg-[#F3F4F6] px-3 py-2 text-xs text-[#374151]">
                     <Calendar className="h-3.5 w-3.5 text-[#9CA3AF]" /> {patientConsults.length} consultation(s)
                   </span>
                 </div>
@@ -222,16 +289,16 @@ export default function MedecinPatientsPage() {
             {/* Quick Actions */}
             <div className="rounded-2xl bg-white p-5 shadow-[0_2px_12px_rgba(0,0,0,0.06)]">
               <h3 className="text-sm font-bold text-[#0F2C52] mb-3">Actions rapides</h3>
-              <div className="flex flex-wrap gap-3">
+              <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
                 <button
                   onClick={() => router.push(`/medecin/messages?patient=${selectedPatient.id}`)}
-                  className="flex items-center gap-2 rounded-xl bg-[#3B6EF8] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#2D5BD4] transition"
+                  className="flex items-center justify-center gap-2 rounded-xl bg-[#3B6EF8] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#2D5BD4]"
                 >
                   <MessageSquare className="h-4 w-4" /> Message
                 </button>
                 <button
                   onClick={() => router.push(`/medecin/consultations?patient=${selectedPatient.id}`)}
-                  className="flex items-center gap-2 rounded-xl bg-[#10B981] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#059669] transition"
+                  className="flex items-center justify-center gap-2 rounded-xl bg-[#10B981] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#059669]"
                 >
                   <Stethoscope className="h-4 w-4" /> Nouvelle consultation
                 </button>
@@ -242,15 +309,15 @@ export default function MedecinPatientsPage() {
             {/* Consultation History */}
             <div className="rounded-2xl bg-white p-5 shadow-[0_2px_12px_rgba(0,0,0,0.06)]">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-sm font-bold text-[#0F2C52] flex items-center gap-2">
+                <h3 className="flex min-w-0 items-center gap-2 text-sm font-bold text-[#0F2C52]">
                   <FileText className="h-4 w-4 text-[#3B6EF8]" /> Historique des consultations
                 </h3>
-                <span className="text-xs text-[#9CA3AF]">{patientConsults.length} au total</span>
+                <span className="ml-3 shrink-0 text-xs text-[#9CA3AF]">{patientConsults.length} au total</span>
               </div>
               {patientConsults.length > 0 ? (
                 <div className="space-y-2">
                   {patientConsults.map((c) => (
-                    <div key={c.id} className="flex items-start gap-4 rounded-xl border border-[#E5E7EB] p-4 hover:bg-[#F9FAFB] transition">
+                    <div key={c.id} className="flex items-start gap-3 rounded-xl border border-[#E5E7EB] p-3 transition hover:bg-[#F9FAFB] sm:gap-4 sm:p-4">
                       <div className="flex flex-col items-center min-w-[44px]">
                         <span className="text-xs font-bold text-[#0F2C52]">
                           {new Date(c.createdAt).toLocaleDateString('fr-FR', { day: 'numeric' })}
@@ -260,8 +327,8 @@ export default function MedecinPatientsPage() {
                         </span>
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold text-[#374151]">{c.motif || 'Motif non précisé'}</p>
-                        <div className="flex items-center gap-3 mt-1">
+                        <p className="break-words text-sm font-semibold text-[#374151]">{c.motif || 'Motif non précisé'}</p>
+                        <div className="mt-1 flex flex-wrap items-center gap-2 sm:gap-3">
                           <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold border ${STATUT_BADGE[c.statut] || ''}`}>
                             {STATUT_LABEL[c.statut] || c.statut}
                           </span>
@@ -279,11 +346,12 @@ export default function MedecinPatientsPage() {
                 <div className="flex flex-col items-center justify-center py-10 text-center">
                   <FileText className="h-10 w-10 text-[#D1D5DB] mb-3" />
                   <p className="text-sm font-medium text-[#6B7280]">Aucune consultation</p>
-                  <p className="text-xs text-[#9CA3AF] mt-1">Ce patient n'a pas encore consulté</p>
+                  <p className="text-xs text-[#9CA3AF] mt-1">Ce patient n&apos;a pas encore consulté</p>
                 </div>
               )}
             </div>
           </div>
+          </>
         ) : (
           <div className="flex h-full items-center justify-center">
             <div className="text-center">

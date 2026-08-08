@@ -8,12 +8,10 @@ use ApiPlatform\Metadata\Operation;
 use ApiPlatform\State\ProcessorInterface;
 use App\Entity\Avis;
 use App\Entity\Patient;
-use App\Repository\AvisRepository;
 use App\Repository\ConsultationRepository;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
-use Symfony\Component\HttpKernel\Exception\UnprocessableEntityHttpException;
 
 /**
  * Injecte automatiquement le patient connecté comme auteur de l'avis.
@@ -26,7 +24,6 @@ class AvisProcessor implements ProcessorInterface
         private readonly ProcessorInterface $persistProcessor,
         private readonly Security $security,
         private readonly ConsultationRepository $consultationRepository,
-        private readonly AvisRepository $avisRepository,
     ) {
     }
 
@@ -43,12 +40,6 @@ class AvisProcessor implements ProcessorInterface
             if (!$medecin || !$this->consultationRepository->hasCompletedConsultation($user, $medecin)) {
                 throw new AccessDeniedHttpException(
                     'Un avis peut être publié après une consultation terminée avec ce médecin.'
-                );
-            }
-
-            if ($this->avisRepository->existsForPatientAndMedecin($user, $medecin)) {
-                throw new UnprocessableEntityHttpException(
-                    'Vous avez déjà publié un avis pour ce médecin.'
                 );
             }
 

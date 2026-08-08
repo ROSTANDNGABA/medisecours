@@ -101,12 +101,15 @@ class MessageProcessor implements ProcessorInterface
             $conv?->setDernierMessage($result);
             foreach ($conv?->getParticipants() ?? [] as $participant) {
                 if ($participant !== $result->getExpediteur()) {
+                    $messageLink = $participant instanceof Medecin
+                        ? '/medecin/messages?conversation=' . $conv?->getId()
+                        : '/patient/messages?conversation=' . $conv?->getId();
                     $this->notificationService->create(
                         $participant,
                         'message_received',
                         'Nouveau message',
                         'Vous avez reçu un nouveau message médical.',
-                        '/messages?conversation=' . $conv?->getId(),
+                        $messageLink,
                     );
                 }
             }

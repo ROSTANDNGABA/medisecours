@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState, useSyncExternalStore, Suspense, type ReactNode } from 'react'
+import { Suspense, type ReactNode } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
@@ -12,24 +12,8 @@ import {
 } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 import { useUnreadCount } from '../../hooks/useUnreadCount'
+import { useTheme } from '../../hooks/useTheme'
 import { resolveImgPath } from '../../lib/config'
-
-const THEME_EVENT = 'medisecours-theme-change'
-
-function subscribeTheme(onChange: () => void) {
-  if (typeof window === 'undefined') return () => {}
-  window.addEventListener('storage', onChange)
-  window.addEventListener(THEME_EVENT, onChange)
-  return () => {
-    window.removeEventListener('storage', onChange)
-    window.removeEventListener(THEME_EVENT, onChange)
-  }
-}
-
-function getThemeSnapshot() {
-  if (typeof window === 'undefined') return false
-  return localStorage.getItem('medisecours_theme') === 'dark'
-}
 
 function ConversationAware({ children }: { children: (inConversation: boolean) => ReactNode }) {
   const searchParams = useSearchParams()
@@ -37,24 +21,13 @@ function ConversationAware({ children }: { children: (inConversation: boolean) =
 }
 
 export default function Navbar() {
-  const dark = useSyncExternalStore(subscribeTheme, getThemeSnapshot, () => false)
+  const { dark, toggleTheme: toggleDark } = useTheme()
   const { isAuthenticated, user, isAdmin, logout } = useAuth()
   const pathname = usePathname()
   const router = useRouter()
   const { unreadCount } = useUnreadCount()
 
   const estDansLaMessagerie = pathname.includes('/messages') || pathname.includes('/conversations') || pathname.includes('/medecin/messages')
-
-  useEffect(() => {
-    document.documentElement.classList.toggle('dark', dark)
-  }, [dark])
-
-  const toggleDark = () => {
-    const next = !dark
-    localStorage.setItem('medisecours_theme', next ? 'dark' : 'light')
-    document.documentElement.classList.toggle('dark', next)
-    window.dispatchEvent(new Event(THEME_EVENT))
-  }
 
   const initials = user ? `${user.prenom?.[0] || ''}${user.nom?.[0] || ''}`.toUpperCase() : ''
   const isActive = (to: string) => (to === '/' ? pathname === '/' : pathname.startsWith(to))

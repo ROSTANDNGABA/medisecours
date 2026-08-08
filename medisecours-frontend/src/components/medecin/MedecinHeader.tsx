@@ -9,6 +9,7 @@ import { useAuth } from '../../hooks/useAuth'
 import api from '../../api/axios'
 import { imgUrl } from '../../lib/config'
 import { useNotification } from '../../contexts/NotificationContext'
+import DashboardThemeToggle from '../ui/DashboardThemeToggle'
 
 type SearchCategory = 'patients' | 'consultations' | 'messages' | 'maladies' | 'centres'
 
@@ -132,12 +133,21 @@ export default function MedecinHeader() {
 
   useEffect(() => {
     const q = debouncedQuery.trim()
-    if (q.length < 2) { setResults(null); setLoading(false); return }
+    if (q.length < 2) return
     let cancelled = false
-    setLoading(true)
     api.get<SearchResults>('/api/search', { params: { q } })
-      .then(({ data }) => { if (!cancelled) setResults(data); setLoading(false) })
-      .catch(() => { if (!cancelled) setResults(null); setLoading(false) })
+      .then(({ data }) => {
+        if (!cancelled) {
+          setResults(data)
+          setLoading(false)
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setResults(null)
+          setLoading(false)
+        }
+      })
     return () => { cancelled = true }
   }, [debouncedQuery])
 
@@ -160,7 +170,17 @@ export default function MedecinHeader() {
           ref={inputRef}
           type="text"
           value={searchQuery}
-          onChange={(e) => { setSearchQuery(e.target.value); setShowResults(true) }}
+          onChange={(e) => {
+            const value = e.target.value
+            setSearchQuery(value)
+            setShowResults(true)
+            if (value.trim().length < 2) {
+              setResults(null)
+              setLoading(false)
+            } else {
+              setLoading(true)
+            }
+          }}
           onFocus={() => setShowResults(true)}
           placeholder="Rechercher patients, consultations, maladies..."
           className="w-[320px] xl:w-[420px] rounded-full bg-[#F3F4F6] py-2 pl-10 pr-4 text-sm text-[#374151] placeholder-[#9CA3AF] outline-none transition focus:bg-white focus:ring-2 focus:ring-[#3B6EF8]/20"
@@ -231,7 +251,9 @@ export default function MedecinHeader() {
                 ))
             )}
             {!loading && debouncedQuery.trim().length >= 2 && results && !hasResults && (
-              <div className="px-4 py-6 text-center text-sm text-[#9CA3AF]">Aucun résultat pour "{debouncedQuery}"</div>
+              <div className="px-4 py-6 text-center text-sm text-[#9CA3AF]">
+                Aucun résultat pour &quot;{debouncedQuery}&quot;
+              </div>
             )}
           </div>
         )}
@@ -241,6 +263,8 @@ export default function MedecinHeader() {
           </div>
         )}
       </div>
+
+      <DashboardThemeToggle />
 
       {/* Notification icon + dropdown */}
       <div ref={notifRef} className="relative">
@@ -264,9 +288,9 @@ export default function MedecinHeader() {
                 {notifications.some(n => n.unread) && (
                   <button
                     onClick={() => clearAllNotifications()}
-                    className="text-xs font-semibold text-[#EF4444] hover:underline"
+                    className="text-xs font-semibold text-[#3B6EF8] hover:underline"
                   >
-                    Tout effacer
+                    Tout marquer comme lu
                   </button>
                 )}
                 <button

@@ -2,6 +2,9 @@
 
 namespace App\Repository;
 
+use App\Entity\Consultation;
+use App\Entity\Medecin;
+use App\Entity\Patient;
 use App\Entity\User;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
@@ -31,6 +34,38 @@ class UserRepository extends ServiceEntityRepository implements PasswordUpgrader
         $user->setPassword($newHashedPassword);
         $this->getEntityManager()->persist($user);
         $this->getEntityManager()->flush();
+    }
+
+    /**
+     * @return list<Patient>
+     */
+    public function findActivePatientsForMedecin(Medecin $medecin, ?string $search = null): array
+    {
+        $patientIdsDql = $this->getEntityManager()
+            ->createQueryBuilder()
+            ->select('IDENTITY(patientConsultation.patient)')
+            ->from(Consultation::class, 'patientConsultation')
+            ->where('patientConsultation.medecin = :medecin')
+            ->getDQL();
+
+        $qb = $this->createQueryBuilder('u');
+        $qb
+            ->where('u INSTANCE OF ' . Patient::class)
+            ->andWhere($qb->expr()->in('u.id', $patientIdsDql))
+            ->andWhere('u.actif = :actif')
+            ->setParameter('medecin', $medecin)
+            ->setParameter('actif', true)
+            ->orderBy('u.nom', 'ASC')
+            ->addOrderBy('u.prenom', 'ASC');
+
+        $normalizedSearch = mb_strtolower(trim((string) $search));
+        if (mb_strlen($normalizedSearch) >= 2) {
+            $qb->andWhere(
+                '(LOWER(u.nom) LIKE :q OR LOWER(u.prenom) LIKE :q OR LOWER(u.email) LIKE :q OR u.telephone LIKE :q)'
+            )->setParameter('q', '%' . $normalizedSearch . '%');
+        }
+
+        return $qb->getQuery()->getResult();
     }
 
 //    /**

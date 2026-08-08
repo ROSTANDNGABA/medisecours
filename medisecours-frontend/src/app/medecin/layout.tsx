@@ -82,7 +82,7 @@ export default function MedecinLayout({ children }: { children: React.ReactNode 
 
   if (!mounted || !isMedecin) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#F8F9FD]">
+      <div className="dashboard-theme dashboard-shell flex min-h-screen items-center justify-center">
         <LoadingSpinner label="Chargement de l'espace médecin…" />
       </div>
     )
@@ -91,14 +91,14 @@ export default function MedecinLayout({ children }: { children: React.ReactNode 
   const pageTitle = PAGE_TITLES[pathname as keyof typeof PAGE_TITLES] || 'Espace Médecin'
 
   return (
-    <div className="flex min-h-screen bg-[#F8F9FD]">
+    <div className="dashboard-theme dashboard-shell flex min-h-screen">
       <NotificationProvider>
         <SWRConfig value={swrConfig}>
           <SidebarWrapper setMobileOpen={setMobileOpen} />
           <MobileDrawer open={mobileOpen} onClose={() => setMobileOpen(false)} />
 
           <div className="flex min-w-0 flex-1 flex-col">
-            <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-[#E5E7EB] bg-white px-4 sm:px-6">
+            <header className="dashboard-panel sticky top-0 z-30 flex h-16 items-center justify-between border-b px-4 shadow-none sm:px-6">
               <div className="flex items-center gap-4">
                 <button
                   className="flex items-center justify-center rounded-xl p-2 text-[#6B7280] hover:bg-[#F3F4F6] md:hidden"
@@ -107,7 +107,7 @@ export default function MedecinLayout({ children }: { children: React.ReactNode 
                 >
                   <Menu className="h-5 w-5" />
                 </button>
-                <h1 className="font-display text-lg font-bold text-[#0F2C52]">{pageTitle}</h1>
+                <h1 className="font-display text-lg font-bold text-[#0F2C52] dark:text-white">{pageTitle}</h1>
               </div>
               <MedecinHeader />
             </header>

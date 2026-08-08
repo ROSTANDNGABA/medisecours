@@ -2,7 +2,21 @@
 
 import { useEffect, useRef, useCallback } from 'react'
 
-const WS_URL = process.env.NEXT_PUBLIC_WS_URL || 'ws://127.0.0.1:8081/ws'
+function resolveWebSocketUrl(configuredUrl?: string): string {
+  const fallbackUrl = 'ws://127.0.0.1:8081/ws'
+
+  try {
+    const url = new URL(configuredUrl || fallbackUrl)
+    if (url.pathname === '/' || url.pathname === '') {
+      url.pathname = '/ws'
+    }
+    return url.toString()
+  } catch {
+    return fallbackUrl
+  }
+}
+
+const WS_URL = resolveWebSocketUrl(process.env.NEXT_PUBLIC_WS_URL)
 const MAX_BACKOFF = 30000
 const PING_INTERVAL = 30000
 const PONG_TIMEOUT = 10000

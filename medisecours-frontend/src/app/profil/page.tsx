@@ -4,16 +4,77 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 import {
   Camera, Edit3, Save, ShieldCheck, X, Phone, MapPin, Droplet,
   HeartPulse, Siren, Plus, Stethoscope, BadgeCheck, CalendarClock, Lock, AlertTriangle,
-  CheckCircle2, AlertCircle, Info,
+  CheckCircle2, AlertCircle, Info, Flag, Clock3, MessageSquareText, XCircle, Eye,
+  ChevronRight,
 } from 'lucide-react'
+import useSWR from 'swr'
 import api from '../../api/axios'
 import { useAuth } from '../../hooks/useAuth'
 import { useToast } from '../../components/ui/Toast'
 import { resolveImgPath } from '../../lib/config'
+import { fetcher } from '../../lib/fetcher'
+import EmptyState from '../../components/ui/EmptyState'
+import LoadingSpinner from '../../components/ui/LoadingSpinner'
+import Modal from '../../components/ui/Modal'
 
 const GROUPES_SANGUINS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-']
 const PHONE_RE = /^\+237\s?[26]\d{8}$/
 const PHONE_EXAMPLE = '+237 6XXXXXXXX'
+
+type ReportStatus = 'NOUVEAU' | 'EN_COURS' | 'TRAITE' | 'REJETE'
+
+interface PatientReport {
+  id: number
+  motif: string
+  description: string
+  statut: ReportStatus
+  noteAdmin?: string | null
+  createdAt: string
+  updatedAt: string
+  traiteAt?: string | null
+  medecin?: {
+    id?: string
+    nom?: string | null
+    prenom?: string | null
+    specialite?: string | null
+  } | null
+}
+
+const REPORT_REASON_LABELS: Record<string, string> = {
+  COMPORTEMENT_INAPPROPRIE: 'Comportement inapproprié',
+  FAUSSE_INFORMATION: 'Informations fausses ou trompeuses',
+  HARCELEMENT: 'Harcèlement ou propos déplacés',
+  NEGLIGENCE: 'Négligence pendant la prise en charge',
+  FRAUDE: 'Fraude ou paiement suspect',
+  AUTRE: 'Autre motif',
+}
+
+const REPORT_STATUS_META: Record<ReportStatus, {
+  label: string
+  className: string
+  icon: typeof Flag
+}> = {
+  NOUVEAU: {
+    label: 'Reçu',
+    className: 'border-red-200 bg-red-50 text-red-700 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-200',
+    icon: Flag,
+  },
+  EN_COURS: {
+    label: 'En cours d’examen',
+    className: 'border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-200',
+    icon: Clock3,
+  },
+  TRAITE: {
+    label: 'Traité',
+    className: 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-200',
+    icon: CheckCircle2,
+  },
+  REJETE: {
+    label: 'Rejeté',
+    className: 'border-slate-200 bg-slate-100 text-slate-700 dark:border-white/10 dark:bg-white/5 dark:text-slate-200',
+    icon: XCircle,
+  },
+}
 
 function validatePhone(v: string): { ok: boolean; message: string } | null {
   const t = v.trim()
@@ -238,6 +299,135 @@ function disponibilitesLabel(d: unknown): string {
     .join(', ')
 }
 
+function formatReportDate(value?: string | null): string {
+  if (!value) return ''
+
+  return new Intl.DateTimeFormat('fr-FR', {
+    day: '2-digit',
+    month: 'long',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(new Date(value))
+}
+
+function PatientReportCard({ report }: { report: PatientReport }) {
+  const status = REPORT_STATUS_META[report.statut] ?? REPORT_STATUS_META.NOUVEAU
+  const StatusIcon = status.icon
+  const doctorName = `Dr ${report.medecin?.prenom ?? ''} ${report.medecin?.nom ?? ''}`
+    .replace(/\s+/g, ' ')
+    .trim()
+  const responseDate = report.traiteAt ?? report.updatedAt
+
+  return (
+    <article className="p-5 sm:p-6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
+          <p className="truncate text-base font-extrabold text-slate-900 dark:text-white">
+            {doctorName === 'Dr' ? 'Médecin concerné' : doctorName}
+          </p>
+          <p className="mt-1 text-xs font-medium text-slate-500 dark:text-slate-300">
+            {report.medecin?.specialite || 'Spécialité non renseignée'}
+          </p>
+          <p className="mt-2 text-xs text-slate-400">
+            Envoyé le {formatReportDate(report.createdAt)}
+          </p>
+        </div>
+        <span className={`inline-flex w-fit shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-bold ${status.className}`}>
+          <StatusIcon className="h-3.5 w-3.5" />
+          {status.label}
+        </span>
+      </div>
+
+      <div className="mt-4 rounded-2xl border border-slate-100 bg-slate-50 p-4 dark:border-white/10 dark:bg-primary-900/40">
+        <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-400">
+          {REPORT_REASON_LABELS[report.motif] ?? report.motif}
+        </p>
+        <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-700 dark:text-slate-200">
+          {report.description}
+        </p>
+      </div>
+
+      <div className={`mt-4 rounded-2xl border p-4 ${
+        report.noteAdmin
+          ? 'border-blue-200 bg-blue-50 dark:border-blue-500/20 dark:bg-blue-500/10'
+          : 'border-slate-200 bg-white dark:border-white/10 dark:bg-white/5'
+      }`}>
+        <div className="flex items-center gap-2">
+          <MessageSquareText className={`h-4 w-4 ${report.noteAdmin ? 'text-blue-600 dark:text-blue-300' : 'text-slate-400'}`} />
+          <p className="text-xs font-extrabold uppercase tracking-[0.14em] text-slate-700 dark:text-slate-200">
+            Réponse de l’administration
+          </p>
+        </div>
+        {report.noteAdmin ? (
+          <>
+            <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-slate-700 dark:text-slate-200">
+              {report.noteAdmin}
+            </p>
+            <p className="mt-3 text-xs text-slate-400">
+              Mise à jour le {formatReportDate(responseDate)}
+            </p>
+          </>
+        ) : (
+          <p className="mt-3 text-sm leading-6 text-slate-500 dark:text-slate-300">
+            {report.statut === 'NOUVEAU'
+              ? 'Votre signalement a bien été reçu. Il n’a pas encore été examiné par un administrateur.'
+              : report.statut === 'EN_COURS'
+                ? 'Votre signalement est en cours d’examen. Aucune réponse écrite n’a encore été publiée.'
+                : 'Le dossier a été clôturé sans commentaire administratif complémentaire.'}
+          </p>
+        )}
+      </div>
+    </article>
+  )
+}
+
+function PatientReportRow({
+  report,
+  onOpen,
+}: {
+  report: PatientReport
+  onOpen: () => void
+}) {
+  const status = REPORT_STATUS_META[report.statut] ?? REPORT_STATUS_META.NOUVEAU
+  const StatusIcon = status.icon
+  const doctorName = `Dr ${report.medecin?.prenom ?? ''} ${report.medecin?.nom ?? ''}`
+    .replace(/\s+/g, ' ')
+    .trim()
+
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      className="group flex w-full items-center gap-3 p-4 text-left transition-colors hover:bg-slate-50 dark:hover:bg-white/5 sm:px-5"
+    >
+      <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border ${status.className}`}>
+        <StatusIcon className="h-4 w-4" />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-sm font-extrabold text-slate-900 dark:text-white">
+          {doctorName === 'Dr' ? 'Médecin concerné' : doctorName}
+        </span>
+        <span className="mt-1 block truncate text-xs text-slate-500 dark:text-slate-300">
+          {REPORT_REASON_LABELS[report.motif] ?? report.motif}
+          <span className="mx-1.5 text-slate-300 dark:text-slate-600">·</span>
+          {new Date(report.createdAt).toLocaleDateString('fr-FR')}
+        </span>
+        <span className="mt-1 block text-[11px] font-bold text-slate-500 dark:text-slate-300 sm:hidden">
+          {status.label}
+        </span>
+      </span>
+      <span className={`hidden shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-bold sm:inline-flex ${status.className}`}>
+        <StatusIcon className="h-3 w-3" />
+        {status.label}
+      </span>
+      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-slate-400 transition-colors group-hover:bg-white group-hover:text-blue-600 dark:group-hover:bg-white/10">
+        <Eye className="h-4 w-4" />
+      </span>
+    </button>
+  )
+}
+
 export default function ProfilPage() {
   const { user, updateUser } = useAuth()
   const toast = useToast()
@@ -246,7 +436,20 @@ export default function ProfilPage() {
   const [editing, setEditing] = useState(false)
   const [saving, setSaving] = useState(false)
   const [uploading, setUploading] = useState(false)
+  const [selectedReport, setSelectedReport] = useState<PatientReport | null>(null)
+  const [reportsHistoryOpen, setReportsHistoryOpen] = useState(false)
   const isMedecin = user?.roles?.includes('ROLE_MEDECIN')
+  const isPatient = user?.roles?.includes('ROLE_PATIENT')
+  const {
+    data: reportsData,
+    error: reportsError,
+    isLoading: reportsLoading,
+  } = useSWR<{ items: PatientReport[] }>(
+    isPatient ? '/api/signalements-medecins/mine' : null,
+    fetcher,
+    { revalidateOnFocus: true },
+  )
+  const reports = reportsData?.items ?? []
 
   const [form, setForm] = useState<any>(() => formFromUser(user))
 
@@ -338,6 +541,35 @@ export default function ProfilPage() {
   const primaryLocation = isMedecin ? (form.specialite || 'Spécialité non renseignée') : (form.quartier || 'Localisation non renseignée')
   return (
     <div className="min-h-[calc(100dvh-6rem)] bg-[#F7FAFC] dark:bg-primary-900">
+      <Modal
+        isOpen={Boolean(selectedReport)}
+        onClose={() => setSelectedReport(null)}
+        title="Détail du signalement"
+        size="lg"
+      >
+        {selectedReport && <PatientReportCard report={selectedReport} />}
+      </Modal>
+
+      <Modal
+        isOpen={reportsHistoryOpen}
+        onClose={() => setReportsHistoryOpen(false)}
+        title="Historique des signalements"
+        size="lg"
+      >
+        <div className="max-h-[65dvh] divide-y divide-slate-100 overflow-y-auto rounded-2xl border border-slate-200 dark:divide-white/10 dark:border-white/10">
+          {reports.map((report) => (
+            <PatientReportRow
+              key={report.id}
+              report={report}
+              onOpen={() => {
+                setReportsHistoryOpen(false)
+                setSelectedReport(report)
+              }}
+            />
+          ))}
+        </div>
+      </Modal>
+
       <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8 py-6 sm:py-8 lg:py-10">
         <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
@@ -542,6 +774,60 @@ export default function ProfilPage() {
                     <button onClick={() => setEditing(true)} className="flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-red-200 px-4 py-4 text-sm font-bold text-red-500 transition-colors hover:border-red-300 hover:bg-red-50 dark:border-red-500/20 dark:hover:bg-red-500/10">
                       <Plus className="h-4 w-4" /> Ajouter un contact d’urgence
                     </button>
+                  )}
+                </Card>
+
+                <Card className="rounded-[24px] p-0 overflow-hidden">
+                  <div className="flex flex-col gap-2 border-b border-slate-100 p-5 dark:border-white/10 sm:flex-row sm:items-center sm:justify-between sm:p-6">
+                    <CardHeading
+                      icon={<Flag className="h-4 w-4" />}
+                      title="Mes signalements"
+                      badgeClass="bg-red-50 dark:bg-red-500/10 text-red-600"
+                    />
+                    {!reportsLoading && !reportsError && (
+                      <span className="w-fit rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-600 dark:bg-white/10 dark:text-slate-200">
+                        {reports.length} dossier{reports.length > 1 ? 's' : ''}
+                      </span>
+                    )}
+                  </div>
+
+                  {reportsLoading ? (
+                    <LoadingSpinner label="Chargement des signalements..." />
+                  ) : reportsError ? (
+                    <div className="p-6">
+                      <div className="flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-200">
+                        <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                        Impossible de charger l’historique de vos signalements.
+                      </div>
+                    </div>
+                  ) : reports.length === 0 ? (
+                    <EmptyState
+                      icon={Flag}
+                      title="Aucun signalement"
+                      description="Les signalements envoyés à l’administration apparaîtront ici avec leur état de traitement."
+                    />
+                  ) : (
+                    <div className="divide-y divide-slate-100 dark:divide-white/10">
+                      {reports.slice(0, 3).map((report) => (
+                        <PatientReportRow
+                          key={report.id}
+                          report={report}
+                          onOpen={() => setSelectedReport(report)}
+                        />
+                      ))}
+                      {reports.length > 3 && (
+                        <div className="p-4 sm:px-5">
+                          <button
+                            type="button"
+                            onClick={() => setReportsHistoryOpen(true)}
+                            className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 text-sm font-bold text-slate-700 transition-colors hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700 dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:border-blue-500/30 dark:hover:bg-blue-500/10"
+                          >
+                            Voir les {reports.length} signalements
+                            <ChevronRight className="h-4 w-4" />
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   )}
                 </Card>
               </>

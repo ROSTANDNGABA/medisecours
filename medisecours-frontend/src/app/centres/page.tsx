@@ -72,6 +72,7 @@ export default function CentresPage() {
   const [destination, setDestination] = useState<Destination | null>(null)
   const [isTracking, setIsTracking] = useState(false)
   const [previewCentre, setPreviewCentre] = useState<any>(null)
+  const [mobileMapInteractive, setMobileMapInteractive] = useState(false)
 
   const { position, error, loading: locating, locate, watch, stopWatch, isWatching } = useGeolocation()
   const toast = useToast()
@@ -332,7 +333,7 @@ export default function CentresPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
         {/* Map */}
-        <div className="isolate z-0 lg:col-span-3 relative rounded-2xl overflow-hidden shadow-xl border border-white/50 dark:border-white/10 h-[420px] lg:h-[600px]">
+        <div className="isolate z-0 lg:col-span-3 relative h-[340px] overflow-hidden rounded-2xl border border-white/50 shadow-xl sm:h-[420px] lg:h-[600px] dark:border-white/10">
           <CentresMap
             centres={sorted}
             position={position || undefined}
@@ -341,10 +342,39 @@ export default function CentresPage() {
             isFallback={isFallback}
             destination={destination}
           />
+
+          {!mobileMapInteractive && (
+            <div className="absolute inset-0 z-[600] flex touch-pan-y items-end justify-center bg-gradient-to-t from-slate-950/45 via-transparent to-transparent p-4 lg:hidden">
+              <div className="w-full max-w-sm rounded-xl border border-white/70 bg-white/95 p-3 text-center shadow-xl backdrop-blur-md dark:border-white/15 dark:bg-slate-950/95">
+                <p className="text-xs leading-5 text-slate-600 dark:text-slate-300">
+                  Faites glisser votre doigt pour parcourir la page et la liste des centres.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setMobileMapInteractive(true)}
+                  className="mt-2 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg bg-primary-600 px-4 text-sm font-bold text-white transition hover:bg-primary-700 focus:outline-none focus:ring-4 focus:ring-primary-500/25"
+                >
+                  <MapPin className="h-4 w-4" />
+                  Explorer la carte
+                </button>
+              </div>
+            </div>
+          )}
+
+          {mobileMapInteractive && (
+            <button
+              type="button"
+              onClick={() => setMobileMapInteractive(false)}
+              className="absolute right-3 top-3 z-[600] inline-flex min-h-10 items-center gap-2 rounded-lg border border-white/80 bg-white/95 px-3 text-xs font-bold text-slate-800 shadow-lg backdrop-blur-md dark:border-white/15 dark:bg-slate-950/95 dark:text-white lg:hidden"
+            >
+              <X className="h-4 w-4" />
+              Reprendre le défilement
+            </button>
+          )}
           
           {/* Contrôle au-dessus de la carte, limité à son contexte d'empilement. */}
           {position && (
-            <div className="absolute bottom-6 left-1/2 z-20 -translate-x-1/2">
+            <div className={`absolute bottom-6 left-1/2 z-20 -translate-x-1/2 ${mobileMapInteractive ? '' : 'hidden lg:block'}`}>
               <button
                 onClick={() => setIsTracking(!isTracking)}
                 className={`flex items-center gap-2 px-6 py-3 rounded-full font-bold text-white shadow-xl transition-all ${
@@ -360,7 +390,7 @@ export default function CentresPage() {
         </div>
 
         {/* Centre cards list */}
-        <div ref={listRef} className="lg:col-span-2 max-h-[600px] overflow-y-auto pr-1 space-y-3">
+        <div ref={listRef} className="space-y-3 pr-1 lg:col-span-2 lg:max-h-[600px] lg:overflow-y-auto">
           {loading ? (
             <LoadingSpinner label="Chargement des centres…" />
           ) : sorted.length === 0 ? (

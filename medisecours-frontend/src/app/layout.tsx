@@ -8,7 +8,24 @@ export const metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="fr" className="h-dvh antialiased" data-scroll-behavior="smooth">
+    <html
+      lang="fr"
+      className="h-dvh antialiased"
+      data-scroll-behavior="smooth"
+      suppressHydrationWarning
+    >
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              try {
+                var theme = localStorage.getItem('medisecours_theme');
+                document.documentElement.classList.toggle('dark', theme === 'dark');
+              } catch (_) {}
+            `,
+          }}
+        />
+      </head>
       <body className="min-h-dvh flex flex-col">
         <Providers>{children}</Providers>
       </body>

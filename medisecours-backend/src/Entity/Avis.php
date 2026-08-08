@@ -21,10 +21,9 @@ use ApiPlatform\Metadata\ApiFilter;
 
 /**
  * Avis laissé par un patient sur un médecin après un échange.
- * Un patient ne peut laisser qu'un seul avis par médecin (contrainte DB unique).
+ * Chaque avis représente une expérience distincte après une consultation terminée.
  */
 #[ORM\Entity(repositoryClass: AvisRepository::class)]
-#[ORM\UniqueConstraint(name: 'unique_avis_patient_medecin', fields: ['patient', 'medecin'])]
 #[ApiFilter(SearchFilter::class, properties: [
     'patient.nom' => 'partial',
     'patient.prenom' => 'partial',

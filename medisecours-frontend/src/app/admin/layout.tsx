@@ -9,6 +9,7 @@ import {
   BookOpen,
   Building2,
   ClipboardCheck,
+  Flag,
   HeartPulse,
   HelpCircle,
   LayoutDashboard,
@@ -18,7 +19,6 @@ import {
   Settings,
   ShieldCheck,
   Sparkles,
-  Star,
   Users,
   X,
 } from 'lucide-react'
@@ -26,6 +26,7 @@ import { useAuth } from '../../hooks/useAuth'
 import api from '../../api/axios'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import NotificationBell from '../../components/ui/NotificationBell'
+import DashboardThemeToggle from '../../components/ui/DashboardThemeToggle'
 
 const NAV_GROUPS = [
   {
@@ -45,7 +46,7 @@ const NAV_GROUPS = [
     items: [
       { href: '/admin/catalogue', label: 'Catalogue', icon: BookOpen },
       { href: '/admin/protocoles', label: 'Protocoles cliniques', icon: ClipboardCheck },
-      { href: '/admin/avis', label: 'Avis', icon: Star },
+      { href: '/admin/signalements', label: 'Signalements', icon: Flag, badge: 'reports' },
       { href: '/admin/parametres', label: 'Parametres', icon: Settings },
     ],
   },
@@ -76,9 +77,9 @@ const PAGE_META: Record<string, { title: string; subtitle: string }> = {
     title: 'Protocoles cliniques',
     subtitle: 'Revue, validation externe et publication des premiers gestes',
   },
-  '/admin/avis': {
-    title: 'Avis et moderation',
-    subtitle: 'Suivi qualite et moderation communautaire',
+  '/admin/signalements': {
+    title: 'Signalements',
+    subtitle: 'Examen des alertes transmises par les patients',
   },
   '/admin/parametres': {
     title: 'Parametres',
@@ -88,7 +89,7 @@ const PAGE_META: Record<string, { title: string; subtitle: string }> = {
 
 function SidebarBlock({ children, className = '' }: { children: React.ReactNode; className?: string }) {
   return (
-    <div className={`rounded-[24px] border border-[#e4e8df] bg-[#f7f8f3] shadow-[0_18px_50px_rgba(15,36,24,0.06)] ${className}`}>
+    <div className={`dashboard-panel rounded-[24px] border ${className}`}>
       {children}
     </div>
   )
@@ -101,6 +102,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const [mobileOpen, setMobileOpen] = useState(false)
   const [now, setNow] = useState(new Date())
   const [pendingCount, setPendingCount] = useState(0)
+  const [reportCount, setReportCount] = useState(0)
 
   useEffect(() => {
     if (mounted && !isAdmin) router.replace('/login')
@@ -115,11 +117,14 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     api.get('/api/admin/stats')
       .then((res) => setPendingCount(res.data?.utilisateurs?.medecinsEnAttente ?? 0))
       .catch(() => {})
+    api.get('/api/admin/signalements/stats')
+      .then((res) => setReportCount(res.data?.nouveaux ?? 0))
+      .catch(() => {})
   }, [])
 
   if (!mounted || !isAdmin) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#dfe5db]">
+      <div className="dashboard-theme dashboard-shell min-h-screen flex items-center justify-center">
         <LoadingSpinner label="Chargement de l'administration..." />
       </div>
     )
@@ -184,6 +189,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                         {pendingCount}
                       </span>
                     )}
+                    {badge === 'reports' && reportCount > 0 && (
+                      <span className={`min-w-[22px] rounded-full px-1.5 py-0.5 text-center text-[10px] font-bold ${active ? 'bg-red-300 text-red-950' : 'bg-red-600 text-white'}`}>
+                        {reportCount}
+                      </span>
+                    )}
                   </Link>
                 )
               })}
@@ -244,7 +254,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   )
 
   return (
-    <div className="min-h-screen bg-[#dfe5db] p-3 sm:p-5 md:pl-0">
+    <div className="dashboard-theme dashboard-shell min-h-screen p-3 sm:p-5 md:pl-0">
       <div className="flex min-h-[calc(100vh-1.5rem)] gap-4 lg:gap-5">
         <aside className="hidden w-[290px] shrink-0 md:block md:sticky md:top-5 md:self-start md:max-h-[calc(100vh-2.5rem)] md:overflow-y-auto">
           <SidebarBlock className="flex h-full flex-col md:rounded-l-none md:border-l-0">
@@ -286,6 +296,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                           {badge === 'pending' && pendingCount > 0 && (
                             <span className={`min-w-[22px] rounded-full px-1.5 py-0.5 text-center text-[10px] font-bold ${active ? 'bg-[#59c56c] text-[#0f2418]' : 'bg-[#0f2418] text-white'}`}>
                               {pendingCount}
+                            </span>
+                          )}
+                          {badge === 'reports' && reportCount > 0 && (
+                            <span className={`min-w-[22px] rounded-full px-1.5 py-0.5 text-center text-[10px] font-bold ${active ? 'bg-red-300 text-red-950' : 'bg-red-600 text-white'}`}>
+                              {reportCount}
                             </span>
                           )}
                         </Link>
@@ -405,6 +420,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                   >
                     <Search className="h-4 w-4" />
                   </button>
+                  <DashboardThemeToggle />
                   <NotificationBell count={pendingCount} href="/admin/medecins" badgeColor="#59c56c" dotColor="#59c56c" />
                 </div>
               </div>

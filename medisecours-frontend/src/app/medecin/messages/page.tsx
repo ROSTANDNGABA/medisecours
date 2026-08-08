@@ -122,9 +122,9 @@ function lastMsgPreview(m) {
 function DateDivider({ label }) {
   return (
     <div className="flex items-center gap-4 my-6">
-      <div className="flex-1 h-px bg-gray-200" />
-      <span className="text-[11px] font-semibold tracking-wider text-gray-400 uppercase">{label}</span>
-      <div className="flex-1 h-px bg-gray-200" />
+      <div className="flex-1 h-px bg-gray-200 dark:bg-white/10" />
+      <span className="text-[11px] font-semibold tracking-wider text-gray-400 dark:text-slate-400 uppercase">{label}</span>
+      <div className="flex-1 h-px bg-gray-200 dark:bg-white/10" />
     </div>
   )
 }
@@ -132,10 +132,10 @@ function DateDivider({ label }) {
 function TypingDots() {
   return (
     <div className="flex justify-start mb-3 pl-[44px]">
-      <div className="bg-[#EDEDED] rounded-[18px] rounded-bl-[4px] px-4 py-3 flex items-center gap-1">
-        <span className="w-2 h-2 rounded-full bg-gray-400" style={{ animation: 'dotPulse 1.4s ease-in-out infinite', animationDelay: '0s' }} />
-        <span className="w-2 h-2 rounded-full bg-gray-400" style={{ animation: 'dotPulse 1.4s ease-in-out infinite', animationDelay: '0.2s' }} />
-        <span className="w-2 h-2 rounded-full bg-gray-400" style={{ animation: 'dotPulse 1.4s ease-in-out infinite', animationDelay: '0.4s' }} />
+      <div className="bg-[#EDEDED] dark:bg-primary-700 rounded-[18px] rounded-bl-[4px] px-4 py-3 flex items-center gap-1">
+        <span className="w-2 h-2 rounded-full bg-gray-400 dark:bg-slate-400" style={{ animation: 'dotPulse 1.4s ease-in-out infinite', animationDelay: '0s' }} />
+        <span className="w-2 h-2 rounded-full bg-gray-400 dark:bg-slate-400" style={{ animation: 'dotPulse 1.4s ease-in-out infinite', animationDelay: '0.2s' }} />
+        <span className="w-2 h-2 rounded-full bg-gray-400 dark:bg-slate-400" style={{ animation: 'dotPulse 1.4s ease-in-out infinite', animationDelay: '0.4s' }} />
       </div>
     </div>
   )
@@ -156,7 +156,7 @@ function UserAvatar({ user: u, size = 40, className = '' }) {
       <img
         src={src}
         alt={name}
-        className={`${className} rounded-full object-cover ring-2 ring-white shadow-sm shrink-0`}
+        className={`${className} rounded-full object-cover ring-2 ring-white dark:ring-primary-700 shadow-sm shrink-0`}
         style={{ width: size, height: size }}
         onError={() => setImgErr(true)}
       />
@@ -888,7 +888,7 @@ function MedecinMessagesContent() {
 
 
   return (
-    <div className="h-[calc(100vh-4rem)] bg-gradient-to-br from-blue-50 to-blue-100 flex p-0 lg:p-4">
+    <div className="h-[calc(100vh-4rem)] bg-gradient-to-br from-blue-50 to-blue-100 dark:from-primary-900 dark:to-primary-800 flex p-0 lg:p-4">
       <div className="w-full h-full max-w-6xl mx-auto bg-white lg:rounded-[12px] shadow-none lg:shadow-xl flex overflow-hidden">
         {/* ── Sidebar ── */}
         <div className={`w-full lg:w-[360px] shrink-0 border-r border-gray-200 bg-white flex flex-col ${activeId ? 'hidden lg:flex' : 'flex'}`}>
@@ -934,7 +934,7 @@ function MedecinMessagesContent() {
                     <div className="relative shrink-0">
                       <UserAvatar user={c.info} size={48} />
                       {onlineUsers.has(String(c.info?.id)) && (
-                        <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-[#4CAF50] border-2 border-white" />
+                        <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-[#4CAF50] border-2 border-white dark:border-primary-700" />
                       )}
                     </div>
                     <div className="flex-1 min-w-0">
@@ -982,7 +982,7 @@ function MedecinMessagesContent() {
                 </button>
                 <div className="relative shrink-0">
                   <UserAvatar user={activeConv.info} size={40} />
-                  {onlineUsers.has(String(activeConv.info?.id)) && <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-[#4CAF50] border-2 border-white" />}
+                  {onlineUsers.has(String(activeConv.info?.id)) && <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-[#4CAF50] border-2 border-white dark:border-primary-700" />}
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold text-[#212121]">

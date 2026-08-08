@@ -9,6 +9,7 @@ import {
   CalendarDays,
   CheckCircle2,
   Clock3,
+  Flag,
   LoaderCircle,
   MessageSquareText,
   PhoneCall,
@@ -22,6 +23,7 @@ import { emergencyCallHref, EMERGENCY_NUMBER } from '@/config/firstAid'
 import { useAuth } from '@/hooks/useAuth'
 import { resolveImgPath } from '@/lib/config'
 import CertifiedBadge from '@/components/ui/CertifiedBadge'
+import Modal from '@/components/ui/Modal'
 import {
   idFromRelation,
   type Consultation,
@@ -29,6 +31,15 @@ import {
   type PublicMedecinDetail,
 } from '@/types/api'
 import { useToast } from '@/components/ui/Toast'
+
+const REPORT_REASONS = [
+  { value: 'COMPORTEMENT_INAPPROPRIE', label: 'Comportement inapproprié' },
+  { value: 'FAUSSE_INFORMATION', label: 'Informations fausses ou trompeuses' },
+  { value: 'HARCELEMENT', label: 'Harcèlement ou propos déplacés' },
+  { value: 'NEGLIGENCE', label: 'Négligence pendant la prise en charge' },
+  { value: 'FRAUDE', label: 'Fraude ou demande de paiement suspecte' },
+  { value: 'AUTRE', label: 'Autre motif' },
+]
 
 function fullName(medecin: PublicMedecinDetail): string {
   return `Dr ${medecin.prenom ?? ''} ${medecin.nom ?? ''}`.replace(/\s+/g, ' ').trim()
@@ -90,7 +101,10 @@ export default function MedecinDetailPage({ params }: { params: Promise<{ id: st
   const [note, setNote] = useState(0)
   const [commentaire, setCommentaire] = useState('')
   const [sending, setSending] = useState(false)
-  const [reviewSent, setReviewSent] = useState(false)
+  const [reportOpen, setReportOpen] = useState(false)
+  const [reportReason, setReportReason] = useState('')
+  const [reportDescription, setReportDescription] = useState('')
+  const [reportSending, setReportSending] = useState(false)
 
   const { data: medecin, error, isLoading, mutate } = useSWR<PublicMedecinDetail>(
     `/api/medecins-publics/${encodeURIComponent(id)}`,
@@ -115,7 +129,6 @@ export default function MedecinDetailPage({ params }: { params: Promise<{ id: st
     consultation.statut === 'TERMINEE'
     && String(idFromRelation(consultation.medecin)) === String(id)
   ))
-
   const submitReview = async (event: React.FormEvent) => {
     event.preventDefault()
     const text = commentaire.trim()
@@ -135,7 +148,6 @@ export default function MedecinDetailPage({ params }: { params: Promise<{ id: st
         note,
         commentaire: text || null,
       })
-      setReviewSent(true)
       setNote(0)
       setCommentaire('')
       await mutate()
@@ -145,12 +157,45 @@ export default function MedecinDetailPage({ params }: { params: Promise<{ id: st
       if (status === 403) {
         toast.error('Un avis peut être publié après une consultation terminée avec ce médecin.')
       } else if (status === 422) {
-        toast.error('Vous avez déjà publié un avis pour ce médecin.')
+        toast.error('Vérifiez la note et le contenu de votre avis.')
       } else {
         toast.error('Impossible de publier cet avis.')
       }
     } finally {
       setSending(false)
+    }
+  }
+
+  const submitReport = async (event: React.FormEvent) => {
+    event.preventDefault()
+    const description = reportDescription.trim()
+    if (!reportReason) {
+      toast.error('Sélectionnez le motif du signalement.')
+      return
+    }
+    if (description.length < 20) {
+      toast.error('Décrivez les faits avec au moins 20 caractères.')
+      return
+    }
+
+    setReportSending(true)
+    try {
+      await api.post('/api/signalements-medecins', {
+        medecin: `/api/users/${id}`,
+        motif: reportReason,
+        description,
+      })
+      setReportOpen(false)
+      setReportReason('')
+      setReportDescription('')
+      toast.success('Votre signalement a été transmis à l’administration.')
+    } catch (requestError: unknown) {
+      const response = (requestError as {
+        response?: { status?: number; data?: { error?: string } }
+      }).response
+      toast.error(response?.data?.error || 'Impossible de transmettre ce signalement.')
+    } finally {
+      setReportSending(false)
     }
   }
 
@@ -198,6 +243,74 @@ export default function MedecinDetailPage({ params }: { params: Promise<{ id: st
 
   return (
     <main className="mx-auto w-full max-w-5xl px-4 py-8 sm:px-6 sm:py-10">
+      <Modal
+        isOpen={reportOpen}
+        onClose={() => {
+          if (!reportSending) setReportOpen(false)
+        }}
+        title={`Signaler ${fullName(medecin)}`}
+        size="md"
+      >
+        <form onSubmit={submitReport} className="space-y-4">
+          <div className="border border-red-200 bg-red-50 p-3 text-xs leading-5 text-red-900 dark:border-red-500/25 dark:bg-red-500/10 dark:text-red-100">
+            Ce formulaire est privé. Il sera uniquement transmis aux administrateurs chargés d’examiner le dossier.
+          </div>
+          <div>
+            <label htmlFor="report-reason" className="text-sm font-bold text-slate-900 dark:text-white">
+              Motif
+            </label>
+            <select
+              id="report-reason"
+              value={reportReason}
+              onChange={(event) => setReportReason(event.target.value)}
+              className="mt-2 min-h-11 w-full border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none focus:border-red-500 dark:border-white/10 dark:bg-slate-950 dark:text-white"
+              required
+            >
+              <option value="">Sélectionner un motif</option>
+              {REPORT_REASONS.map((reason) => (
+                <option key={reason.value} value={reason.value}>{reason.label}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label htmlFor="report-description" className="text-sm font-bold text-slate-900 dark:text-white">
+              Description des faits
+            </label>
+            <textarea
+              id="report-description"
+              value={reportDescription}
+              onChange={(event) => setReportDescription(event.target.value)}
+              rows={6}
+              minLength={20}
+              maxLength={2000}
+              placeholder="Décrivez les faits, le contexte et les éléments utiles à la vérification."
+              className="mt-2 w-full resize-y border border-slate-300 bg-white px-3 py-3 text-sm text-slate-900 outline-none focus:border-red-500 dark:border-white/10 dark:bg-slate-950 dark:text-white"
+              required
+            />
+            <p className="mt-1 text-right text-xs text-slate-500">
+              {reportDescription.length}/2000
+            </p>
+          </div>
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <button
+              type="button"
+              onClick={() => setReportOpen(false)}
+              disabled={reportSending}
+              className="min-h-11 border border-slate-300 bg-white px-4 text-sm font-bold text-slate-700 disabled:opacity-50 dark:border-white/15 dark:bg-slate-900 dark:text-white"
+            >
+              Annuler
+            </button>
+            <button
+              type="submit"
+              disabled={reportSending || !reportReason || reportDescription.trim().length < 20}
+              className="min-h-11 bg-red-700 px-4 text-sm font-bold text-white hover:bg-red-600 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {reportSending ? 'Transmission...' : 'Envoyer le signalement'}
+            </button>
+          </div>
+        </form>
+      </Modal>
+
       <Link
         href="/medecins"
         className="inline-flex min-h-10 items-center gap-2 text-sm font-bold text-slate-600 hover:text-slate-950 dark:text-slate-300"
@@ -273,13 +386,25 @@ export default function MedecinDetailPage({ params }: { params: Promise<{ id: st
               {contactLabel}
             </Link>
             {isPatient && (
-              <Link
-                href="/patient/consultations?new=1"
-                className="mt-2 inline-flex min-h-11 w-full items-center justify-center gap-2 border border-slate-300 bg-white px-4 text-sm font-bold text-slate-700 dark:border-white/15 dark:bg-slate-900 dark:text-white"
-              >
-                <CalendarDays className="h-4 w-4" aria-hidden="true" />
-                Nouvelle consultation
-              </Link>
+              <>
+                <Link
+                  href="/patient/consultations?new=1"
+                  className="mt-2 inline-flex min-h-11 w-full items-center justify-center gap-2 border border-slate-300 bg-white px-4 text-sm font-bold text-slate-700 dark:border-white/15 dark:bg-slate-900 dark:text-white"
+                >
+                  <CalendarDays className="h-4 w-4" aria-hidden="true" />
+                  Nouvelle consultation
+                </Link>
+                {canReview && (
+                  <button
+                    type="button"
+                    onClick={() => setReportOpen(true)}
+                    className="mt-2 inline-flex min-h-11 w-full items-center justify-center gap-2 border border-red-200 bg-red-50 px-4 text-sm font-bold text-red-700 hover:bg-red-100 dark:border-red-500/25 dark:bg-red-500/10 dark:text-red-200"
+                  >
+                    <Flag className="h-4 w-4" aria-hidden="true" />
+                    Signaler ce médecin
+                  </button>
+                )}
+              </>
             )}
           </aside>
         </div>
@@ -316,7 +441,7 @@ export default function MedecinDetailPage({ params }: { params: Promise<{ id: st
           </span>
         </div>
 
-        {isPatient && canReview && !reviewSent && (
+        {isPatient && canReview && (
           <form
             onSubmit={submitReview}
             className="mt-5 border border-slate-200 bg-slate-50 p-5 dark:border-white/10 dark:bg-slate-900"

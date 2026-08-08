@@ -20,7 +20,7 @@ const NAV = [
 
 const NAV_BOTTOM = [
   { href: '/medecin/rapports', label: 'Rapports', icon: BarChart3 },
-  { href: '/medecin/notifications', label: 'Notifications', icon: Bell },
+  { href: '/medecin/notifications', label: 'Notifications', icon: Bell, badge: 'notifications' },
   { href: '/medecin/profil', label: 'Profil', icon: Settings },
 ]
 
@@ -28,7 +28,7 @@ export default function MedecinSidebar({ setMobileOpen }: { setMobileOpen: (open
   const pathname = usePathname()
   const router = useRouter()
   const { user, logout } = useAuth()
-  const { unreadCount, pendingConsultationCount } = useNotification()
+  const { unreadCount, pendingConsultationCount, notificationCount } = useNotification()
 
   const estSurLaPageMessages = pathname.startsWith('/medecin/messages')
 
@@ -58,11 +58,18 @@ export default function MedecinSidebar({ setMobileOpen }: { setMobileOpen: (open
         </span>
       )
     }
+    if (badgeType === 'notifications' && notificationCount > 0) {
+      return (
+        <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-red-500 px-1.5 text-[10px] font-bold text-white">
+          {notificationCount > 99 ? '99+' : notificationCount}
+        </span>
+      )
+    }
     return null
   }
 
   return (
-    <div className="flex h-full flex-col bg-white">
+    <div className="dashboard-panel flex h-full flex-col border-r shadow-none">
       <div className="flex items-center gap-2.5 px-5 py-6">
         <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#1D4E89]">
           <HeartPulse className="h-5 w-5 text-white" />
@@ -95,21 +102,24 @@ export default function MedecinSidebar({ setMobileOpen }: { setMobileOpen: (open
 
         <div className="my-3 border-t border-gray-200" />
 
-        {NAV_BOTTOM.map(({ href, label, icon: Icon }) => {
+        {NAV_BOTTOM.map(({ href, label, icon: Icon, badge }) => {
           const active = isActive(href, false)
           return (
             <Link
               key={href}
               href={href}
               onClick={() => setMobileOpen?.(false)}
-              className={`flex items-center gap-3 rounded-full px-4 py-2.5 text-sm font-medium transition ${
+              className={`flex items-center justify-between gap-3 rounded-full px-4 py-2.5 text-sm font-medium transition ${
                 active
                   ? 'bg-[#3B6EF8] text-white'
                   : 'text-[#6B7280] hover:bg-[#F3F4F6] hover:text-[#374151]'
               }`}
             >
-              <Icon className="h-4 w-4" />
-              {label}
+              <span className="flex items-center gap-3">
+                <Icon className="h-4 w-4" />
+                {label}
+              </span>
+              {renderBadge(badge)}
             </Link>
           )
         })}

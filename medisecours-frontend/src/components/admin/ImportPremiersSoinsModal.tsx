@@ -147,7 +147,7 @@ export function ImportPremiersSoinsModal({ isOpen, onClose, onSuccess }: { isOpe
                             leaveFrom="opacity-100 scale-100"
                             leaveTo="opacity-0 scale-95"
                         >
-                            <Dialog.Panel className="w-full max-w-3xl transform overflow-hidden rounded-2xl bg-white p-6 shadow-xl transition-all">
+                            <Dialog.Panel className="dashboard-theme w-full max-w-3xl transform overflow-hidden rounded-2xl bg-white p-6 shadow-xl transition-all">
                                 <div className="flex items-center justify-between mb-4">
                                     <Dialog.Title className="text-xl font-semibold text-gray-900">
                                         Importer des Premiers Soins

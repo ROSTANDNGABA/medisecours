@@ -1,239 +1,359 @@
-// @ts-nocheck
 'use client'
 
-import { useEffect, useMemo, useCallback, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import useSWR, { mutate as globalMutate } from 'swr'
-import Link from 'next/link'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Bell, MessageSquare, Star, ArrowRight, Clock, Trash2 } from 'lucide-react'
+import {
+  ArrowRight,
+  Bell,
+  CalendarClock,
+  CheckCheck,
+  Clock,
+  MessageSquare,
+  Stethoscope,
+  Trash2,
+} from 'lucide-react'
 import api from '../../../api/axios'
 import { fetcher } from '../../../lib/fetcher'
+import { NOTIFICATIONS_KEY, UNREAD_NOTIFICATIONS_KEY } from '../../../lib/keys'
 import { useAuth } from '../../../hooks/useAuth'
-import { UNREAD_MESSAGES_KEY } from '../../../lib/keys'
 import LoadingSpinner from '../../../components/ui/LoadingSpinner'
 import EmptyState from '../../../components/ui/EmptyState'
-import Avatar from '../../../components/ui/Avatar'
 import { useToast } from '../../../components/ui/Toast'
-import { idStrFromRelation } from '../../../types/api'
 
-const easeOut = { type: 'spring', damping: 20, stiffness: 300 }
+interface NotificationRecord {
+  id: number
+  type: string
+  title: string
+  body?: string | null
+  link?: string | null
+  createdAt: string
+  readAt?: string | null
+}
+
 const stagger = { animate: { transition: { staggerChildren: 0.05 } } }
 const itemFade = {
   initial: { opacity: 0, y: 12, scale: 0.97 },
-  animate: { opacity: 1, y: 0, scale: 1, transition: { type: 'spring', damping: 22, stiffness: 320, mass: 0.9 } },
+  animate: {
+    opacity: 1,
+    y: 0,
+    scale: 1,
+    transition: { type: 'spring' as const, damping: 22, stiffness: 320, mass: 0.9 },
+  },
 }
 
-/** Clé SWR paginée : on ne charge QUE les 20 derniers messages (C2 corrigé). */
-const RECENT_MESSAGES_KEY = '/api/messages?itemsPerPage=20&order[createdAt]=desc'
+const iconByType = {
+  message_received: {
+    icon: MessageSquare,
+    color: '#3B6EF8',
+    background: 'rgba(59,110,248,0.12)',
+  },
+  consultation_accepted: {
+    icon: Stethoscope,
+    color: '#059669',
+    background: 'rgba(5,150,105,0.12)',
+  },
+  consultation_closed: {
+    icon: CalendarClock,
+    color: '#D97706',
+    background: 'rgba(217,119,6,0.12)',
+  },
+}
 
-function timeAgo(dateString) {
-  const diff = Date.now() - new Date(dateString).getTime()
-  const minutes = Math.floor(diff / 60000)
+function timeAgo(dateString: string): string {
+  const timestamp = new Date(dateString).getTime()
+  if (!Number.isFinite(timestamp)) return ''
+
+  const minutes = Math.max(0, Math.floor((Date.now() - timestamp) / 60000))
   if (minutes < 1) return "À l'instant"
   if (minutes < 60) return `Il y a ${minutes} min`
+
   const hours = Math.floor(minutes / 60)
-  if (hours < 24) return `Il y a ${hours}h`
+  if (hours < 24) return `Il y a ${hours} h`
+
   const days = Math.floor(hours / 24)
-  if (days < 30) return `Il y a ${days}j`
-  return `Il y a ${Math.floor(days / 30)}mois`
+  if (days < 30) return `Il y a ${days} j`
+
+  return `Il y a ${Math.floor(days / 30)} mois`
 }
 
-const ICON_MAP = {
-  message: { icon: MessageSquare, color: '#3B6EF8', bg: 'rgba(59,110,248,0.12)' },
-  avis: { icon: Star, color: '#F59E0B', bg: 'rgba(245,158,11,0.12)' },
-  signalement: { icon: Bell, color: '#EF4444', bg: 'rgba(239,68,68,0.12)' },
+function normalizeLink(link?: string | null): string {
+  if (!link) return '/medecin/notifications'
+  if (link.startsWith('/messages')) {
+    return `/medecin/messages${link.slice('/messages'.length)}`
+  }
+  return link
 }
 
 export default function MedecinNotificationsPage() {
-  const { user } = useAuth()
+  const { user, mounted } = useAuth()
+  const router = useRouter()
   const toast = useToast()
-  // C2 corrigé : pagination stricte (20 derniers) au lieu de charger tous les messages.
-  const { data: msgData, isLoading: msgLoading } = useSWR(RECENT_MESSAGES_KEY, fetcher, { revalidateOnFocus: false })
-  const { data: avisData, isLoading: avisLoading } = useSWR(user?.id ? `/api/avis?medecin=${user.id}` : null, fetcher, { revalidateOnFocus: false })
-  const messages = useMemo(() => (Array.isArray(msgData) ? msgData : []), [msgData])
-  const avis = useMemo(() => (Array.isArray(avisData) ? avisData : []), [avisData])
-
-  useEffect(() => {
-    if (!msgData && !msgLoading) toast.error('Impossible de charger les notifications.')
-  }, [msgData, msgLoading, toast])
-
-  const notifications = useMemo(() => {
-    const items = []
-    for (const m of messages) {
-      if (idStrFromRelation(m.expediteur) === user?.id) continue
-      if (m.statut === 'LU') continue
-      items.push({
-        id: `msg-${m.id}`,
-        type: 'message',
-        title: 'Nouveau message',
-        description: m.contenu?.slice(0, 100) || 'Message reçu',
-        time: m.createdAt,
-        unread: true,
-        link: '/medecin/messages',
-        sender: m.expediteur,
-      })
-    }
-    for (const a of avis) {
-      items.push({
-        id: `avis-${a.id}`,
-        type: 'avis',
-        title: 'Nouvel avis',
-        description: `Note: ${a.note}/5${a.commentaire ? ` — ${a.commentaire.slice(0, 80)}` : ''}`,
-        time: a.createdAt,
-        unread: false,
-        link: '/medecin/avis',
-        sender: a.patient,
-      })
-      if (a.signale) {
-        items.push({
-          id: `signale-${a.id}`,
-          type: 'signalement',
-          title: 'Avis signalé',
-          description: a.raisonSignalement || 'Un avis a été signalé pour modération',
-          time: a.createdAt,
-          unread: false,
-          link: '/medecin/avis',
-          sender: a.patient,
-        })
-      }
-    }
-    items.sort((a, b) => new Date(b.time) - new Date(a.time))
-    return items
-  }, [messages, avis, user?.id])
-
-  const unreadCount = useMemo(() => notifications.filter(n => n.unread).length, [notifications])
-  const [clearing, setClearing] = useState(false)
-
-  const clearAllNotifications = useCallback(async () => {
-    setClearing(true)
-    try {
-      const res = await api.get('/api/messages', { params: { itemsPerPage: 200, order: { createdAt: 'desc' } } })
-      const allMsgs = res.data?.['hydra:member'] ?? res.data?.member ?? (Array.isArray(res.data) ? res.data : [])
-      const unreadMsgs = allMsgs.filter((m) => m.statut !== 'LU' && idStrFromRelation(m.expediteur) !== user?.id)
-
-      if (unreadMsgs.length > 0) {
-        const results = await Promise.allSettled(
-          unreadMsgs.map((m) => {
-            const msgId = m.id ?? String(m['@id']?.split('/').pop())
-            return api.patch(`/api/messages/${msgId}`, { statut: 'LU' }, { headers: { 'Content-Type': 'application/merge-patch+json' } })
-          })
-        )
-        const failed = results.filter((r) => r.status === 'rejected')
-        if (failed.length > 0) {
-          console.error(`[notifications/clearAll] ${failed.length}/${unreadMsgs.length} PATCH échoués`)
-        }
-      }
-
-      globalMutate(UNREAD_MESSAGES_KEY)
-      globalMutate(RECENT_MESSAGES_KEY)
-    } catch (err) {
-      console.error('[notifications/clearAll] Erreur:', err)
-      globalMutate(UNREAD_MESSAGES_KEY)
-      globalMutate(RECENT_MESSAGES_KEY)
-    } finally {
-      setClearing(false)
-    }
-  }, [user?.id])
-
-  if (msgLoading || avisLoading) return (
-    <div className="flex min-h-[60vh] items-center justify-center">
-      <LoadingSpinner label="Chargement des notifications…" />
-    </div>
+  const [markingAll, setMarkingAll] = useState(false)
+  const [deletingAll, setDeletingAll] = useState(false)
+  const [markingId, setMarkingId] = useState<number | null>(null)
+  const { data, error, isLoading, mutate } = useSWR<NotificationRecord[]>(
+    user ? NOTIFICATIONS_KEY : null,
+    fetcher,
+    { revalidateOnFocus: true },
   )
+
+  const notifications = useMemo(
+    () => (Array.isArray(data) ? data : []),
+    [data],
+  )
+  const unreadCount = useMemo(
+    () => notifications.filter((notification) => !notification.readAt).length,
+    [notifications],
+  )
+
+  const markAsRead = useCallback(async (notification: NotificationRecord) => {
+    if (notification.readAt) return true
+
+    setMarkingId(notification.id)
+    const readAt = new Date().toISOString()
+    try {
+      await api.patch(
+        `/api/notifications/${notification.id}`,
+        { readAt },
+        { headers: { 'Content-Type': 'application/merge-patch+json' } },
+      )
+      await mutate(
+        (current) => current?.map((item) => (
+          item.id === notification.id ? { ...item, readAt } : item
+        )),
+        { revalidate: false },
+      )
+      globalMutate(
+        UNREAD_NOTIFICATIONS_KEY,
+        (current: { unreadCount?: number } | undefined) => ({
+          unreadCount: Math.max(0, (current?.unreadCount ?? unreadCount) - 1),
+        }),
+        { revalidate: false },
+      )
+      return true
+    } catch {
+      toast.error('Impossible de marquer cette notification comme lue.')
+      return false
+    } finally {
+      setMarkingId(null)
+    }
+  }, [mutate, toast, unreadCount])
+
+  const openNotification = useCallback(async (notification: NotificationRecord) => {
+    await markAsRead(notification)
+    router.push(normalizeLink(notification.link))
+  }, [markAsRead, router])
+
+  const markAllAsRead = useCallback(async () => {
+    if (unreadCount === 0) return
+
+    setMarkingAll(true)
+    const readAt = new Date().toISOString()
+    try {
+      await api.patch('/api/notifications/mark-all-read')
+      await mutate(
+        (current) => current?.map((item) => (
+          item.readAt ? item : { ...item, readAt }
+        )),
+        { revalidate: false },
+      )
+      globalMutate(UNREAD_NOTIFICATIONS_KEY, { unreadCount: 0 }, false)
+      toast.success('Toutes les notifications ont été marquées comme lues.')
+    } catch {
+      toast.error('Impossible de marquer toutes les notifications comme lues.')
+      await mutate()
+      globalMutate(UNREAD_NOTIFICATIONS_KEY)
+    } finally {
+      setMarkingAll(false)
+    }
+  }, [mutate, toast, unreadCount])
+
+  const deleteAllNotifications = useCallback(async () => {
+    if (notifications.length === 0) return
+    if (!window.confirm(
+      "Effacer définitivement tout l'historique des notifications ? Cette action ne supprime ni les messages ni les consultations.",
+    )) {
+      return
+    }
+
+    setDeletingAll(true)
+    try {
+      await api.delete('/api/notifications')
+      await mutate([], { revalidate: false })
+      globalMutate(NOTIFICATIONS_KEY, [], false)
+      globalMutate(UNREAD_NOTIFICATIONS_KEY, { unreadCount: 0 }, false)
+      toast.success("L'historique des notifications a été effacé.")
+    } catch {
+      toast.error("Impossible d'effacer l'historique des notifications.")
+      await mutate()
+      globalMutate(UNREAD_NOTIFICATIONS_KEY)
+    } finally {
+      setDeletingAll(false)
+    }
+  }, [mutate, notifications.length, toast])
+
+  if (!mounted || isLoading) {
+    return (
+      <div className="flex min-h-[60vh] items-center justify-center">
+        <LoadingSpinner label="Chargement des notifications..." />
+      </div>
+    )
+  }
 
   return (
     <div className="mx-auto max-w-3xl px-4 pb-12 pt-6 sm:px-6 sm:pt-8">
-      <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} transition={easeOut} className="mb-8">
-        <div className="flex items-center gap-4">
-          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#3B6EF8]/10">
+      <motion.div
+        initial={{ opacity: 0, y: -8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ type: 'spring', damping: 20, stiffness: 300 }}
+        className="mb-8"
+      >
+        <div className="flex flex-wrap items-center gap-4">
+          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[#3B6EF8]/10">
             <Bell className="h-6 w-6 text-[#3B6EF8]" />
           </div>
-          <div className="flex-1">
-            <h1 className="text-2xl font-bold tracking-tight text-[#0F2C52]">Notifications</h1>
+          <div className="min-w-0 flex-1">
+            <h1 className="text-2xl font-bold tracking-tight text-[#0F2C52]">
+              Notifications
+            </h1>
             <p className="mt-0.5 text-sm text-[#6B7280]">
               {unreadCount > 0
                 ? `${unreadCount} non lue${unreadCount > 1 ? 's' : ''}`
                 : 'Tout est à jour'}
             </p>
           </div>
-          <button
-            onClick={clearAllNotifications}
-            disabled={clearing}
-            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors duration-200 disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            {clearing ? (
-              <span className="h-4 w-4 animate-spin rounded-full border-2 border-red-400 border-t-transparent" />
-            ) : (
-              <Trash2 className="h-4 w-4" />
-            )}
-            Tout effacer
-          </button>
+          {notifications.length > 0 && (
+            <div className="flex w-full flex-wrap gap-2 sm:w-auto sm:justify-end">
+              {unreadCount > 0 && (
+                <button
+                  type="button"
+                  onClick={markAllAsRead}
+                  disabled={markingAll || deletingAll}
+                  className="inline-flex min-h-10 flex-1 items-center justify-center gap-2 rounded-lg bg-[#F0F4FF] px-4 py-2 text-sm font-semibold text-[#315FD6] transition hover:bg-[#E2EAFF] disabled:cursor-not-allowed disabled:opacity-50 sm:flex-none"
+                >
+                  {markingAll ? (
+                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-[#3B6EF8] border-t-transparent" />
+                  ) : (
+                    <CheckCheck className="h-4 w-4" />
+                  )}
+                  Tout marquer comme lu
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={deleteAllNotifications}
+                disabled={deletingAll || markingAll}
+                className="inline-flex min-h-10 flex-1 items-center justify-center gap-2 rounded-lg bg-red-50 px-4 py-2 text-sm font-semibold text-red-600 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50 sm:flex-none"
+              >
+                {deletingAll ? (
+                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-red-500 border-t-transparent" />
+                ) : (
+                  <Trash2 className="h-4 w-4" />
+                )}
+                Tout effacer
+              </button>
+            </div>
+          )}
         </div>
       </motion.div>
 
-      {notifications.length === 0 ? (
-        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15, ...easeOut }}>
+      {error ? (
+        <div className="rounded-xl border border-red-200 bg-red-50 px-5 py-6 text-center">
+          <p className="text-sm font-medium text-red-700">
+            Impossible de charger les notifications.
+          </p>
+          <button
+            type="button"
+            onClick={() => mutate()}
+            className="mt-3 rounded-lg bg-white px-4 py-2 text-sm font-semibold text-red-700 shadow-sm"
+          >
+            Réessayer
+          </button>
+        </div>
+      ) : notifications.length === 0 ? (
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.15, type: 'spring', damping: 20, stiffness: 300 }}
+        >
           <EmptyState
             icon={Bell}
             title="Aucune notification"
-            description="Vous serez notifié des nouveaux messages, avis et alertes ici."
+            description="Les nouveaux messages et événements liés à vos consultations apparaîtront ici."
           />
         </motion.div>
       ) : (
-        <motion.div variants={stagger} initial="initial" animate="animate" className="space-y-1.5">
+        <motion.div
+          variants={stagger}
+          initial="initial"
+          animate="animate"
+          className="space-y-1.5"
+        >
           <AnimatePresence mode="popLayout">
-            {notifications.map((n, i) => {
-              const meta = ICON_MAP[n.type] || ICON_MAP.message
+            {notifications.map((notification) => {
+              const unread = !notification.readAt
+              const iconMeta = iconByType[
+                notification.type as keyof typeof iconByType
+              ] ?? {
+                icon: Bell,
+                color: '#6B7280',
+                background: 'rgba(107,114,128,0.12)',
+              }
+              const Icon = iconMeta.icon
+
               return (
                 <motion.div
-                  key={n.id}
+                  key={notification.id}
                   layout
                   variants={itemFade}
                   exit={{ opacity: 0, scale: 0.95, y: -8, transition: { duration: 0.15 } }}
                 >
-                  <Link
-                    href={n.link}
-                    className={`group relative flex items-start gap-4 rounded-2xl p-4 transition-all active:scale-[0.98] ${
-                      n.unread
+                  <button
+                    type="button"
+                    onClick={() => openNotification(notification)}
+                    disabled={markingId === notification.id}
+                    className={`group relative flex w-full items-start gap-4 rounded-xl p-4 text-left transition active:scale-[0.98] disabled:cursor-wait ${
+                      unread
                         ? 'bg-[#F0F4FF] shadow-sm shadow-blue-500/5'
                         : 'bg-white hover:bg-[#F9FAFB]'
                     }`}
-                    style={{ transition: 'transform 0.1s ease-out, background 0.2s ease-out' }}
                   >
-                    {n.unread && (
+                    {unread && (
                       <span className="absolute left-0 top-1/2 h-6 w-1 -translate-y-1/2 rounded-r-full bg-[#3B6EF8]" />
                     )}
                     <div
-                      className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl backdrop-blur-sm"
-                      style={{ backgroundColor: meta.bg }}
+                      className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg"
+                      style={{ backgroundColor: iconMeta.background }}
                     >
-                      <meta.icon className="h-5 w-5" style={{ color: meta.color }} />
+                      <Icon className="h-5 w-5" style={{ color: iconMeta.color }} />
                     </div>
                     <div className="min-w-0 flex-1">
-                      <div className="flex items-center justify-between gap-2">
-                        <p className={`text-sm ${n.unread ? 'font-bold text-[#0F2C52]' : 'font-semibold text-[#374151]'}`}>
-                          {n.title}
+                      <div className="flex items-start justify-between gap-2">
+                        <p className={`text-sm ${
+                          unread
+                            ? 'font-bold text-[#0F2C52]'
+                            : 'font-semibold text-[#374151]'
+                        }`}
+                        >
+                          {notification.title}
                         </p>
                         <span className="flex shrink-0 items-center gap-1 text-[11px] text-[#9CA3AF]">
                           <Clock className="h-3 w-3" />
-                          {timeAgo(n.time)}
+                          {timeAgo(notification.createdAt)}
                         </span>
                       </div>
-                      {n.sender && (
-                        <div className="mt-1.5 flex items-center gap-2">
-                          <Avatar
-                            name={`${n.sender?.prenom || ''} ${n.sender?.nom || ''}`}
-                            size="sm"
-                          />
-                          <span className="text-xs font-medium text-[#6B7280]">
-                            {n.sender?.prenom} {n.sender?.nom}
-                          </span>
-                        </div>
-                      )}
-                      <p className="mt-1 text-xs leading-relaxed text-[#9CA3AF] line-clamp-2">{n.description}</p>
+                      <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-[#6B7280]">
+                        {notification.body || 'Une nouvelle information est disponible.'}
+                      </p>
                     </div>
-                    <ArrowRight className="mt-2 h-4 w-4 shrink-0 text-[#D1D5DB] transition group-hover:text-[#3B6EF8] group-hover:translate-x-0.5" style={{ transition: 'color 0.2s, transform 0.2s' }} />
-                  </Link>
+                    {markingId === notification.id ? (
+                      <span className="mt-2 h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-[#3B6EF8] border-t-transparent" />
+                    ) : (
+                      <ArrowRight className="mt-2 h-4 w-4 shrink-0 text-[#D1D5DB] transition group-hover:translate-x-0.5 group-hover:text-[#3B6EF8]" />
+                    )}
+                  </button>
                 </motion.div>
               )
             })}
