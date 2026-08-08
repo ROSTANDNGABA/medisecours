@@ -59,6 +59,26 @@ h1, h2, h3, h4 {
   @apply bg-mint-100 text-primary-900;
 }
 
+.auth-field {
+  color-scheme: light;
+}
+
+.dark .auth-field {
+  color-scheme: dark;
+  caret-color: #f8fafc;
+}
+
+.dark .auth-field:-webkit-autofill,
+.dark .auth-field:-webkit-autofill:hover,
+.dark .auth-field:-webkit-autofill:focus,
+.dark .auth-field:-webkit-autofill:active {
+  -webkit-text-fill-color: #f1f5f9 !important;
+  caret-color: #f8fafc;
+  border-color: #334155;
+  -webkit-box-shadow: 0 0 0 1000px #0f172a inset !important;
+  box-shadow: 0 0 0 1000px #0f172a inset !important;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;
