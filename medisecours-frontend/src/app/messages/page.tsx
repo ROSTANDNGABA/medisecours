@@ -16,6 +16,7 @@ import { useAuth } from '../../hooks/useAuth'
 import { useNotification } from '../../contexts/NotificationContext'
 import useSWR, { mutate as globalMutate } from 'swr'
 import { fetcher } from '../../lib/fetcher'
+import { useWsStatus } from '../../hooks/useWebSocket'
 import { UNREAD_MESSAGES_KEY } from '../../lib/keys'
 import { useSearchParams, useRouter } from 'next/navigation'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
@@ -134,7 +135,9 @@ export default function MessagesPage() {
   const msgLoadingRef = useRef(false)
   const initialPageReadyRef = useRef(false)
 
-  const { data: convData, isLoading: convLoading, error: convError, mutate: mutateConvs } = useSWR('/api/conversations', fetcher, { revalidateOnFocus: false })
+  const wsOnline = useWsStatus()
+
+  const { data: convData, isLoading: convLoading, error: convError, mutate: mutateConvs } = useSWR('/api/conversations', fetcher, { revalidateOnFocus: false, refreshInterval: wsOnline ? 0 : 12000 })
 
   const preselectConsultation = searchParams?.get('consultation')
   const preselectMedecin = searchParams?.get('medecin')
@@ -221,7 +224,7 @@ export default function MessagesPage() {
   const { data: msgData, isLoading: msgLoading, error: msgError, mutate: mutateMsgs } = useSWR(
     activeIdNum ? `/api/messages?conversation=/api/conversations/${activeIdNum}&order[createdAt]=DESC&order[id]=DESC&itemsPerPage=${MSGS_PER_PAGE}&page=${msgPage}` : null,
     fetcher,
-    { revalidateOnFocus: false }
+    { revalidateOnFocus: false, refreshInterval: wsOnline ? 0 : 12000 }
   )
 
   useEffect(() => { activeIdRef.current = activeId }, [activeId])

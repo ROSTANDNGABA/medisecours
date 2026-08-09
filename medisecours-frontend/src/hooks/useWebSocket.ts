@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useCallback } from 'react'
+import { useEffect, useRef, useCallback, useSyncExternalStore } from 'react'
 
 function resolveWebSocketUrl(configuredUrl?: string): string {
   const fallbackUrl = 'ws://127.0.0.1:8081/ws'
@@ -20,6 +20,25 @@ const WS_URL = resolveWebSocketUrl(process.env.NEXT_PUBLIC_WS_URL)
 const MAX_BACKOFF = 30000
 const PING_INTERVAL = 30000
 const PONG_TIMEOUT = 10000
+
+const connectedSockets = new Set<WebSocket>()
+const wsStatusListeners = new Set<() => void>()
+let wsConnected = false
+
+function emitWsStatus() {
+  for (const listener of wsStatusListeners) listener()
+}
+
+function subscribeWsStatus(listener: () => void) {
+  wsStatusListeners.add(listener)
+  return () => {
+    wsStatusListeners.delete(listener)
+  }
+}
+
+export function useWsStatus(): boolean {
+  return useSyncExternalStore(subscribeWsStatus, () => wsConnected, () => wsConnected)
+}
 
 export function useWebSocket(userId: string, token: string, handlers: {
   onNewMessage?: (msg: any) => void
@@ -97,6 +116,9 @@ export function useWebSocket(userId: string, token: string, handlers: {
           // Auth handshake
           if (parsed.type === 'auth_ok') {
             authenticatedRef.current = true
+            connectedSockets.add(ws)
+            wsConnected = true
+            emitWsStatus()
             startPing(ws)
             return
           }
@@ -125,6 +147,10 @@ export function useWebSocket(userId: string, token: string, handlers: {
 
       ws.onclose = (event) => {
         clearTimers()
+        if (connectedSockets.delete(ws) && connectedSockets.size === 0) {
+          wsConnected = false
+          emitWsStatus()
+        }
         authenticatedRef.current = false
         if (disposed) return
         // Do not retry if auth failed (code 4003)
