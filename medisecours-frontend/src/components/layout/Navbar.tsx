@@ -66,10 +66,10 @@ export default function Navbar() {
   const patientMobileNav: NavLink[] = [
     { to: '/', label: 'Accueil', icon: Home },
     { to: '/premiers-soins', label: 'Secours', icon: Cross },
+    { to: '/maladies', label: 'Orientation', icon: Activity },
     { to: '/medecins', label: 'Médecins', icon: Stethoscope },
     { to: '/patient/consultations', label: 'Rendez-vous', icon: FileText },
     { to: '/centres', label: 'Centres', icon: MapPin },
-    { to: '/messages', label: 'Messages', icon: MessageCircle, badge: unreadCount },
   ]
 
   const mobileNavItems: NavLink[] = isAuthenticated && !isAdmin ? patientMobileNav : publicMobileNav
@@ -150,13 +150,15 @@ export default function Navbar() {
 
           {/* Right: Actions */}
           <div className="flex shrink-0 items-center gap-1.5 pr-1">
-            <button
-              onClick={toggleDark}
-              className="flex items-center justify-center w-9 h-9 rounded-full border border-white/70 dark:border-white/10 bg-white/45 dark:bg-white/5 text-gray-500 dark:text-gray-300 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_4px_12px_rgba(30,58,95,0.08)] hover:bg-white/70 dark:hover:bg-white/10 hover:text-indigo-600 transition-colors"
-              aria-label="Basculer le mode sombre"
-            >
-              {dark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-            </button>
+            {!isAuthenticated && (
+              <button
+                onClick={toggleDark}
+                className="flex items-center justify-center w-9 h-9 rounded-full border border-white/70 dark:border-white/10 bg-white/45 dark:bg-white/5 text-gray-500 dark:text-gray-300 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_4px_12px_rgba(30,58,95,0.08)] hover:bg-white/70 dark:hover:bg-white/10 hover:text-indigo-600 transition-colors"
+                aria-label="Basculer le mode sombre"
+              >
+                {dark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+              </button>
+            )}
 
             {isAuthenticated ? (
               <div className="flex items-center gap-2">
@@ -209,10 +211,10 @@ export default function Navbar() {
       * ══════════════════════════════════════════════════════════════════ */}
       <div id="app-topbar">
       <div className="xl:hidden fixed top-2 inset-x-2 sm:inset-x-4 z-50 isolate overflow-hidden rounded-[22px] border border-white/80 dark:border-white/15 bg-[linear-gradient(135deg,rgba(255,255,255,0.76),rgba(255,255,255,0.42)_52%,rgba(224,231,255,0.5))] dark:bg-[linear-gradient(135deg,rgba(17,24,39,0.84),rgba(30,41,59,0.66)_52%,rgba(49,46,129,0.44))] backdrop-blur-[24px] backdrop-saturate-[1.8] shadow-[0_14px_36px_rgba(30,58,95,0.16),inset_0_1px_0_rgba(255,255,255,0.96)] dark:shadow-[0_14px_36px_rgba(0,0,0,0.36),inset_0_1px_0_rgba(255,255,255,0.16)] before:absolute before:inset-px before:-z-10 before:rounded-[inherit] before:bg-[radial-gradient(circle_at_15%_0%,rgba(255,255,255,0.82),transparent_34%),radial-gradient(circle_at_90%_110%,rgba(99,102,241,0.16),transparent_36%)] dark:before:bg-[radial-gradient(circle_at_15%_0%,rgba(255,255,255,0.14),transparent_34%),radial-gradient(circle_at_90%_110%,rgba(129,140,248,0.2),transparent_36%)]">
-        <div className="flex items-center justify-between px-4 py-3">
+        <div className="flex items-center justify-between gap-2 px-3 py-3 sm:px-4">
           <Link
             href="/"
-            className="flex h-12 w-[142px] shrink-0 items-center justify-center overflow-hidden rounded-xl transition-colors dark:bg-white/90 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.95),0_3px_12px_rgba(0,0,0,0.14)]"
+            className="flex h-11 w-[108px] shrink-0 items-center justify-center overflow-hidden rounded-xl transition-colors dark:bg-white/90 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.95),0_3px_12px_rgba(0,0,0,0.14)] sm:h-12 sm:w-[142px]"
             aria-label="MediSecours - Accueil"
           >
             <Image
@@ -221,24 +223,44 @@ export default function Navbar() {
               width={853}
               height={299}
               priority
-              className="h-auto w-[138px] max-w-full object-contain"
+              className="h-auto w-[104px] max-w-full object-contain sm:w-[138px]"
             />
           </Link>
 
-          <div className="flex items-center gap-2">
-            <button
-              onClick={toggleDark}
-              className="flex items-center justify-center w-9 h-9 rounded-full border border-white/70 dark:border-white/10 bg-white/45 dark:bg-white/5 text-gray-500 dark:text-gray-300 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)] hover:bg-white/70 dark:hover:bg-white/10 hover:text-indigo-600 transition-colors"
-              aria-label="Basculer le mode sombre"
-            >
-              {dark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-            </button>
+          <div className="flex shrink-0 items-center gap-1 sm:gap-2">
+            {!isAuthenticated && (
+              <button
+                onClick={toggleDark}
+                className="flex h-8 w-8 items-center justify-center rounded-full border border-white/70 bg-white/45 text-gray-500 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)] transition-colors hover:bg-white/70 hover:text-indigo-600 dark:border-white/10 dark:bg-white/5 dark:text-gray-300 dark:hover:bg-white/10 sm:h-9 sm:w-9"
+                aria-label="Basculer le mode sombre"
+              >
+                {dark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+              </button>
+            )}
 
             {isAuthenticated && (
               <>
+                {!isAdmin && (
+                  <Link
+                    href="/messages"
+                    className={`relative flex h-8 w-8 items-center justify-center rounded-full border shadow-[inset_0_1px_0_rgba(255,255,255,0.9)] transition-colors sm:h-9 sm:w-9 ${
+                      estDansLaMessagerie
+                        ? 'border-indigo-200 bg-indigo-100/80 text-indigo-600 dark:border-indigo-400/20 dark:bg-indigo-500/20 dark:text-indigo-300'
+                        : 'border-white/70 bg-white/45 text-gray-500 hover:bg-white/70 hover:text-indigo-600 dark:border-white/10 dark:bg-white/5 dark:text-gray-300 dark:hover:bg-white/10'
+                    }`}
+                    aria-label={unreadCount > 0 ? `Messages, ${unreadCount} non lu${unreadCount > 1 ? 's' : ''}` : 'Messages'}
+                  >
+                    <MessageCircle className="h-4 w-4" />
+                    {unreadCount > 0 && !estDansLaMessagerie && (
+                      <span className="absolute -right-1 -top-1 flex h-[17px] min-w-[17px] items-center justify-center rounded-full bg-red-500 px-1 text-[9px] font-bold text-white ring-2 ring-white dark:ring-slate-900">
+                        {unreadCount > 99 ? '99+' : unreadCount}
+                      </span>
+                    )}
+                  </Link>
+                )}
                 <Link
                   href="/profil"
-                  className="flex items-center justify-center w-9 h-9 rounded-full overflow-hidden border border-white/70 dark:border-white/10 bg-white/45 dark:bg-white/5 text-gray-500 dark:text-gray-300 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)] hover:bg-white/70 dark:hover:bg-white/10 hover:text-indigo-600 transition-colors"
+                  className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-full border border-white/70 bg-white/45 text-gray-500 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)] transition-colors hover:bg-white/70 hover:text-indigo-600 dark:border-white/10 dark:bg-white/5 dark:text-gray-300 dark:hover:bg-white/10 sm:h-9 sm:w-9"
                   aria-label="Profil"
                 >
                   {user?.photoProfil ? (
@@ -249,7 +271,7 @@ export default function Navbar() {
                 </Link>
                 <button
                   onClick={() => { logout(); router.push('/') }}
-                  className="flex items-center justify-center w-9 h-9 rounded-full border border-white/70 dark:border-white/10 bg-white/45 dark:bg-white/5 text-gray-500 dark:text-gray-300 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)] hover:text-red-500 hover:bg-red-50/80 dark:hover:bg-red-500/10 transition-colors"
+                  className="flex h-8 w-8 items-center justify-center rounded-full border border-white/70 bg-white/45 text-gray-500 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)] transition-colors hover:bg-red-50/80 hover:text-red-500 dark:border-white/10 dark:bg-white/5 dark:text-gray-300 dark:hover:bg-red-500/10 sm:h-9 sm:w-9"
                   aria-label="Se déconnecter"
                 >
                   <LogOut className="w-4 h-4" />
@@ -284,16 +306,16 @@ export default function Navbar() {
                 <Link
                   key={item.to}
                   href={item.to}
-                  className="relative flex flex-col items-center justify-center min-w-[60px] py-1 gap-0.5 group"
+                  className="group relative flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 py-1"
                 >
                   {/* Active pill background behind icon */}
-                  <div className={`relative flex items-center justify-center w-12 h-8 rounded-2xl transition-all duration-300 ${
+                  <div className={`relative flex h-8 w-10 items-center justify-center rounded-2xl transition-all duration-300 sm:w-12 ${
                     active 
                       ? 'border border-white/75 dark:border-white/10 bg-white/60 dark:bg-indigo-500/20 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_4px_12px_rgba(79,70,229,0.12)]'
                       : 'border border-transparent group-active:border-white/60 group-active:bg-white/45 dark:group-active:bg-white/5'
                   }`}>
                     <Icon 
-                      className={`w-[22px] h-[22px] transition-colors duration-200 ${
+                      className={`h-5 w-5 transition-colors duration-200 sm:h-[22px] sm:w-[22px] ${
                         active 
                           ? 'text-indigo-600 dark:text-indigo-400' 
                           : 'text-gray-400 dark:text-gray-500'
@@ -310,7 +332,7 @@ export default function Navbar() {
                   </div>
 
                   {/* Label */}
-                  <span className={`text-[10px] font-semibold leading-tight transition-colors duration-200 ${
+                  <span className={`max-w-full truncate text-[8px] font-semibold leading-tight transition-colors duration-200 sm:text-[10px] ${
                     active 
                       ? 'text-indigo-600 dark:text-indigo-400' 
                       : 'text-gray-400 dark:text-gray-500'

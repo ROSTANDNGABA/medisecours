@@ -1,155 +1,76 @@
 'use client'
 
-import Link from 'next/link'
 import Image from 'next/image'
+import Link from 'next/link'
 import {
   ArrowRight,
   Building2,
   CheckCircle2,
-  ChevronDown,
-  ClipboardList,
+  ClipboardCheck,
   HeartPulse,
-  LogIn,
-  MessageSquareText,
   PhoneCall,
   Search,
   ShieldAlert,
   Stethoscope,
-  UserPlus,
+  UserRound,
 } from 'lucide-react'
 import { emergencyCallHref, EMERGENCY_NUMBER } from '@/config/firstAid'
 
-const actions = [
+const situations = [
   {
     href: '/premiers-soins',
     icon: ShieldAlert,
-    context: 'Danger immédiat ou accident',
-    title: 'Une personne a besoin de premiers secours',
-    description: 'Choisissez ce que vous observez : étouffement, brûlure, saignement, convulsion, accident ou malaise.',
-    action: 'Ouvrir les fiches de secours',
-    tone: 'border-red-200 bg-red-50 text-red-950 dark:border-red-500/25 dark:bg-red-500/10 dark:text-red-100',
+    label: 'Urgence ou accident',
+    title: 'La personne a besoin d’aide maintenant',
+    description: 'Malaise, étouffement, brûlure, saignement, convulsion ou perte de connaissance.',
+    action: 'Voir les gestes à faire',
+    tone: 'border-red-200 bg-red-50 text-red-950 hover:border-red-300 dark:border-red-500/25 dark:bg-red-500/10 dark:text-red-100',
+    iconTone: 'bg-red-600 text-white',
   },
   {
     href: '/maladies',
     icon: Search,
-    context: 'Sans urgence vitale apparente',
-    title: 'J’observe des symptômes sans danger immédiat',
-    description: 'Décrivez les signes, leur durée et leur intensité pour connaître le niveau de soins adapté, sans diagnostic automatique.',
-    action: 'Décrire les symptômes',
-    tone: 'border-blue-200 bg-blue-50 text-blue-950 dark:border-blue-500/25 dark:bg-blue-500/10 dark:text-blue-100',
-  },
-  {
-    href: '/medecins',
-    icon: MessageSquareText,
-    context: 'Avis médical professionnel',
-    title: 'Je souhaite parler à un médecin',
-    description: 'Demandez une consultation en ligne pour obtenir une évaluation, un diagnostic et une prise en charge professionnels.',
-    action: 'Choisir un médecin',
-    tone: 'border-emerald-200 bg-emerald-50 text-emerald-950 dark:border-emerald-500/25 dark:bg-emerald-500/10 dark:text-emerald-100',
-  },
-  {
-    href: '/centres',
-    icon: Building2,
-    context: 'Examen ou soins sur place',
-    title: 'Je dois me rendre dans un centre de santé',
-    description: 'Localisez une structure adaptée lorsqu’un examen, des soins sur place ou une prise en charge urgente sont nécessaires.',
-    action: 'Rechercher un centre',
-    tone: 'border-violet-200 bg-violet-50 text-violet-950 dark:border-violet-500/25 dark:bg-violet-500/10 dark:text-violet-100',
-  },
-]
-
-const emergencyChecks = [
-  'La personne répond-elle lorsque vous lui parlez ?',
-  'Respire-t-elle normalement ?',
-  'Y a-t-il un saignement important ?',
-  'Le lieu est-il sûr pour vous et pour la victime ?',
-]
-
-const gettingStartedSteps = [
-  {
-    icon: ShieldAlert,
-    title: 'Identifiez d’abord le niveau d’urgence',
-    description: 'Si la personne ne répond pas, respire mal, convulse ou saigne beaucoup, ouvrez immédiatement Premiers soins et contactez les urgences.',
-    href: '/premiers-soins',
-    action: 'Voir les premiers gestes',
-  },
-  {
-    icon: ClipboardList,
-    title: 'Décrivez les signes observés',
-    description: 'Pour une situation non immédiatement critique, indiquez les symptômes, leur durée, leur intensité et le contexte.',
-    href: '/maladies',
+    label: 'Symptômes sans danger apparent',
+    title: 'Je veux savoir vers quel soin m’orienter',
+    description: 'Décrivez les signes observés pour choisir entre surveillance, consultation ou centre de santé.',
     action: 'Commencer l’orientation',
+    tone: 'border-blue-200 bg-blue-50 text-blue-950 hover:border-blue-300 dark:border-blue-500/25 dark:bg-blue-500/10 dark:text-blue-100',
+    iconTone: 'bg-blue-600 text-white',
   },
   {
-    icon: Stethoscope,
-    title: 'Choisissez la prise en charge',
-    description: 'Suivez l’orientation vers les urgences, un centre de santé ou une consultation médicale en ligne.',
     href: '/medecins',
-    action: 'Voir les médecins',
-  },
-  {
-    icon: UserPlus,
-    title: 'Créez un compte pour être accompagné',
-    description: 'Un compte patient permet de demander une consultation, échanger avec un médecin et retrouver le suivi de vos demandes.',
-    href: '/register',
-    action: 'Créer un compte patient',
-  },
-]
-
-const careDestinations = [
-  {
-    icon: ShieldAlert,
-    level: 'Danger immédiat',
-    title: 'Services d’urgence',
-    description: 'L’application affiche les signes de danger, les gestes temporaires à appliquer et la nécessité d’appeler immédiatement les secours.',
-    detail: `Appel prioritaire au ${EMERGENCY_NUMBER}`,
-    tone: 'border-red-200 bg-red-50 text-red-950 dark:border-red-500/25 dark:bg-red-500/10 dark:text-red-100',
-  },
-  {
-    icon: Building2,
-    level: 'Examen nécessaire',
-    title: 'Centre de santé',
-    description: 'MediSecours vous oriente vers une structure lorsque la personne doit être examinée ou recevoir des soins sur place.',
-    detail: 'Recherche de centres disponible',
-    tone: 'border-blue-200 bg-blue-50 text-blue-950 dark:border-blue-500/25 dark:bg-blue-500/10 dark:text-blue-100',
-  },
-  {
     icon: Stethoscope,
-    level: 'Avis médical',
-    title: 'Consultation en ligne',
-    description: 'Pour une situation sans urgence vitale apparente, un médecin peut évaluer les symptômes et décider de la conduite médicale adaptée.',
-    detail: 'Compte patient nécessaire',
-    tone: 'border-emerald-200 bg-emerald-50 text-emerald-950 dark:border-emerald-500/25 dark:bg-emerald-500/10 dark:text-emerald-100',
+    label: 'Besoin d’un avis professionnel',
+    title: 'Je souhaite consulter un médecin',
+    description: 'Choisissez un médecin et envoyez une demande de consultation depuis votre espace patient.',
+    action: 'Voir les médecins',
+    tone: 'border-emerald-200 bg-emerald-50 text-emerald-950 hover:border-emerald-300 dark:border-emerald-500/25 dark:bg-emerald-500/10 dark:text-emerald-100',
+    iconTone: 'bg-emerald-600 text-white',
   },
 ]
 
-const frequentlyAskedQuestions = [
+const steps = [
   {
-    question: 'Puis-je utiliser MediSecours sans créer de compte ?',
-    answer: 'Oui. Les fiches de premiers secours, l’orientation par symptômes et la recherche de centres sont accessibles aux visiteurs. Un compte est nécessaire pour consulter un médecin et utiliser le suivi personnel.',
+    icon: HeartPulse,
+    title: 'Observez la situation',
+    description: 'Vérifiez si la personne répond, respire normalement et présente un danger immédiat.',
   },
   {
-    question: 'MediSecours peut-il établir un diagnostic ?',
-    answer: 'Non. L’orientation aide à reconnaître un niveau d’urgence et à choisir le bon parcours de soins. Seul un médecin qualifié peut établir un diagnostic, prescrire un traitement et organiser le suivi médical.',
+    icon: ClipboardCheck,
+    title: 'Choisissez votre besoin',
+    description: 'Ouvrez les premiers soins, l’orientation par symptômes ou la consultation médicale.',
   },
   {
-    question: 'Quand faut-il appeler directement les urgences ?',
-    answer: `Appelez le ${EMERGENCY_NUMBER} lorsqu’une personne ne répond pas, respire difficilement, convulse, présente un saignement important ou tout autre danger immédiat. Ne retardez jamais l’appel pour terminer un formulaire.`,
-  },
-  {
-    question: 'Comment se déroule une consultation en ligne ?',
-    answer: 'Créez un compte patient, choisissez un médecin disponible et transmettez les informations demandées. Le médecin analyse la situation, échange avec vous et décide si une consultation à distance suffit ou si un examen sur place est nécessaire.',
-  },
-  {
-    question: 'Les premiers gestes remplacent-ils une prise en charge médicale ?',
-    answer: 'Non. Ils servent uniquement à protéger la personne et à limiter l’aggravation en attendant les secours ou un professionnel. Ils ne constituent ni un traitement à domicile ni une prescription médicale.',
+    icon: UserRound,
+    title: 'Suivez l’action indiquée',
+    description: 'Appelez les secours, appliquez un geste temporaire ou contactez un professionnel.',
   },
 ]
 
 export default function HomePage() {
   return (
-    <main>
-      <section className="relative flex min-h-[78vh] items-end overflow-hidden bg-slate-950">
+    <main className="bg-white dark:bg-slate-950">
+      <section className="relative flex min-h-[68svh] items-end overflow-hidden bg-slate-950 sm:min-h-[72svh]">
         <Image
           src="/images/home-emergency.jpg"
           alt=""
@@ -159,276 +80,230 @@ export default function HomePage() {
           className="object-cover object-center"
           aria-hidden="true"
         />
-        <div className="absolute inset-0 bg-slate-950/68" aria-hidden="true" />
-        <div className="absolute inset-0 bg-gradient-to-r from-slate-950 via-slate-950/75 to-slate-950/20" aria-hidden="true" />
-        <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-transparent to-slate-950/45" aria-hidden="true" />
+        <div className="absolute inset-0 bg-slate-950/72" aria-hidden="true" />
+        <div className="absolute inset-0 bg-gradient-to-r from-slate-950 via-slate-950/80 to-slate-950/30" aria-hidden="true" />
+        <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-transparent to-slate-950/30" aria-hidden="true" />
 
-        <div className="relative mx-auto w-full max-w-6xl px-4 pb-10 pt-36 sm:px-6 sm:pb-14 lg:pb-16">
-          <p className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-300">
-            Premiers secours, orientation et consultation
+        <div className="relative mx-auto w-full max-w-6xl px-4 pb-10 pt-28 sm:px-6 sm:pb-14 xl:pt-36">
+          <p className="text-xs font-bold uppercase tracking-[0.16em] text-emerald-300">
+            Besoin d’aide maintenant ?
           </p>
-          <h1 className="mt-3 max-w-4xl font-display text-4xl font-bold leading-tight text-white sm:text-5xl lg:text-6xl">
-            MediSecours
+          <h1 className="mt-3 max-w-3xl font-display text-4xl font-bold leading-tight text-white sm:text-5xl lg:text-6xl">
+            MediSecours vous aide à choisir la prochaine action.
           </h1>
           <p className="mt-4 max-w-2xl text-base leading-7 text-slate-200 sm:text-lg">
-            Une personne vient d&apos;avoir un accident, un malaise ou présente des symptômes ? MediSecours vous indique quoi faire maintenant : alerter les secours, appliquer un premier geste temporaire, rejoindre un centre ou consulter un médecin.
+            Premiers gestes, orientation par symptômes, recherche d’un centre ou consultation médicale : commencez par la situation réelle de la personne.
           </p>
 
-          <div className="mt-7 flex flex-wrap gap-3">
-            <Link href="/premiers-soins" className="inline-flex h-12 items-center gap-2 bg-red-600 px-5 text-sm font-bold text-white transition hover:bg-red-500">
-              <ShieldAlert className="h-5 w-5" />
-              Voir les gestes d&apos;urgence
+          <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+            <Link
+              href="/premiers-soins"
+              className="inline-flex min-h-12 items-center justify-center gap-2 bg-red-600 px-5 text-sm font-bold text-white transition hover:bg-red-500"
+            >
+              <ShieldAlert className="h-5 w-5" aria-hidden="true" />
+              Urgence : que dois-je faire ?
             </Link>
-            <a href={emergencyCallHref()} className="inline-flex h-12 items-center gap-2 border border-white/35 bg-white/10 px-5 text-sm font-bold text-white backdrop-blur transition hover:bg-white/20">
-              <PhoneCall className="h-5 w-5" />
+            <a
+              href={emergencyCallHref()}
+              className="inline-flex min-h-12 items-center justify-center gap-2 border border-white/35 bg-white/10 px-5 text-sm font-bold text-white backdrop-blur transition hover:bg-white/20"
+            >
+              <PhoneCall className="h-5 w-5" aria-hidden="true" />
               Appeler le {EMERGENCY_NUMBER}
             </a>
           </div>
 
-          <p className="mt-6 max-w-2xl text-xs leading-5 text-slate-300">
-            Danger immédiat : appelez d&apos;abord le {EMERGENCY_NUMBER}. MediSecours ne remplace ni les services d&apos;urgence ni un médecin. L&apos;application ne pose pas de diagnostic et ne prescrit aucun traitement.
+          <p className="mt-5 max-w-2xl text-xs leading-5 text-slate-300">
+            Si la personne ne répond pas, ne respire pas normalement ou saigne abondamment, appelez immédiatement les urgences. Ne perdez pas de temps à remplir un formulaire.
           </p>
         </div>
       </section>
 
-      <section className="bg-white py-10 dark:bg-slate-950 sm:py-14">
+      <section className="border-b border-slate-200 bg-white py-10 dark:border-white/10 dark:bg-slate-950 sm:py-14" aria-labelledby="choose-situation-title">
         <div className="mx-auto max-w-6xl px-4 sm:px-6">
           <div className="max-w-3xl">
-            <p className="text-xs font-bold uppercase tracking-[0.16em] text-emerald-700 dark:text-emerald-300">Commencez ici</p>
-            <h2 className="mt-2 font-display text-3xl font-bold text-slate-950 dark:text-white">Quelle situation correspond à votre besoin ?</h2>
-            <p className="mt-3 text-sm leading-6 text-slate-600 dark:text-slate-300 sm:text-base">
-              Choisissez la situation la plus proche de ce que vous vivez. En cas de doute entre deux parcours, commencez par les premiers secours : les signes de danger seront vérifiés en priorité.
+            <p className="text-xs font-bold uppercase tracking-[0.16em] text-emerald-700 dark:text-emerald-300">
+              Commencez ici
             </p>
-            <p className="mt-3 flex items-center gap-2 text-sm font-semibold text-emerald-800 dark:text-emerald-300">
-              <CheckCircle2 className="h-5 w-5 shrink-0" aria-hidden="true" />
-              Les fiches de premiers secours, l&apos;orientation et la recherche de centres sont accessibles sans créer de compte.
+            <h2 id="choose-situation-title" className="mt-2 font-display text-2xl font-bold text-slate-950 dark:text-white sm:text-3xl">
+              Que voulez-vous faire ?
+            </h2>
+            <p className="mt-3 text-sm leading-6 text-slate-600 dark:text-slate-300 sm:text-base">
+              Choisissez une seule option. Vous pourrez revenir à l’accueil à tout moment.
             </p>
           </div>
 
-          <div className="mt-6 grid gap-3 sm:grid-cols-2">
-            {actions.map((action) => {
-              const Icon = action.icon
+          <div className="mt-7 grid gap-3 lg:grid-cols-3">
+            {situations.map((situation) => {
+              const Icon = situation.icon
               return (
-                <Link key={action.href} href={action.href} className={`group flex min-h-56 flex-col border p-5 transition hover:-translate-y-0.5 hover:shadow-md ${action.tone}`}>
-                  <div className="flex items-start justify-between gap-4">
-                    <Icon className="h-7 w-7 shrink-0" />
-                    <ArrowRight className="h-5 w-5 shrink-0 transition group-hover:translate-x-1" />
+                <Link
+                  key={situation.href}
+                  href={situation.href}
+                  className={`group flex min-h-64 flex-col border p-5 transition hover:-translate-y-0.5 hover:shadow-md ${situation.tone}`}
+                >
+                  <div className={`flex h-11 w-11 items-center justify-center rounded-lg ${situation.iconTone}`}>
+                    <Icon className="h-6 w-6" aria-hidden="true" />
                   </div>
-                  <div className="mt-6">
-                    <p className="text-xs font-bold uppercase tracking-[0.12em] opacity-70">{action.context}</p>
-                    <h3 className="font-display text-xl font-bold">{action.title}</h3>
-                    <p className="mt-2 text-sm leading-6 opacity-80">{action.description}</p>
-                  </div>
+                  <p className="mt-5 text-xs font-bold uppercase tracking-[0.1em] opacity-70">{situation.label}</p>
+                  <h3 className="mt-1 font-display text-xl font-bold">{situation.title}</h3>
+                  <p className="mt-2 text-sm leading-6 opacity-80">{situation.description}</p>
                   <span className="mt-auto inline-flex items-center gap-2 pt-5 text-sm font-bold">
-                    {action.action}
+                    {situation.action}
                     <ArrowRight className="h-4 w-4 transition group-hover:translate-x-1" aria-hidden="true" />
                   </span>
                 </Link>
               )
             })}
           </div>
+
+          <div className="mt-4 flex flex-col gap-3 border border-slate-200 bg-slate-50 p-4 dark:border-white/10 dark:bg-slate-900 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex gap-3">
+              <Building2 className="mt-0.5 h-5 w-5 shrink-0 text-violet-600 dark:text-violet-300" aria-hidden="true" />
+              <div>
+                <p className="text-sm font-bold text-slate-900 dark:text-white">Vous devez vous déplacer ?</p>
+                <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">Recherchez directement un centre de santé proche de vous.</p>
+              </div>
+            </div>
+            <Link
+              href="/centres"
+              className="inline-flex min-h-10 shrink-0 items-center justify-center gap-2 border border-slate-300 bg-white px-4 text-sm font-bold text-slate-800 transition hover:bg-slate-100 dark:border-white/15 dark:bg-slate-800 dark:text-white dark:hover:bg-slate-700"
+            >
+              Trouver un centre
+              <ArrowRight className="h-4 w-4" aria-hidden="true" />
+            </Link>
+          </div>
         </div>
       </section>
 
-      <section className="border-y border-slate-200 bg-slate-950 text-white dark:border-white/10" aria-labelledby="getting-started-title">
-        <div className="mx-auto grid max-w-7xl lg:grid-cols-[0.88fr_1.12fr]">
-          <div className="relative min-h-[340px] overflow-hidden sm:min-h-[440px] lg:min-h-[620px]">
-            <Image
-              src="/images/home-guidance.jpg"
-              alt="Accompagnement d'un patient par un professionnel de santé"
-              fill
-              sizes="(max-width: 1024px) 100vw, 44vw"
-              className="object-cover object-center"
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-slate-950/10 lg:bg-gradient-to-r lg:from-transparent lg:to-slate-950/45" aria-hidden="true" />
-          </div>
+      <section className="bg-slate-50 py-10 dark:bg-slate-900 sm:py-14" aria-labelledby="how-it-works-title">
+        <div className="mx-auto max-w-6xl px-4 sm:px-6">
+          <div className="grid gap-8 lg:grid-cols-[0.78fr_1.22fr] lg:items-start">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-[0.16em] text-blue-700 dark:text-blue-300">
+                En trois étapes
+              </p>
+              <h2 id="how-it-works-title" className="mt-2 font-display text-2xl font-bold text-slate-950 dark:text-white sm:text-3xl">
+                Comment utiliser MediSecours
+              </h2>
+              <p className="mt-3 text-sm leading-6 text-slate-600 dark:text-slate-300">
+                Les premiers soins, l’orientation et la recherche de centres sont accessibles sans compte. Un compte patient est seulement nécessaire pour consulter un médecin et conserver votre suivi.
+              </p>
+              <div className="mt-5 flex flex-col gap-2 sm:flex-row lg:flex-col lg:items-start">
+                <Link
+                  href="/register"
+                  className="inline-flex min-h-11 items-center justify-center gap-2 bg-slate-950 px-4 text-sm font-bold text-white transition hover:bg-slate-800 dark:bg-emerald-600 dark:hover:bg-emerald-500"
+                >
+                  Créer un compte patient
+                  <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                </Link>
+                <Link
+                  href="/login"
+                  className="inline-flex min-h-11 items-center justify-center px-4 text-sm font-bold text-slate-700 transition hover:bg-slate-200 dark:text-slate-200 dark:hover:bg-white/5"
+                >
+                  J’ai déjà un compte
+                </Link>
+              </div>
+            </div>
 
-          <div className="px-4 py-10 sm:px-8 sm:py-12 lg:px-12 lg:py-14">
-            <p className="text-xs font-bold uppercase tracking-[0.16em] text-emerald-300">Première visite</p>
-            <h2 id="getting-started-title" className="mt-2 max-w-xl font-display text-3xl font-bold sm:text-4xl">
-              Comment utiliser MediSecours
-            </h2>
-            <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-300">
-              Commencez toujours par l’état réel de la personne. Le parcours change selon qu’il existe un danger immédiat ou qu’un avis médical peut être demandé sans urgence vitale.
-            </p>
-
-            <ol className="mt-8 space-y-6">
-              {gettingStartedSteps.map((step, index) => {
+            <ol className="divide-y divide-slate-200 border-y border-slate-200 dark:divide-white/10 dark:border-white/10">
+              {steps.map((step, index) => {
                 const Icon = step.icon
                 return (
-                  <li key={step.title} className="grid grid-cols-[38px_minmax(0,1fr)] gap-4 border-t border-white/10 pt-5 first:border-t-0 first:pt-0">
-                    <span className="flex h-9 w-9 items-center justify-center border border-white/20 bg-white/10 text-sm font-black text-emerald-300">
-                      {index + 1}
+                  <li key={step.title} className="grid grid-cols-[42px_minmax(0,1fr)] gap-4 py-5">
+                    <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-white text-blue-700 shadow-sm dark:bg-slate-800 dark:text-blue-300">
+                      <Icon className="h-5 w-5" aria-hidden="true" />
                     </span>
                     <div>
-                      <h3 className="flex items-center gap-2 font-display text-lg font-bold">
-                        <Icon className="h-5 w-5 text-emerald-300" aria-hidden="true" />
-                        {step.title}
-                      </h3>
-                      <p className="mt-2 text-sm leading-6 text-slate-300">{step.description}</p>
-                      <Link href={step.href} className="mt-3 inline-flex items-center gap-2 text-sm font-bold text-emerald-300 hover:text-emerald-200">
-                        {step.action}
-                        <ArrowRight className="h-4 w-4" aria-hidden="true" />
-                      </Link>
+                      <p className="text-xs font-bold uppercase tracking-[0.1em] text-slate-400 dark:text-slate-500">Étape {index + 1}</p>
+                      <h3 className="mt-1 font-display text-lg font-bold text-slate-950 dark:text-white">{step.title}</h3>
+                      <p className="mt-1 text-sm leading-6 text-slate-600 dark:text-slate-300">{step.description}</p>
                     </div>
                   </li>
                 )
               })}
             </ol>
+          </div>
 
-            <div className="mt-8 flex flex-wrap gap-3 border-t border-white/10 pt-6">
-              <Link href="/login" className="inline-flex h-11 items-center gap-2 border border-white/25 px-4 text-sm font-bold text-white transition hover:bg-white/10">
-                <LogIn className="h-4 w-4" aria-hidden="true" />
-                J&apos;ai déjà un compte
-              </Link>
-              <Link href="/register" className="inline-flex h-11 items-center gap-2 bg-emerald-500 px-4 text-sm font-bold text-slate-950 transition hover:bg-emerald-400">
-                <UserPlus className="h-4 w-4" aria-hidden="true" />
-                Je crée mon compte
-              </Link>
-            </div>
+          <div className="mt-8 flex gap-3 border-l-4 border-amber-500 bg-amber-50 p-4 text-amber-950 dark:bg-amber-500/10 dark:text-amber-100">
+            <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0" aria-hidden="true" />
+            <p className="text-sm leading-6">
+              MediSecours aide à reconnaître un niveau d’urgence et à choisir un parcours. La plateforme ne remplace pas les services d’urgence et ne pose pas de diagnostic à la place d’un médecin.
+            </p>
           </div>
         </div>
       </section>
 
-      <section className="bg-white py-10 dark:bg-slate-950 sm:py-14" aria-labelledby="orientation-result-title">
-        <div className="mx-auto max-w-6xl px-4 sm:px-6">
+      <section className="relative flex min-h-[480px] items-end overflow-hidden border-t border-slate-200 bg-slate-950 dark:border-white/10 sm:min-h-[560px]" aria-labelledby="home-consultation-title">
+        <Image
+          src="/images/home-doctor-visit.jpg"
+          alt="Médecin accompagnant une patiente à domicile"
+          fill
+          sizes="100vw"
+          className="object-cover object-center"
+        />
+        <div className="absolute inset-0 bg-slate-950/38" aria-hidden="true" />
+        <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/65 to-transparent" aria-hidden="true" />
+
+        <div className="relative mx-auto w-full max-w-6xl px-4 pb-8 pt-24 text-white sm:px-6 sm:pb-12 lg:pb-14">
           <div className="max-w-3xl">
-            <p className="text-xs font-bold uppercase tracking-[0.16em] text-blue-700 dark:text-blue-300">
-              Après votre recherche
-            </p>
-            <h2 id="orientation-result-title" className="mt-2 font-display text-3xl font-bold text-slate-950 dark:text-white">
-              MediSecours vous dirige vers le niveau d’aide adapté
-            </h2>
-            <p className="mt-3 text-sm leading-6 text-slate-600 dark:text-slate-300 sm:text-base">
-              L’objectif n’est pas de vous annoncer une maladie. La plateforme vérifie d’abord les signes de danger, puis vous indique le parcours le plus prudent selon les informations observées.
-            </p>
-          </div>
-
-          <div className="mt-7 grid gap-3 lg:grid-cols-3">
-            {careDestinations.map((destination) => {
-              const Icon = destination.icon
-              return (
-                <article key={destination.title} className={`flex min-h-72 flex-col border p-5 ${destination.tone}`}>
-                  <div className="flex items-start justify-between gap-4">
-                    <Icon className="h-7 w-7 shrink-0" aria-hidden="true" />
-                    <span className="text-xs font-bold uppercase tracking-[0.1em] opacity-70">{destination.level}</span>
-                  </div>
-                  <h3 className="mt-8 font-display text-2xl font-bold">{destination.title}</h3>
-                  <p className="mt-3 text-sm leading-6 opacity-80">{destination.description}</p>
-                  <p className="mt-auto border-t border-current/15 pt-5 text-sm font-bold">{destination.detail}</p>
-                </article>
-              )
-            })}
-          </div>
-
-          <div className="mt-6 flex flex-col gap-4 border-l-4 border-amber-500 bg-amber-50 p-5 text-amber-950 dark:bg-amber-500/10 dark:text-amber-100 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <p className="font-display text-lg font-bold">Vous hésitez sur le parcours à choisir ?</p>
-              <p className="mt-1 text-sm leading-6 opacity-80">
-                Commencez par décrire les signes observés. Toute urgence détectée sera affichée avant les autres résultats.
+              <p className="text-xs font-bold uppercase tracking-[0.16em] text-emerald-300">
+                Consultation médicale
               </p>
-            </div>
-            <Link href="/maladies" className="inline-flex h-11 shrink-0 items-center justify-center gap-2 bg-amber-600 px-4 text-sm font-bold text-white transition hover:bg-amber-500">
-              Commencer l&apos;orientation
-              <ArrowRight className="h-4 w-4" aria-hidden="true" />
-            </Link>
-          </div>
-        </div>
-      </section>
-
-      <section className="border-y border-slate-200 bg-slate-50 py-10 dark:border-white/10 dark:bg-slate-900 sm:py-14">
-        <div className="mx-auto grid max-w-6xl gap-8 px-4 sm:px-6 lg:grid-cols-[0.9fr_1.1fr] lg:items-center">
-          <div>
-            <p className="text-xs font-bold uppercase tracking-[0.16em] text-red-700 dark:text-red-300">Avant tout geste</p>
-            <h2 className="mt-2 font-display text-3xl font-bold text-slate-950 dark:text-white">Évaluer les dangers immédiats</h2>
-            <p className="mt-3 text-sm leading-6 text-slate-600 dark:text-slate-300">
-              N&apos;intervenez pas dans une zone dangereuse. Appelez les secours dès qu&apos;une personne ne répond pas, ne respire pas normalement ou présente un saignement important.
-            </p>
-            <Link href="/premiers-soins" className="mt-5 inline-flex h-11 items-center gap-2 bg-slate-950 px-4 text-sm font-bold text-white hover:bg-slate-800 dark:bg-emerald-600 dark:hover:bg-emerald-500">
-              Ouvrir les fiches de secours <ArrowRight className="h-4 w-4" />
-            </Link>
-          </div>
-          <ol className="grid gap-2 sm:grid-cols-2">
-            {emergencyChecks.map((item, index) => (
-              <li key={item} className="flex min-h-24 gap-3 border border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-slate-950">
-                <span className="flex h-7 w-7 shrink-0 items-center justify-center bg-red-600 text-xs font-black text-white">{index + 1}</span>
-                <span className="text-sm font-semibold leading-6 text-slate-800 dark:text-slate-200">{item}</span>
-              </li>
-            ))}
-          </ol>
-        </div>
-      </section>
-
-      <section className="bg-white py-10 dark:bg-slate-950 sm:py-14">
-        <div className="mx-auto max-w-6xl px-4 sm:px-6">
-          <div className="grid gap-8 lg:grid-cols-2">
-            <div>
-              <HeartPulse className="h-8 w-8 text-emerald-700 dark:text-emerald-300" />
-              <h2 className="mt-4 font-display text-2xl font-bold text-slate-950 dark:text-white">Ce que peut faire un patient</h2>
-              <ul className="mt-4 space-y-3">
-                {[
-                  'Décrire des signes observables et leur évolution.',
-                  'Alerter les secours ou rejoindre un centre de santé.',
-                  'Appliquer uniquement des gestes temporaires validés.',
-                  'Préparer les informations utiles pour le médecin.',
-                ].map((item) => (
-                  <li key={item} className="flex gap-3 text-sm leading-6 text-slate-600 dark:text-slate-300">
-                    <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" /> {item}
-                  </li>
-                ))}
-              </ul>
-            </div>
-            <div>
-              <Stethoscope className="h-8 w-8 text-blue-700 dark:text-blue-300" />
-              <h2 className="mt-4 font-display text-2xl font-bold text-slate-950 dark:text-white">Ce qui reste réservé au médecin</h2>
-              <ul className="mt-4 space-y-3">
-                {[
-                  'Établir ou confirmer un diagnostic.',
-                  'Prescrire un médicament ou en modifier la dose.',
-                  'Définir un traitement et organiser son suivi.',
-                  'Interpréter les examens et décider d une hospitalisation.',
-                ].map((item) => (
-                  <li key={item} className="flex gap-3 text-sm leading-6 text-slate-600 dark:text-slate-300">
-                    <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-blue-600" /> {item}
-                  </li>
-                ))}
-              </ul>
-              <Link href="/medecins" className="mt-5 inline-flex h-11 items-center gap-2 border border-slate-300 px-4 text-sm font-bold text-slate-800 hover:bg-slate-50 dark:border-white/15 dark:text-white dark:hover:bg-white/5">
-                Consulter en ligne <ArrowRight className="h-4 w-4" />
+              <h2 id="home-consultation-title" className="mt-2 font-display text-2xl font-bold sm:text-3xl lg:text-4xl">
+                Échangez avec un médecin depuis chez vous
+              </h2>
+              <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-200 sm:text-base">
+                Lorsque la situation ne présente pas de danger vital apparent, choisissez un médecin, envoyez votre demande et retrouvez vos échanges dans votre espace patient.
+              </p>
+              <Link
+                href="/medecins"
+                className="mt-5 inline-flex min-h-11 items-center justify-center gap-2 bg-emerald-600 px-4 text-sm font-bold text-white transition hover:bg-emerald-500"
+              >
+                Choisir un médecin
+                <ArrowRight className="h-4 w-4" aria-hidden="true" />
               </Link>
-            </div>
           </div>
         </div>
       </section>
 
-      <section className="border-t border-slate-200 bg-slate-50 py-10 dark:border-white/10 dark:bg-slate-900 sm:py-14" aria-labelledby="home-faq-title">
-        <div className="mx-auto grid max-w-6xl gap-8 px-4 sm:px-6 lg:grid-cols-[0.72fr_1.28fr]">
-          <div>
-            <p className="text-xs font-bold uppercase tracking-[0.16em] text-emerald-700 dark:text-emerald-300">
-              Questions fréquentes
-            </p>
-            <h2 id="home-faq-title" className="mt-2 font-display text-3xl font-bold text-slate-950 dark:text-white">
-              Comprendre MediSecours avant de commencer
-            </h2>
-            <p className="mt-3 text-sm leading-6 text-slate-600 dark:text-slate-300">
-              Ces réponses précisent le rôle de la plateforme et les limites à respecter pour l’utiliser de manière responsable.
-            </p>
-            <Link href="/register" className="mt-5 inline-flex h-11 items-center gap-2 bg-slate-950 px-4 text-sm font-bold text-white transition hover:bg-slate-800 dark:bg-emerald-600 dark:hover:bg-emerald-500">
-              Créer un compte patient
-              <ArrowRight className="h-4 w-4" aria-hidden="true" />
-            </Link>
-          </div>
+      <section className="relative flex min-h-[500px] items-end overflow-hidden border-t border-white/10 bg-slate-950 sm:min-h-[580px]" aria-labelledby="home-guided-care-title">
+        <Image
+          src="/images/home-care-guidance.jpg"
+          alt="Professionnels de santé accompagnant un patient"
+          fill
+          sizes="100vw"
+          className="object-cover object-center"
+        />
+        <div className="absolute inset-0 bg-slate-950/40" aria-hidden="true" />
+        <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/70 to-transparent" aria-hidden="true" />
 
-          <div className="divide-y divide-slate-200 border-y border-slate-200 dark:divide-white/10 dark:border-white/10">
-            {frequentlyAskedQuestions.map((item, index) => (
-              <details key={item.question} className="group" open={index === 0}>
-                <summary className="flex cursor-pointer list-none items-center justify-between gap-4 py-5 text-left font-display text-base font-bold text-slate-950 marker:content-none dark:text-white sm:text-lg">
-                  {item.question}
-                  <ChevronDown className="h-5 w-5 shrink-0 text-slate-500 transition group-open:rotate-180 dark:text-slate-400" aria-hidden="true" />
-                </summary>
-                <p className="max-w-3xl pb-5 pr-8 text-sm leading-6 text-slate-600 dark:text-slate-300">{item.answer}</p>
-              </details>
-            ))}
+        <div className="relative mx-auto w-full max-w-6xl px-4 pb-8 pt-24 text-white sm:px-6 sm:pb-12 lg:pb-14">
+          <div className="max-w-3xl">
+              <p className="text-xs font-bold uppercase tracking-[0.16em] text-blue-300">
+                Un parcours plus simple
+              </p>
+              <h2 id="home-guided-care-title" className="mt-2 font-display text-2xl font-bold sm:text-3xl lg:text-4xl">
+                Ne restez pas seul face à une situation de santé
+              </h2>
+              <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-200 sm:text-base">
+                MediSecours réunit les premiers gestes, l’orientation par symptômes, la recherche de centres et l’accès aux médecins. Vous partez de ce que vous observez, puis la plateforme vous conduit vers l’action la plus adaptée.
+              </p>
+              <div className="mt-5 flex flex-col gap-3 sm:flex-row">
+                <Link
+                  href="/premiers-soins"
+                  className="inline-flex min-h-11 items-center justify-center gap-2 bg-blue-600 px-4 text-sm font-bold text-white transition hover:bg-blue-500"
+                >
+                  Consulter les premiers soins
+                  <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                </Link>
+                <Link
+                  href="/centres"
+                  className="inline-flex min-h-11 items-center justify-center gap-2 border border-white/35 bg-white/10 px-4 text-sm font-bold text-white backdrop-blur transition hover:bg-white/20"
+                >
+                  <Building2 className="h-4 w-4" aria-hidden="true" />
+                  Trouver un centre de santé
+                </Link>
+              </div>
           </div>
         </div>
       </section>

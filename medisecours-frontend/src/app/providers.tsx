@@ -33,7 +33,7 @@ export default function Providers({ children }: { children: React.ReactNode }) {
             <NotificationProvider>
               <Navbar />
               <main className="flex-1 flex flex-col min-h-0">{children}</main>
-              {!isMessagingRoute && <Footer />}
+              {!isMessagingRoute && <Footer compact={pathname === '/'} />}
             </NotificationProvider>
           )}
         </ToastProvider>

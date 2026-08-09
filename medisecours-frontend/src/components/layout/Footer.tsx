@@ -5,8 +5,29 @@ import Image from 'next/image'
 import { ArrowRight, MapPin } from 'lucide-react'
 import { useAuthContext } from '../../contexts/AuthContext'
 
-export default function Footer() {
+export default function Footer({ compact = false }: { compact?: boolean }) {
   const { isAuthenticated } = useAuthContext()
+
+  if (compact) {
+    return (
+      <footer className="w-full border-t border-slate-200 bg-white pb-24 dark:border-white/10 dark:bg-slate-950 lg:pb-0">
+        <div className="mx-auto flex max-w-6xl flex-col gap-5 px-4 py-8 sm:px-6 md:flex-row md:items-center md:justify-between">
+          <div>
+            <p className="font-display text-base font-bold text-slate-950 dark:text-white">MediSecours</p>
+            <p className="mt-1 max-w-xl text-xs leading-5 text-slate-500 dark:text-slate-400">
+              Premiers gestes, orientation et accès aux professionnels de santé. En cas de danger immédiat, contactez d’abord les services d’urgence.
+            </p>
+          </div>
+          <nav className="flex flex-wrap gap-x-5 gap-y-2 text-xs font-semibold text-slate-600 dark:text-slate-300" aria-label="Liens de bas de page">
+            <Link href="/premiers-soins" className="hover:text-emerald-600 dark:hover:text-emerald-300">Premiers soins</Link>
+            <Link href="/centres" className="hover:text-emerald-600 dark:hover:text-emerald-300">Centres</Link>
+            <Link href="/medecins" className="hover:text-emerald-600 dark:hover:text-emerald-300">Médecins</Link>
+            <Link href="/login" className="hover:text-emerald-600 dark:hover:text-emerald-300">Connexion</Link>
+          </nav>
+        </div>
+      </footer>
+    )
+  }
 
   return (
     <footer className="mt-10 w-full min-w-0 overflow-x-clip border-t border-slate-100 bg-white pb-20 dark:border-white/5 dark:bg-[#111827] lg:pb-0">

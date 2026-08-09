@@ -5,11 +5,12 @@ import {
   Camera, Edit3, Save, ShieldCheck, X, Phone, MapPin, Droplet,
   HeartPulse, Siren, Plus, Stethoscope, BadgeCheck, CalendarClock, Lock, AlertTriangle,
   CheckCircle2, AlertCircle, Info, Flag, Clock3, MessageSquareText, XCircle, Eye,
-  ChevronRight,
+  ChevronRight, Moon, Sun,
 } from 'lucide-react'
 import useSWR from 'swr'
 import api from '../../api/axios'
 import { useAuth } from '../../hooks/useAuth'
+import { useTheme } from '../../hooks/useTheme'
 import { useToast } from '../../components/ui/Toast'
 import { resolveImgPath } from '../../lib/config'
 import { fetcher } from '../../lib/fetcher'
@@ -430,6 +431,7 @@ function PatientReportRow({
 
 export default function ProfilPage() {
   const { user, updateUser } = useAuth()
+  const { dark, toggleTheme } = useTheme()
   const toast = useToast()
   const fileRef = useRef<HTMLInputElement>(null)
   const syncedRef = useRef(false)
@@ -850,6 +852,42 @@ export default function ProfilPage() {
           </main>
 
           <aside className="space-y-5 lg:sticky lg:top-28 lg:self-start">
+            <Card className="rounded-[24px] p-5 sm:p-6">
+              <CardHeading
+                icon={dark ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
+                title="Apparence"
+                badgeClass="bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-300"
+              />
+              <div className="flex items-center justify-between gap-4">
+                <div className="min-w-0">
+                  <p className="text-sm font-bold text-slate-800 dark:text-sable">Thème sombre</p>
+                  <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-300">
+                    Adaptez l’affichage de votre espace patient à votre préférence.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={dark}
+                  aria-label={dark ? 'Désactiver le thème sombre' : 'Activer le thème sombre'}
+                  onClick={toggleTheme}
+                  className={`relative h-7 w-12 shrink-0 rounded-full border transition-colors ${
+                    dark
+                      ? 'border-indigo-400 bg-indigo-500'
+                      : 'border-slate-300 bg-slate-200'
+                  }`}
+                >
+                  <span
+                    className={`absolute left-0.5 top-0.5 flex h-[22px] w-[22px] items-center justify-center rounded-full bg-white text-slate-500 shadow-sm transition-transform ${
+                      dark ? 'translate-x-[22px]' : 'translate-x-0.5'
+                    }`}
+                  >
+                    {dark ? <Moon className="h-3 w-3" /> : <Sun className="h-3 w-3" />}
+                  </span>
+                </button>
+              </div>
+            </Card>
+
             <Card className="rounded-[24px] p-5 sm:p-6">
               <CardHeading icon={<ShieldCheck className="w-4 h-4" />} title="Confidentialité" />
               <div className="space-y-3 text-sm text-slate-600 dark:text-slate-300">
