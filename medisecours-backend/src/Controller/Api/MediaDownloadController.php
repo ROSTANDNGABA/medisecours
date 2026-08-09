@@ -18,7 +18,7 @@ use Symfony\Component\Routing\Annotation\Route;
 final class MediaDownloadController extends AbstractController
 {
     #[Route('/api/media_objects/{id}/download', name: 'api_media_download', methods: ['GET'])]
-    public function __invoke(MediaObject $media, EntityManagerInterface $entityManager): BinaryFileResponse
+    public function __invoke(MediaObject $media, EntityManagerInterface $entityManager): Response
     {
         $user = $this->getUser();
         if (!$media->isPublic() && !$this->canReadPrivateMedia($media, $entityManager, $user instanceof User ? $user : null)) {
@@ -30,13 +30,24 @@ final class MediaDownloadController extends AbstractController
             throw new NotFoundHttpException('Fichier introuvable.');
         }
 
+        $data = $media->getData();
+        if ($data !== null && $data !== '') {
+            return $this->binaryResponse($data, $media);
+        }
+
         $path = dirname(__DIR__, 3) . '/var/uploads/media/' . $fileName;
         if (!is_file($path)) {
             throw new NotFoundHttpException('Fichier introuvable.');
         }
 
-        $response = new BinaryFileResponse($path);
+        return new BinaryFileResponse($path);
+    }
+
+    private function binaryResponse(string $data, MediaObject $media): Response
+    {
+        $response = new Response($data);
         $response->headers->set('Content-Type', $media->getMimeType() ?? 'application/octet-stream');
+        $response->headers->set('Content-Length', (string) strlen($data));
         $response->headers->set('X-Content-Type-Options', 'nosniff');
         $response->headers->set('Content-Security-Policy', "default-src 'none'; sandbox");
         $response->headers->set(

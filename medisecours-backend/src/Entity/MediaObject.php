@@ -64,8 +64,16 @@ class MediaObject
     private ?string $mimeType = null;
 
     #[ORM\Column(nullable: true)]
-    #[Groups(['media:read', 'centre_sante:read', 'categorie:read', 'maladie:read', 'message:read'])]
+    #[Groups(['media:read', 'centre_sante:read', 'categorie:read', 'maladie:read', 'message:read', 'conversation:read'])]
     private ?int $size = null;
+
+    /**
+     * Contenu binaire du fichier, encodé en base64. Le stockage en base évite
+     * la perte des fichiers lors des redéploiements (disque éphémère Render).
+     * Jamais exposé via l'API (aucun groupe de sérialisation).
+     */
+    #[ORM\Column(type: 'text', nullable: true)]
+    private ?string $data = null;
 
     #[ORM\Column]
     #[Groups(['media:read', 'centre_sante:read', 'categorie:read', 'maladie:read'])]
@@ -163,6 +171,22 @@ class MediaObject
     public function getSize(): ?int
     {
         return $this->size;
+    }
+
+    public function getData(): ?string
+    {
+        if ($this->data === null) {
+            return null;
+        }
+
+        return base64_decode($this->data, true) ?: null;
+    }
+
+    public function setData(?string $data): static
+    {
+        $this->data = $data !== null ? base64_encode($data) : null;
+
+        return $this;
     }
 
     #[Groups(['media:read', 'centre_sante:read', 'categorie:read', 'maladie:read', 'message:read', 'conversation:read'])]
