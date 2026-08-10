@@ -100,12 +100,36 @@ final class UploadProfilePhotoController extends AbstractController
             );
         }
 
+        $contents = @file_get_contents($file->getPathname());
+        if ($contents === false || $contents === '') {
+            return $this->json(
+                ['error' => 'La photo ne peut pas etre lue. Reessayez avec un autre fichier.'],
+                Response::HTTP_UNPROCESSABLE_ENTITY
+            );
+        }
+
+        $extension = match ($detectedMimeType) {
+            'image/jpeg' => 'jpg',
+            'image/png' => 'png',
+            'image/webp' => 'webp',
+            default => throw new \LogicException('Type d image valide non pris en charge.'),
+        };
+        $storedFileName = bin2hex(random_bytes(20)).'.'.$extension;
+        $originalName = basename(trim($file->getClientOriginalName()));
+        if ($originalName === '' || $originalName === '.' || $originalName === '..') {
+            $originalName = 'photo-profil.'.$extension;
+        }
+
         $connection = $entityManager->getConnection();
         $connection->beginTransaction();
 
         try {
             $media = (new MediaObject())
-                ->setFile($file)
+                ->setFilePath($storedFileName)
+                ->setOriginalName($originalName)
+                ->setMimeType($detectedMimeType)
+                ->setSize(strlen($contents))
+                ->setData($contents)
                 ->setUploadedBy($user)
                 ->setIsPublic(true);
 

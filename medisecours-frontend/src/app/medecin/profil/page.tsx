@@ -159,9 +159,13 @@ export default function MedecinProfilPage() {
       globalMutate(CONVERSATIONS_KEY)
       globalMutate((key) => typeof key === 'string' && key.startsWith('/api/medecins-publics'))
       toast.success('Photo de profil mise à jour.')
-    } catch (err) {
+    } catch (err: any) {
       console.error('Upload error:', err?.response?.data || err)
-      toast.error("Échec de l'envoi de la photo.")
+      toast.error(
+        err?.response?.data?.error
+        || err?.response?.data?.detail
+        || "Échec de l'envoi de la photo.",
+      )
     } finally {
       setUploading(false)
       if (e.target) e.target.value = ''

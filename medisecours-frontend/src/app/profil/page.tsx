@@ -522,8 +522,12 @@ export default function ProfilPage() {
       const { data } = await api.post('/api/profile/photo', formData)
       updateUser({ ...user, photoProfil: data.photoProfil })
       toast.success('Photo de profil mise à jour.')
-    } catch {
-      toast.error("Échec de l'envoi de la photo.")
+    } catch (error: any) {
+      toast.error(
+        error?.response?.data?.error
+        || error?.response?.data?.detail
+        || "Échec de l'envoi de la photo.",
+      )
     } finally {
       setUploading(false)
       if (e.target) e.target.value = ''
