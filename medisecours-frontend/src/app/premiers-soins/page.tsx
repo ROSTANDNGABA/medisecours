@@ -42,19 +42,20 @@ interface FirstAidNavigationState {
   page: number
 }
 
-const urgencyRank: Record<FirstAidUrgency, number> = {
-  CRITIQUE: 4,
-  ELEVE: 3,
-  MOYEN: 2,
-  FAIBLE: 1,
-}
-
 const urgencyStyle: Record<FirstAidUrgency, string> = {
   CRITIQUE: 'bg-red-100 text-red-800 dark:bg-red-500/15 dark:text-red-200',
   ELEVE: 'bg-amber-100 text-amber-800 dark:bg-amber-500/15 dark:text-amber-200',
   MOYEN: 'bg-blue-100 text-blue-800 dark:bg-blue-500/15 dark:text-blue-200',
   FAIBLE: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-200',
 }
+
+const CAMEROON_PRIORITY_LABELS = [
+  'Fièvre et paludisme',
+  'Respiration',
+  'Diarrhée et déshydratation',
+  'Accidents et traumatismes',
+  'Malaises et convulsions',
+]
 
 function protocolIcon(slug: string) {
   if (slug.includes('respiratoire') || slug === 'etouffement') return Wind
@@ -210,7 +211,6 @@ export default function FirstAidPage() {
     return source
       .filter((protocol) => debouncedQuery === '' || urgency === 'TOUS' || protocol.niveauUrgence === urgency)
       .filter((protocol) => debouncedQuery === '' || category === CATEGORY_SLUG || protocol.categorie === category)
-      .sort((a, b) => urgencyRank[b.niveauUrgence] - urgencyRank[a.niveauUrgence] || a.titre.localeCompare(b.titre))
   }, [protocols, searchData, debouncedQuery, urgency, category])
 
   const showOffline = hydrated && !online && !isLoading
@@ -349,6 +349,27 @@ export default function FirstAidPage() {
         </div>
       )}
 
+      {!debouncedQuery && category === CATEGORY_SLUG && urgency === 'TOUS' && (
+        <section className="mt-5 border border-emerald-200 bg-emerald-50 p-4 dark:border-emerald-500/20 dark:bg-emerald-500/10">
+          <p className="text-sm font-bold text-emerald-950 dark:text-emerald-100">
+            Les situations courantes au Cameroun sont affichées en premier
+          </p>
+          <p className="mt-1 text-xs leading-5 text-emerald-800 dark:text-emerald-200">
+            Le classement combine la fréquence observée dans le pays et le niveau d&apos;urgence. Il ne remplace pas l&apos;évaluation de la situation présente.
+          </p>
+          <div className="mt-3 flex flex-wrap gap-1.5">
+            {CAMEROON_PRIORITY_LABELS.map((label) => (
+              <span
+                key={label}
+                className="border border-emerald-200 bg-white px-2.5 py-1 text-[11px] font-bold text-emerald-800 dark:border-emerald-400/20 dark:bg-slate-950/40 dark:text-emerald-200"
+              >
+                {label}
+              </span>
+            ))}
+          </div>
+        </section>
+      )}
+
       {(!hydrated || (isLoading && protocols.length === 0)) ? (
         <div role="status" className="flex min-h-[360px] items-center justify-center text-sm text-slate-500">
           <Loader2 className="mr-3 h-5 w-5 animate-spin" aria-hidden="true" />
@@ -372,7 +393,9 @@ export default function FirstAidPage() {
             <h2 className="text-sm font-bold text-slate-900 dark:text-white">
               {debouncedQuery ? visible.length : displayedTotal} protocoles disponibles
             </h2>
-            <p className="text-xs text-slate-500">Classés par niveau d&apos;urgence</p>
+            <p className="text-xs text-slate-500">
+              {debouncedQuery ? 'Classés par pertinence' : 'Fréquence au Cameroun, puis urgence'}
+            </p>
           </div>
           {suggestions.length > 0 && (
             <p className="mb-3 text-xs leading-5 text-slate-500" role="status">

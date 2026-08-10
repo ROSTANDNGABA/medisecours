@@ -7,6 +7,7 @@ namespace App\Controller;
 use App\Entity\ProtocoleConsultation;
 use App\Entity\ProtocoleRechercheStat;
 use App\Repository\ProtocolePremiersGestesRepository;
+use App\Service\CameroonFirstAidPriorityService;
 use App\Service\FirstAidProtocolPublicSerializer;
 use App\Service\FirstAidProtocolSearchService;
 use Doctrine\ORM\EntityManagerInterface;
@@ -27,6 +28,7 @@ final class PublicFirstAidProtocolController extends AbstractController
 {
     public function __construct(
         private readonly ProtocolePremiersGestesRepository $protocolRepository,
+        private readonly CameroonFirstAidPriorityService $priorityService,
         private readonly FirstAidProtocolPublicSerializer $serializer,
         private readonly FirstAidProtocolSearchService $searchService,
         private readonly EntityManagerInterface $entityManager,
@@ -46,12 +48,12 @@ final class PublicFirstAidProtocolController extends AbstractController
         $category = trim((string) $request->query->get('category', ''));
         $urgency = strtoupper(trim((string) $request->query->get('urgency', '')));
 
-        $protocols = array_values(array_filter(
+        $protocols = $this->priorityService->sort(array_values(array_filter(
             $this->protocolRepository->findAllPublic(),
             static fn ($protocol): bool =>
                 ($category === '' || $protocol->getCategorie() === $category)
                 && ($urgency === '' || $protocol->getNiveauUrgence() === $urgency)
-        ));
+        )));
         $total = count($protocols);
         $totalPages = max(1, (int) ceil($total / $itemsPerPage));
         $page = min($page, $totalPages);
