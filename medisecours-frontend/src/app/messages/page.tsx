@@ -808,6 +808,19 @@ export default function MessagesPage() {
         }
         return prev.some(m => sameMsg(m, data)) ? prev : [...prev, data]
       })
+      // Mirror the media path: inject the created message into the SWR cache so the
+      // append effect (msgPage === 1) does not rebuild the list without it when a
+      // WS message (patient reply) mutates the cache afterwards.
+      const msgKey = `/api/messages?conversation=/api/conversations/${Number(currentActiveId)}&order[createdAt]=DESC&order[id]=DESC&itemsPerPage=${MSGS_PER_PAGE}&page=1`
+      globalMutate(msgKey, (currentCache: any) => {
+        const arr = Array.isArray(currentCache) ? currentCache : (currentCache?.['hydra:member'] || [])
+        const createdId = String(data.id ?? data['@id'])
+        if (arr.some((m: any) => String(m.id ?? m['@id']) === createdId)) {
+          return currentCache
+        }
+        const newArr = [data, ...arr]
+        return Array.isArray(currentCache) ? newArr : { ...currentCache, 'hydra:member': newArr }
+      }, { revalidate: false })
       mutateConvs()
     } catch {
       setAllLoadedMsgs(prev => prev.filter(m => m.id !== tempId))
