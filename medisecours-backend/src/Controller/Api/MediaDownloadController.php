@@ -57,7 +57,7 @@ final class MediaDownloadController extends AbstractController
         $disposition = $media->getMimeType() === 'application/pdf'
             ? ResponseHeaderBag::DISPOSITION_ATTACHMENT
             : ResponseHeaderBag::DISPOSITION_INLINE;
-        $response->setContentDisposition($disposition, $media->getOriginalName() ?? 'document');
+        $response->headers->set('Content-Disposition', $response->headers->makeDisposition($disposition, $media->getOriginalName() ?? 'document'));
 
         return $response;
     }
