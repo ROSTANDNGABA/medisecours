@@ -1,8 +1,8 @@
-// @ts-nocheck
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useMemo } from 'react'
 import { useRouter } from 'next/navigation'
+import useSWR, { mutate as globalMutate } from 'swr'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Bell, MessageSquare, ArrowRight, Clock } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
@@ -10,6 +10,18 @@ import { useToast } from '../../components/ui/Toast'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import EmptyState from '../../components/ui/EmptyState'
 import api from '../../api/axios'
+import { fetcher } from '../../lib/fetcher'
+import { NOTIFICATIONS_KEY, UNREAD_NOTIFICATIONS_KEY } from '../../lib/keys'
+
+interface NotificationRecord {
+  id: number
+  type: string
+  title: string
+  body?: string | null
+  link?: string | null
+  createdAt: string
+  readAt?: string | null
+}
 
 function timeAgo(dateString) {
   if (!dateString) return ''
@@ -27,24 +39,24 @@ function timeAgo(dateString) {
 const stagger = { animate: { transition: { staggerChildren: 0.05 } } }
 const itemFade = {
   initial: { opacity: 0, y: 12, scale: 0.97 },
-  animate: { opacity: 1, y: 0, scale: 1, transition: { type: 'spring', damping: 22, stiffness: 320, mass: 0.9 } },
+  animate: { opacity: 1, y: 0, scale: 1, transition: { type: 'spring' as const, damping: 22, stiffness: 320, mass: 0.9 } },
 }
 
 export default function NotificationsPage() {
   const { user, mounted } = useAuth()
   const router = useRouter()
   const toast = useToast()
-  const [notifications, setNotifications] = useState([])
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    if (!mounted || !user) return
-    api.get('/api/notifications').then(r => {
-      const raw = r.data?.['hydra:member'] ?? r.data?.member ?? r.data
-      setNotifications(Array.isArray(raw) ? raw : [])
-    }).catch(() => toast.error('Impossible de charger les notifications.'))
-    .finally(() => setLoading(false))
-  }, [mounted, user, toast])
+  const { data, error, isLoading, mutate } = useSWR<NotificationRecord[]>(
+    user ? NOTIFICATIONS_KEY : null,
+    fetcher,
+    { revalidateOnFocus: true },
+  )
+  const notifications = useMemo(
+    () => (Array.isArray(data) ? data : []).filter((notification) => (
+      notification.type !== 'message_received' || !notification.readAt
+    )),
+    [data],
+  )
 
   const notificationItems = useMemo(() => {
     const items = []
@@ -56,15 +68,16 @@ export default function NotificationsPage() {
         time: notification.createdAt,
         unread: !notification.readAt,
         link: notification.link || '/notifications',
+        type: notification.type,
       })
     }
-    items.sort((a, b) => new Date(b.time) - new Date(a.time))
+    items.sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime())
     return items
   }, [notifications])
 
   const unreadCount = useMemo(() => notificationItems.filter(n => n.unread).length, [notificationItems])
 
-  if (!mounted || loading) return (
+  if (!mounted || isLoading) return (
     <div className="flex min-h-[60vh] items-center justify-center">
       <LoadingSpinner label="Chargement des notifications…" />
     </div>
@@ -88,7 +101,20 @@ export default function NotificationsPage() {
         </div>
       </motion.div>
 
-      {notificationItems.length === 0 ? (
+      {error ? (
+        <div className="rounded-xl border border-red-200 bg-red-50 px-5 py-6 text-center dark:border-red-900/50 dark:bg-red-950/30">
+          <p className="text-sm font-medium text-red-700 dark:text-red-300">
+            Impossible de charger les notifications.
+          </p>
+          <button
+            type="button"
+            onClick={() => mutate()}
+            className="mt-3 rounded-lg bg-white px-4 py-2 text-sm font-semibold text-red-700 shadow-sm dark:bg-slate-900 dark:text-red-300"
+          >
+            Réessayer
+          </button>
+        </div>
+      ) : notificationItems.length === 0 ? (
         <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15, type: 'spring', damping: 20, stiffness: 300 }}>
           <EmptyState icon={Bell} title="Aucune notification" description="Vous serez notifié des nouveaux messages de vos médecins ici." />
         </motion.div>
@@ -100,11 +126,24 @@ export default function NotificationsPage() {
                 <button
                   onClick={async () => {
                     if (n.unread) {
+                      const readAt = new Date().toISOString()
                       try {
-                        await api.patch(`/api/notifications/${n.id}`, { readAt: new Date().toISOString() }, {
+                        await api.patch(`/api/notifications/${n.id}`, { readAt }, {
                           headers: { 'Content-Type': 'application/merge-patch+json' },
                         })
-                        setNotifications((current: any[]) => current.map((item) => item.id === n.id ? { ...item, readAt: new Date().toISOString() } : item))
+                        await mutate(
+                          (current) => current?.map((item) => (
+                            item.id === n.id ? { ...item, readAt } : item
+                          )),
+                          { revalidate: false },
+                        )
+                        globalMutate(
+                          UNREAD_NOTIFICATIONS_KEY,
+                          (current: { unreadCount?: number } | undefined) => ({
+                            unreadCount: Math.max(0, Number(current?.unreadCount || 0) - 1),
+                          }),
+                          { revalidate: false },
+                        )
                       } catch {
                         toast.error('Impossible de marquer la notification comme lue.')
                       }
@@ -128,7 +167,12 @@ export default function NotificationsPage() {
                         {timeAgo(n.time)}
                       </span>
                     </div>
-                    <p className="mt-1 text-xs leading-relaxed text-[#9CA3AF] line-clamp-2">{n.description || 'Message reçu'}</p>
+                    <p className="mt-1 line-clamp-3 text-xs leading-relaxed text-[#6B7280] dark:text-slate-300">
+                      {n.description || 'Une nouvelle information est disponible.'}
+                    </p>
+                    <span className="mt-2 inline-flex text-xs font-semibold text-[#315FD6] dark:text-blue-300">
+                      {n.type === 'message_received' ? 'Voir la conversation' : 'Voir les détails'}
+                    </span>
                   </div>
                   <ArrowRight className="mt-2 h-4 w-4 shrink-0 text-[#D1D5DB] transition group-hover:text-[#3B6EF8] group-hover:translate-x-0.5" style={{ transition: 'color 0.2s, transform 0.2s' }} />
                 </button>

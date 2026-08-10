@@ -330,7 +330,12 @@ export default function MedecinHeader() {
                             {timeAgo(n.time)}
                           </span>
                         </div>
-                        <p className="mt-0.5 truncate text-xs text-[#9CA3AF]">{n.description}</p>
+                        <p className="mt-0.5 line-clamp-2 text-xs leading-relaxed text-[#6B7280]">
+                          {n.description || 'Une nouvelle information est disponible.'}
+                        </p>
+                        <span className="mt-1 inline-flex text-[11px] font-semibold text-[#315FD6]">
+                          {n.type === 'message' ? 'Voir la conversation' : 'Voir les détails'}
+                        </span>
                       </div>
                     </button>
                   ))}

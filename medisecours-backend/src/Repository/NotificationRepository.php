@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Repository;
 
+use App\Entity\Conversation;
 use App\Entity\Notification;
 use App\Entity\User;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
@@ -37,6 +38,26 @@ class NotificationRepository extends ServiceEntityRepository
             ->andWhere('notification.readAt IS NULL')
             ->setParameter('recipient', $recipient)
             ->orderBy('notification.createdAt', 'DESC')
+            ->getQuery()
+            ->getResult();
+    }
+
+    /**
+     * @return Notification[]
+     */
+    public function findUnreadMessageNotificationsForConversation(
+        User $recipient,
+        Conversation $conversation,
+    ): array {
+        return $this->createQueryBuilder('notification')
+            ->andWhere('notification.recipient = :recipient')
+            ->andWhere('notification.type = :type')
+            ->andWhere('notification.readAt IS NULL')
+            ->andWhere('notification.link LIKE :conversationLink')
+            ->setParameter('recipient', $recipient)
+            ->setParameter('type', 'message_received')
+            ->setParameter('conversationLink', '%?conversation=' . $conversation->getId())
+            ->orderBy('notification.createdAt', 'ASC')
             ->getQuery()
             ->getResult();
     }

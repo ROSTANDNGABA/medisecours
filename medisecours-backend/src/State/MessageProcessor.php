@@ -104,11 +104,16 @@ class MessageProcessor implements ProcessorInterface
                     $messageLink = $participant instanceof Medecin
                         ? '/medecin/messages?conversation=' . $conv?->getId()
                         : '/patient/messages?conversation=' . $conv?->getId();
+                    $senderName = trim(sprintf(
+                        '%s %s',
+                        (string) $result->getExpediteur()?->getPrenom(),
+                        (string) $result->getExpediteur()?->getNom(),
+                    ));
                     $this->notificationService->create(
                         $participant,
                         'message_received',
-                        'Nouveau message',
-                        'Vous avez reçu un nouveau message médical.',
+                        $senderName !== '' ? 'Message de ' . $senderName : 'Nouveau message',
+                        $this->messagePreview($result),
                         $messageLink,
                     );
                 }
@@ -118,6 +123,24 @@ class MessageProcessor implements ProcessorInterface
         }
 
         return $result;
+    }
+
+    private function messagePreview(Message $message): string
+    {
+        $content = preg_replace('/\s+/u', ' ', trim((string) $message->getContenu())) ?? '';
+        if ($content !== '') {
+            return mb_strlen($content) > 180
+                ? mb_substr($content, 0, 177) . '...'
+                : $content;
+        }
+
+        return match ($message->getTypeMessage()) {
+            Message::TYPE_VOIX => 'Vous avez reçu un message vocal.',
+            Message::TYPE_IMAGE => 'Vous avez reçu une image.',
+            Message::TYPE_VIDEO => 'Vous avez reçu une vidéo.',
+            Message::TYPE_FICHIER => 'Vous avez reçu un fichier.',
+            default => 'Vous avez reçu un nouveau message.',
+        };
     }
 
     private function notifyWebSocket(Message $message): void

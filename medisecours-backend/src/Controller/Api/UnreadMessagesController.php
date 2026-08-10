@@ -7,6 +7,7 @@ use App\Entity\Conversation;
 use App\Entity\User;
 use App\Message\WebSocketNotification;
 use App\Repository\MessageRepository;
+use App\Repository\NotificationRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -76,6 +77,7 @@ class UnreadMessagesController extends AbstractController
     public function markConversationRead(
         Conversation $conversation,
         MessageRepository $messages,
+        NotificationRepository $notifications,
         EntityManagerInterface $em,
         MessageBusInterface $messageBus,
     ): JsonResponse {
@@ -89,14 +91,26 @@ class UnreadMessagesController extends AbstractController
             $message->setStatut(Message::STATUT_LU);
         }
 
-        if ($unreadMessages !== []) {
+        $unreadNotifications = $notifications->findUnreadMessageNotificationsForConversation(
+            $user,
+            $conversation,
+        );
+        $readAt = new \DateTimeImmutable();
+        foreach ($unreadNotifications as $notification) {
+            $notification->setReadAt($readAt);
+        }
+
+        if ($unreadMessages !== [] || $unreadNotifications !== []) {
             $em->flush();
+        }
+        if ($unreadMessages !== []) {
             $this->publishReadReceipts($unreadMessages, $user, $messageBus);
         }
 
         return new JsonResponse([
             'conversationId' => (string) $conversation->getId(),
             'markedCount' => count($unreadMessages),
+            'notificationMarkedCount' => count($unreadNotifications),
         ]);
     }
 

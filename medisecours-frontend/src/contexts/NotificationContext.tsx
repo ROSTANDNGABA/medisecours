@@ -58,7 +58,7 @@ interface NotificationContextValue {
   msgOpen: boolean
   openMsg: () => Promise<void>
   dismissMsg: (id: string, href?: string) => Promise<void>
-  markConversationAsRead: (convId: string) => void
+  markConversationAsRead: (convId: string) => Promise<void>
   closeMsg: () => void
   msgDisplayCount: number
   activeConversationId: string | null
@@ -86,6 +86,16 @@ function notificationHref(link: string | null | undefined, user: any): string {
     return `${base}/messages${link.slice('/messages'.length)}`
   }
   return link
+}
+
+function conversationIdFromHref(href: string | null | undefined): string | null {
+  if (!href) return null
+  try {
+    const url = new URL(href, 'https://medisecours.local')
+    return url.searchParams.get('conversation')
+  } catch {
+    return href.match(/[?&]conversation=([^&]+)/)?.[1] ?? null
+  }
 }
 
 function notificationToItem(notification: any, user: any): NotifItem {
@@ -155,6 +165,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   const messageHandlers = React.useRef<((msg: any) => void)[]>([])
   const profileChangeHandlers = React.useRef<((data: any) => void)[]>([])
   const receivedMessageIds = React.useRef<Set<string>>(new Set())
+  const conversationReadRequests = React.useRef<Map<string, Promise<void>>>(new Map())
 
   const subscribeToMessages = useCallback((handler: (msg: any) => void) => {
     messageHandlers.current.push(handler)
@@ -175,6 +186,80 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     if (typeof val === 'object') return val.id
     return val.split('/').pop()
   }, [])
+
+  const markConversationAsRead = useCallback((convId: string): Promise<void> => {
+    const normalizedId = String(convId)
+    const pendingRequest = conversationReadRequests.current.get(normalizedId)
+    if (pendingRequest) return pendingRequest
+
+    setMsgItems((prev) => prev.filter((item) => (
+      conversationIdFromHref(item.href) !== normalizedId
+    )))
+    setNotifications((prev) => prev.filter((item) => (
+      item.type !== 'message' || conversationIdFromHref(item.href) !== normalizedId
+    )))
+    globalMutate(
+      NOTIFICATIONS_KEY,
+      (cache: any) => {
+        if (!cache) return cache
+        const items = extractMsgs(cache)
+        const filtered = items.filter((notification: any) => (
+          notification.type !== 'message_received'
+          || conversationIdFromHref(notification.link) !== normalizedId
+        ))
+        if (Array.isArray(cache)) return filtered
+        if (cache?.member) return { ...cache, member: filtered }
+        if (cache?.['hydra:member']) return { ...cache, 'hydra:member': filtered }
+        return cache
+      },
+      { revalidate: false },
+    )
+
+    const request = api.patch(`/api/conversations/${normalizedId}/read`)
+      .then((response) => {
+        const markedCount = Number(response.data?.markedCount || 0)
+        const notificationMarkedCount = Number(response.data?.notificationMarkedCount || 0)
+
+        if (markedCount > 0) {
+          globalMutate(
+            UNREAD_MESSAGES_KEY,
+            (data: any) => ({
+              unreadCount: Math.max(0, Number(data?.unreadCount || 0) - markedCount),
+            }),
+            { revalidate: false },
+          )
+        }
+        if (notificationMarkedCount > 0) {
+          globalMutate(
+            UNREAD_NOTIFICATIONS_KEY,
+            (data: any) => ({
+              unreadCount: Math.max(0, Number(data?.unreadCount || 0) - notificationMarkedCount),
+            }),
+            { revalidate: false },
+          )
+        }
+      })
+      .catch(() => {
+        // La revalidation finale restaure la vérité serveur si la lecture échoue.
+      })
+      .finally(() => {
+        conversationReadRequests.current.delete(normalizedId)
+        globalMutate(UNREAD_MESSAGES_KEY)
+        globalMutate(UNREAD_NOTIFICATIONS_KEY)
+        globalMutate(NOTIFICATIONS_KEY)
+        globalMutate(CONVERSATIONS_KEY)
+      })
+
+    conversationReadRequests.current.set(normalizedId, request)
+    return request
+  }, [])
+
+  const activateConversation = useCallback((id: string | null) => {
+    setActiveConversationId(id)
+    if (id) {
+      void markConversationAsRead(id)
+    }
+  }, [markConversationAsRead])
 
   // ── WebSocket listener — injecte chaque message reçu dans le cache SWR ──
   // L'injection utilise revalidate:false pour ne PAS écraser l'état optimiste
@@ -235,11 +320,15 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
         return Array.isArray(cache) ? next : { ...cache, 'hydra:member': next }
       }, { revalidate: false })
 
+      // 4. Une conversation visible est lue immédiatement, messages et
+      //    notifications persistées compris.
+      if (convId === activeConversationId) {
+        void markConversationAsRead(convId)
+        return
+      }
+
       globalMutate(UNREAD_NOTIFICATIONS_KEY)
       globalMutate(NOTIFICATIONS_KEY)
-
-      // 4. Si l'utilisateur lit cette conversation, ne PAS incrémenter le badge
-      if (convId === activeConversationId) return
 
       // 5. Compteur unread — revalidate:true pour sync serveur
       globalMutate(UNREAD_MESSAGES_KEY, (data: any) => {
@@ -288,9 +377,11 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     setNotifOpen(true)
     try {
       const response = await api.get(NOTIFICATIONS_KEY)
-      const items: NotifItem[] = extractMsgs(response.data).map((notification) => (
-        notificationToItem(notification, user)
-      ))
+      const items: NotifItem[] = extractMsgs(response.data)
+        .filter((notification) => (
+          notification.type !== 'message_received' || !notification.readAt
+        ))
+        .map((notification) => notificationToItem(notification, user))
       items.sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime())
       setNotifications(items)
     } catch {
@@ -331,35 +422,6 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     }
     if (href) router.push(href)
   }, [notifications, router])
-
-  // ── Marquer une conversation comme lue (depuis la page messages) ────────
-  const markConversationAsRead = useCallback((convId: string) => {
-    api.patch(`/api/conversations/${convId}/read`)
-      .then(() => globalMutate(UNREAD_MESSAGES_KEY))
-      .catch(() => globalMutate(UNREAD_MESSAGES_KEY))
-
-    setMsgItems((prev) => {
-      const toRemove = prev.filter((m) => {
-        const id = m.href.split('conversation=')[1]?.split('&')[0]
-        return id === convId
-      })
-      if (toRemove.length === 0) return prev
-      const removeIds = new Set(toRemove.map((m) => m.id))
-
-      globalMutate(UNREAD_MESSAGES_KEY, (data: any) => {
-        if (!data) return { unreadCount: 0 }
-        return { unreadCount: Math.max(0, data.unreadCount - toRemove.length) }
-      }, { revalidate: false })
-
-      return prev.filter((m) => !removeIds.has(m.id))
-    })
-
-    setNotifications((prev) => prev.filter((m) => {
-      if (!m.id.startsWith('msg-')) return true
-      const id = m.href.split('conversation=')[1]?.split('&')[0]
-      return id !== convId
-    }))
-  }, [])
 
   // ── Dropdown messages : fetch ON DEMAND au clic ─────────────────────────
   const openMsg = useCallback(async () => {
@@ -424,13 +486,13 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     consultationCount: openConsultationCount, pendingConsultationCount, notificationCount,
     openNotif, dismissNotif, clearAllNotifications, closeNotif, notifOpen,
     msgNotifications: msgItems, msgLoading, msgOpen, openMsg, dismissMsg, markConversationAsRead, closeMsg, msgDisplayCount,
-    activeConversationId, setActiveConversationId, subscribeToMessages, subscribeToProfileChanges, onlineUsers,
+    activeConversationId, setActiveConversationId: activateConversation, subscribeToMessages, subscribeToProfileChanges, onlineUsers,
   }), [
     notifications, notifLoading, unreadCount,
     openConsultationCount, pendingConsultationCount, notificationCount,
     openNotif, dismissNotif, clearAllNotifications, closeNotif, notifOpen,
     msgItems, msgLoading, msgOpen, openMsg, dismissMsg, markConversationAsRead, closeMsg, msgDisplayCount,
-    activeConversationId, setActiveConversationId, subscribeToMessages, subscribeToProfileChanges, onlineUsers,
+    activeConversationId, activateConversation, subscribeToMessages, subscribeToProfileChanges, onlineUsers,
   ])
 
   return (

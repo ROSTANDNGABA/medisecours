@@ -100,7 +100,9 @@ export default function MedecinNotificationsPage() {
   )
 
   const notifications = useMemo(
-    () => (Array.isArray(data) ? data : []),
+    () => (Array.isArray(data) ? data : []).filter((notification) => (
+      notification.type !== 'message_received' || !notification.readAt
+    )),
     [data],
   )
   const unreadCount = useMemo(
@@ -344,9 +346,14 @@ export default function MedecinNotificationsPage() {
                           {timeAgo(notification.createdAt)}
                         </span>
                       </div>
-                      <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-[#6B7280]">
+                      <p className="mt-1 line-clamp-3 text-xs leading-relaxed text-[#6B7280] dark:text-slate-300">
                         {notification.body || 'Une nouvelle information est disponible.'}
                       </p>
+                      <span className="mt-2 inline-flex text-xs font-semibold text-[#315FD6] dark:text-blue-300">
+                        {notification.type === 'message_received'
+                          ? 'Voir la conversation'
+                          : 'Voir les détails'}
+                      </span>
                     </div>
                     {markingId === notification.id ? (
                       <span className="mt-2 h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-[#3B6EF8] border-t-transparent" />
