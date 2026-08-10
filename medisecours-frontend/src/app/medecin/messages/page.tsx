@@ -260,16 +260,24 @@ function MedecinMessagesContent() {
   useEffect(() => {
     if (!msgData) return
     const arr = Array.isArray(msgData) ? msgData : msgData['hydra:member'] || []
+    // Keep only messages belonging to the active conversation.
+    // With keepPreviousData, SWR may return the previous conversation's data
+    // while the new key loads; filtering prevents cross-conversation pollution.
+    const activeMsgs = arr.filter((m) => {
+      const convIri = typeof m.conversation === 'object' ? (m.conversation['@id'] || m.conversation.id) : m.conversation
+      const convId = idFromIri(convIri)
+      return !convId || String(convId) === String(activeIdNum)
+    })
     // SWR has completed the page request; synchronize the pagination boundary.
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    if (arr.length < MSGS_PER_PAGE) setHasMore(false)
+    if (activeMsgs.length < MSGS_PER_PAGE) setHasMore(false)
 
     // Save scroll position before updating (for loading older messages)
     const container = msgContainerRef.current
     const prevScrollHeight = container ? container.scrollHeight : 0
 
     if (msgPage === 1) {
-      setAllLoadedMsgs(arr)
+      setAllLoadedMsgs(activeMsgs)
       // Fix: scroll to bottom when entering a conversation and loading first messages
       setTimeout(() => {
         bottomRef.current?.scrollIntoView({ behavior: 'auto' })
@@ -280,7 +288,7 @@ function MedecinMessagesContent() {
       olderPageMergeRef.current = true
       setAllLoadedMsgs(prev => {
         const existingIds = new Set(prev.map(m => String(m.id ?? m['@id'])))
-        const newMsgs = arr.filter(m => !existingIds.has(String(m.id ?? m['@id'])))
+        const newMsgs = activeMsgs.filter(m => !existingIds.has(String(m.id ?? m['@id'])))
         return newMsgs.length > 0 ? [...prev, ...newMsgs] : prev
       })
     }
@@ -295,7 +303,7 @@ function MedecinMessagesContent() {
         })
       }, 0)
     }
-  }, [msgData, msgPage])
+  }, [msgData, msgPage, activeIdNum])
 
   // Scroll to bottom on new conversation
   useEffect(() => {

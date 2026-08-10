@@ -244,7 +244,13 @@ function PatientMessagesContent() {
   useEffect(() => {
     if (!msgData) return
     const arr = Array.isArray(msgData) ? msgData : msgData['hydra:member'] || []
-    if (arr.length < MSGS_PER_PAGE) {
+    // Keep only messages belonging to the active conversation (protect against keepPreviousData)
+    const activeMsgs = arr.filter((m) => {
+      const convIri = typeof m.conversation === 'object' ? (m.conversation['@id'] || m.conversation.id) : m.conversation
+      const convId = idFromIri(convIri)
+      return !convId || String(convId) === String(activeIdNum)
+    })
+    if (activeMsgs.length < MSGS_PER_PAGE) {
       window.setTimeout(() => setHasMore(false), 0)
     }
 
@@ -253,7 +259,7 @@ function PatientMessagesContent() {
 
     window.setTimeout(() => {
       if (msgPage === 1) {
-        setAllLoadedMsgs(arr)
+        setAllLoadedMsgs(activeMsgs)
         setTimeout(() => {
           scrollToLatestMessage('auto')
           initialPageReadyRef.current = true
@@ -262,7 +268,7 @@ function PatientMessagesContent() {
         olderPageMergeRef.current = true
         setAllLoadedMsgs(prev => {
           const existingIds = new Set(prev.map(m => String(m.id ?? m['@id'])))
-          const newMsgs = arr.filter(m => !existingIds.has(String(m.id ?? m['@id'])))
+          const newMsgs = activeMsgs.filter(m => !existingIds.has(String(m.id ?? m['@id'])))
           return newMsgs.length > 0 ? [...prev, ...newMsgs] : prev
         })
       }
@@ -277,7 +283,7 @@ function PatientMessagesContent() {
         })
       }, 0)
     }
-  }, [msgData, msgPage, scrollToLatestMessage])
+  }, [msgData, msgPage, activeIdNum, scrollToLatestMessage])
 
   // Scroll to bottom on new conversation
   useEffect(() => {

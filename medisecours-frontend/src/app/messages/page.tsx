@@ -277,7 +277,13 @@ export default function MessagesPage() {
   useEffect(() => {
     if (!msgData) return
     const arr = Array.isArray(msgData) ? msgData : msgData['hydra:member'] || []
-    if (arr.length < MSGS_PER_PAGE) {
+    // Keep only messages belonging to the active conversation (protect against keepPreviousData)
+    const activeMsgs = arr.filter((m) => {
+      const convIri = typeof m.conversation === 'object' ? (m.conversation['@id'] || m.conversation.id) : m.conversation
+      const convId = idFromIri(convIri)
+      return !convId || String(convId) === String(activeIdNum)
+    })
+    if (activeMsgs.length < MSGS_PER_PAGE) {
       window.setTimeout(() => setHasMore(false), 0)
     }
 
@@ -286,7 +292,7 @@ export default function MessagesPage() {
 
     window.setTimeout(() => {
       if (msgPage === 1) {
-        setAllLoadedMsgs(arr)
+        setAllLoadedMsgs(activeMsgs)
         requestAnimationFrame(() => {
           bottomRef.current?.scrollIntoView({ behavior: 'auto' })
           initialPageReadyRef.current = true
@@ -294,7 +300,7 @@ export default function MessagesPage() {
       } else {
         setAllLoadedMsgs(prev => {
           const existingIds = new Set(prev.map(m => String(m.id ?? m['@id'])))
-          const newMsgs = arr.filter(m => !existingIds.has(String(m.id ?? m['@id'])))
+          const newMsgs = activeMsgs.filter(m => !existingIds.has(String(m.id ?? m['@id'])))
           return newMsgs.length > 0 ? [...prev, ...newMsgs] : prev
         })
       }
@@ -307,7 +313,7 @@ export default function MessagesPage() {
         container.scrollTop += newScrollHeight - prevScrollHeight
       })
     }
-  }, [msgData, msgPage])
+  }, [msgData, msgPage, activeIdNum])
 
   function sameMsg(a, b) {
     const idA = String(a.id ?? a['@id'] ?? '')
