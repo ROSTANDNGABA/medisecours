@@ -113,7 +113,7 @@ function FitBounds({
         map.stop()
       }
     }
-  }, [position?.lat, position?.lng, destination?.lat, destination?.lng, map])
+  }, [position, destination, map])
   return null
 }
 

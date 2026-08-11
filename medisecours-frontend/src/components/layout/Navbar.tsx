@@ -28,6 +28,7 @@ export default function Navbar() {
   const { unreadCount } = useUnreadCount()
 
   const estDansLaMessagerie = pathname.includes('/messages') || pathname.includes('/conversations') || pathname.includes('/medecin/messages')
+  const isCentresRoute = pathname === '/centres'
 
   const initials = user ? `${user.prenom?.[0] || ''}${user.nom?.[0] || ''}`.toUpperCase() : ''
   const isActive = (to: string) => (to === '/' ? pathname === '/' : pathname.startsWith(to))
@@ -352,7 +353,9 @@ export default function Navbar() {
       </nav>
 
       {/* Bottom spacer so page content doesn't hide behind the tab bar */}
-      <div className={`xl:hidden h-[88px] ${inConversation ? 'hidden md:block' : ''}`} />
+      <div className={`xl:hidden h-[88px] ${
+        isCentresRoute ? 'hidden' : (inConversation ? 'hidden md:block' : '')
+      }`} />
       </>
           )}
         </ConversationAware>

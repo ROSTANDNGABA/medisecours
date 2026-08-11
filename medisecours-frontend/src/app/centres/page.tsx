@@ -1,58 +1,42 @@
 'use client'
 
 import dynamic from 'next/dynamic'
-import { useEffect, useState, useMemo, useCallback, useRef } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { AnimatePresence, motion } from 'framer-motion'
 import {
-  LocateFixed, Phone, Clock, MapPin,
-  Car, Footprints, Navigation, Route,
-  Loader2, AlertCircle, X, Eye,
+  AlertCircle,
+  Car,
+  Clock,
+  Eye,
+  Footprints,
+  Loader2,
+  LocateFixed,
+  MapPin,
+  Navigation,
+  PanelLeftClose,
+  PanelLeftOpen,
+  Phone,
+  Route,
+  Search,
+  X,
 } from 'lucide-react'
 import api from '../../api/axios'
+import EmptyState from '../../components/ui/EmptyState'
+import LoadingSpinner from '../../components/ui/LoadingSpinner'
+import Modal from '../../components/ui/Modal'
+import { useToast } from '../../components/ui/Toast'
 import { useGeolocation } from '../../hooks/useGeolocation'
 import { useWayfinding } from '../../hooks/useWayfinding'
-import LoadingSpinner from '../../components/ui/LoadingSpinner'
-import EmptyState from '../../components/ui/EmptyState'
-import { useToast } from '../../components/ui/Toast'
-import Modal from '../../components/ui/Modal'
 import { imgUrl } from '../../lib/config'
 
 const CentresMap = dynamic(() => import('../../components/CentresMap'), {
   ssr: false,
   loading: () => (
-    <div className="h-full w-full flex items-center justify-center">
+    <div className="flex h-full w-full items-center justify-center">
       <LoadingSpinner label="Chargement de la carte…" />
     </div>
   ),
 })
-
-// ─── Helpers ────────────────────────────────────────────────────────────────
-
-function extractArray(res: any) {
-  const raw = res.data?.['hydra:member'] ?? res.data?.member ?? res.data
-  return Array.isArray(raw) ? raw : []
-}
-
-function distanceKm(a: {lat: number, lng: number}, b: {lat: number, lng: number}) {
-  if (!a || !b) return null
-  const R = 6371
-  const dLat = ((b.lat - a.lat) * Math.PI) / 180
-  const dLng = ((b.lng - a.lng) * Math.PI) / 180
-  const lat1 = (a.lat * Math.PI) / 180
-  const lat2 = (b.lat * Math.PI) / 180
-  const h = Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2
-  return R * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h))
-}
-
-function formatDuration(seconds: number | null) {
-  if (!seconds) return '–'
-  const h = Math.floor(seconds / 3600)
-  const m = Math.round((seconds % 3600) / 60)
-  if (h > 0) return `${h}h ${m}min`
-  return `${m} min`
-}
-
-// ─── Types ──────────────────────────────────────────────────────────────────
 
 type TravelMode = 'driving' | 'walking'
 
@@ -62,30 +46,104 @@ interface Destination {
   nom: string
 }
 
-// ─── Page Component ─────────────────────────────────────────────────────────
+interface Centre {
+  id: number
+  nom: string
+  adresse?: string
+  ville?: string
+  region?: string
+  telephone?: string
+  horaires?: string
+  type_centre?: string
+  latitude?: number
+  longitude?: number
+  photo?: string
+  imageUrl?: string
+  photos?: string[] | string
+  images?: string[] | string
+  services?: string[] | string
+  capacite_lits?: number
+}
+
+function extractArray(response: { data?: unknown }): Centre[] {
+  const data = response.data as {
+    'hydra:member'?: unknown
+    member?: unknown
+  } | undefined
+  const raw = data?.['hydra:member'] ?? data?.member ?? response.data
+  return Array.isArray(raw) ? raw as Centre[] : []
+}
+
+function distanceKm(
+  from: { lat: number; lng: number },
+  to: { lat: number; lng: number },
+) {
+  const earthRadius = 6371
+  const latitudeDelta = ((to.lat - from.lat) * Math.PI) / 180
+  const longitudeDelta = ((to.lng - from.lng) * Math.PI) / 180
+  const latitudeFrom = (from.lat * Math.PI) / 180
+  const latitudeTo = (to.lat * Math.PI) / 180
+  const haversine =
+    Math.sin(latitudeDelta / 2) ** 2 +
+    Math.cos(latitudeFrom) *
+      Math.cos(latitudeTo) *
+      Math.sin(longitudeDelta / 2) ** 2
+
+  return earthRadius * 2 * Math.atan2(Math.sqrt(haversine), Math.sqrt(1 - haversine))
+}
+
+function formatDuration(seconds: number | null) {
+  if (!seconds) return '–'
+  const hours = Math.floor(seconds / 3600)
+  const minutes = Math.round((seconds % 3600) / 60)
+  return hours > 0 ? `${hours} h ${minutes} min` : `${minutes} min`
+}
+
+function getCentrePhoto(centre: Centre) {
+  if (centre.photo) return centre.photo
+  if (centre.imageUrl) return centre.imageUrl
+  if (Array.isArray(centre.photos)) return centre.photos[0] || null
+  if (typeof centre.photos === 'string') return centre.photos.split(',')[0]?.trim() || null
+  return null
+}
+
+function getCentrePhotos(centre: Centre) {
+  const source = centre.photos ?? centre.images ?? centre.imageUrl ?? centre.photo
+  if (!source) return []
+  const photos = Array.isArray(source) ? source : String(source).split(',')
+  return photos.map((photo) => String(photo).trim()).filter(Boolean)
+}
 
 export default function CentresPage() {
-  const [centres, setCentres] = useState<any[]>([])
+  const [centres, setCentres] = useState<Centre[]>([])
   const [loading, setLoading] = useState(true)
-  const [selected, setSelected] = useState<any>(null)
+  const [selected, setSelected] = useState<number | null>(null)
   const [mode, setMode] = useState<TravelMode>('driving')
   const [destination, setDestination] = useState<Destination | null>(null)
   const [isTracking, setIsTracking] = useState(false)
-  const [previewCentre, setPreviewCentre] = useState<any>(null)
-  const [mobileMapInteractive, setMobileMapInteractive] = useState(false)
+  const [previewCentre, setPreviewCentre] = useState<Centre | null>(null)
+  const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
 
   const { position, error, loading: locating, locate, watch, stopWatch, isWatching } = useGeolocation()
   const toast = useToast()
-  
   const listRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    if (isTracking) {
-      watch()
-    } else {
-      stopWatch()
+    const desktopQuery = window.matchMedia('(min-width: 1024px)')
+    const syncSidebar = (event?: MediaQueryListEvent) => {
+      setSidebarOpen(event ? event.matches : desktopQuery.matches)
     }
-  }, [isTracking, watch, stopWatch])
+
+    syncSidebar()
+    desktopQuery.addEventListener('change', syncSidebar)
+    return () => desktopQuery.removeEventListener('change', syncSidebar)
+  }, [])
+
+  useEffect(() => {
+    if (isTracking) watch()
+    else stopWatch()
+  }, [isTracking, stopWatch, watch])
 
   const {
     route,
@@ -101,14 +159,12 @@ export default function CentresPage() {
     mode,
   })
 
-  // ─── Abortable fetches with useCallback ──────────────────────────────────
   const fetchAllCentres = useCallback(() => {
     const controller = new AbortController()
-    setLoading(true)
     api.get('/api/centre_de_santes', { signal: controller.signal })
-      .then((res: any) => setCentres(extractArray(res)))
-      .catch((err) => {
-        if (err.name !== 'CanceledError' && err.message !== 'canceled') {
+      .then((response) => setCentres(extractArray(response)))
+      .catch((requestError) => {
+        if (requestError.name !== 'CanceledError' && requestError.message !== 'canceled') {
           toast.error('Impossible de charger les centres de santé.')
         }
       })
@@ -116,25 +172,24 @@ export default function CentresPage() {
     return controller
   }, [toast])
 
-  const fetchNearbyCentres = useCallback((pos: {lat: number, lng: number}) => {
+  const fetchNearbyCentres = useCallback((coordinates: { lat: number; lng: number }) => {
     const controller = new AbortController()
     api.get('/api/centres_de_santes/proches', {
-      params: { lat: pos.lat, lng: pos.lng, rayon: 25, limit: 20 },
-      signal: controller.signal
+      params: { lat: coordinates.lat, lng: coordinates.lng, rayon: 25, limit: 20 },
+      signal: controller.signal,
     })
-      .then((res: any) => {
-        const data = extractArray(res)
-        if (data.length > 0) setCentres(data)
+      .then((response) => {
+        const nearbyCentres = extractArray(response)
+        if (nearbyCentres.length > 0) setCentres(nearbyCentres)
       })
-      .catch((err) => {
-        if (err.name !== 'CanceledError' && err.message !== 'canceled') {
+      .catch((requestError) => {
+        if (requestError.name !== 'CanceledError' && requestError.message !== 'canceled') {
           toast.error('Impossible de récupérer les centres proches.')
         }
       })
     return controller
   }, [toast])
 
-  // Initial load
   useEffect(() => {
     const controller = fetchAllCentres()
     return () => controller.abort()
@@ -142,483 +197,560 @@ export default function CentresPage() {
 
   const hasFetchedNearbyRef = useRef(false)
 
-  // Load nearby when position is available (only once automatically)
   useEffect(() => {
-    if (!position) return
-    if (destination) return
-    if (hasFetchedNearbyRef.current) return
-
+    if (!position || destination || hasFetchedNearbyRef.current) return
     hasFetchedNearbyRef.current = true
     const controller = fetchNearbyCentres(position)
     return () => controller.abort()
-  }, [position, fetchNearbyCentres, destination])
+  }, [destination, fetchNearbyCentres, position])
 
-  // ─── Precalculate distances to avoid recalculating on every render ──────
   const distancesMap = useMemo(() => {
-    const map = new Map<number, number | null>()
-    if (!position) return map
-    centres.forEach(c => {
-      map.set(c.id, distanceKm(position, { lat: c.latitude, lng: c.longitude }))
+    const distances = new Map<number, number>()
+    if (!position) return distances
+
+    centres.forEach((centre) => {
+      if (centre.latitude == null || centre.longitude == null) return
+      distances.set(
+        centre.id,
+        distanceKm(position, { lat: centre.latitude, lng: centre.longitude }),
+      )
     })
-    return map
+    return distances
   }, [centres, position])
 
-  // ─── Sort centres by precalculated distance ─────────────────────────────
-  const sorted = useMemo(() => {
+  const sortedCentres = useMemo(() => {
     if (!position) return centres
-    return [...centres].sort((a: any, b: any) => {
-      const da = distancesMap.get(a.id) ?? 9999
-      const db = distancesMap.get(b.id) ?? 9999
-      return da - db
-    })
-  }, [centres, position, distancesMap])
+    return [...centres].sort(
+      (first, second) =>
+        (distancesMap.get(first.id) ?? Number.MAX_VALUE) -
+        (distancesMap.get(second.id) ?? Number.MAX_VALUE),
+    )
+  }, [centres, distancesMap, position])
 
-  const handleSelectCentre = useCallback((centreId: number) => {
-    if (selected === centreId) {
-      // Deselect: clear everything and restore ALL centres
-      setSelected(null)
-      setDestination(null)
-      clearRoute()
-      setIsTracking(false)
-      fetchAllCentres()
-    } else {
-      setSelected(centreId)
-      const c = sorted.find((x: any) => x.id === centreId)
-      if (c && c.latitude != null && c.longitude != null) {
-        setDestination({ lat: c.latitude, lng: c.longitude, nom: c.nom })
-      }
-    }
-  }, [selected, sorted, clearRoute, position, fetchAllCentres])
+  const visibleCentres = useMemo(() => {
+    const normalizedQuery = searchQuery.trim().toLocaleLowerCase('fr')
+    if (!normalizedQuery) return sortedCentres
+
+    return sortedCentres.filter((centre) =>
+      [
+        centre.nom,
+        centre.adresse,
+        centre.ville,
+        centre.region,
+        centre.type_centre,
+      ]
+        .filter(Boolean)
+        .some((value) =>
+          String(value).toLocaleLowerCase('fr').includes(normalizedQuery),
+        ),
+    )
+  }, [searchQuery, sortedCentres])
 
   const clearAll = useCallback(() => {
     setSelected(null)
     setDestination(null)
     clearRoute()
     setIsTracking(false)
-    fetchAllCentres() // Restore ALL centres on the map
+    fetchAllCentres()
   }, [clearRoute, fetchAllCentres])
-  
-  // ─── Scroll to selected centre in the list ──────────────────────────────
-  useEffect(() => {
-    if (selected && listRef.current) {
-      const el = listRef.current.querySelector(`[data-id="${selected}"]`)
-      if (el) {
-        el.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
-      }
+
+  const handleSelectCentre = useCallback((centreId: number) => {
+    setSidebarOpen(true)
+
+    if (selected === centreId) {
+      clearAll()
+      return
     }
+
+    setSelected(centreId)
+    const centre = sortedCentres.find((item) => item.id === centreId)
+    if (centre?.latitude != null && centre.longitude != null) {
+      setDestination({
+        lat: centre.latitude,
+        lng: centre.longitude,
+        nom: centre.nom,
+      })
+    }
+  }, [clearAll, selected, sortedCentres])
+
+  useEffect(() => {
+    if (!selected || !listRef.current) return
+    listRef.current
+      .querySelector(`[data-id="${selected}"]`)
+      ?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
   }, [selected])
 
   const handleLocate = () => {
     if (selected) {
       setIsTracking(true)
-    } else {
-      if (position) {
-        // Force refetch nearby centers if clicking while already localized
-        fetchNearbyCentres(position)
-      }
-      locate()
+      return
     }
+    if (position) fetchNearbyCentres(position)
+    locate()
   }
 
-  // ─── Render ─────────────────────────────────────────────────────────────
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-10">
-      {/* Header */}
-      <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
-        <div>
-          <h1 className="font-display font-bold text-3xl text-primary-900 dark:text-sable">
-            Centres de santé
-          </h1>
-          <p className="text-primary-300 text-sm mt-1">Localisez le centre le plus proche de vous.</p>
-        </div>
-        <button
-          onClick={handleLocate}
-          disabled={locating}
-          aria-busy={locating}
-          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-mint-500 hover:bg-mint-700 text-white font-semibold shadow-lg transition disabled:opacity-60"
-        >
-          <LocateFixed className={`w-4 h-4 ${locating ? 'animate-spin' : ''}`} />
-          {locating ? 'Localisation…' : (isWatching ? 'Suivi GPS en cours' : 'Me localiser')}
-        </button>
+    <div className="relative isolate h-[calc(100dvh-76px)] min-h-[520px] w-full overflow-hidden bg-slate-100 xl:h-[calc(100dvh-96px)] dark:bg-slate-950">
+      <div className="absolute inset-0 z-0">
+        <CentresMap
+          centres={visibleCentres}
+          position={position || undefined}
+          onSelect={handleSelectCentre}
+          route={route}
+          isFallback={isFallback}
+          destination={destination}
+        />
       </div>
 
-      {error && <p className="text-sm text-urgence-500 mb-4">{error}</p>}
-
-      {/* ═══ Mode selector + Route info panel ═══ */}
-      <div className="space-y-3 mb-4">
-        {/* Travel mode selector (visible only when position available AND a centre is selected) */}
-        {position && selected && (
-          <div className="flex gap-2 items-center">
-            <span className="text-xs text-primary-300 font-medium">Mode :</span>
-            {(['driving', 'walking'] as TravelMode[]).map((m) => (
-              <button
-                key={m}
-                onClick={() => setMode(m)}
-                aria-pressed={mode === m}
-                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold
-                  border transition-colors ${
-                  mode === m
-                    ? 'bg-primary-500 text-white border-primary-500'
-                    : 'bg-white dark:bg-primary-800 text-primary-300 border-primary-100 dark:border-white/10 hover:border-primary-300 dark:hover:border-white/30'
-                }`}
-              >
-                {m === 'driving'
-                  ? <><Car className="w-3.5 h-3.5" /> En voiture</>
-                  : <><Footprints className="w-3.5 h-3.5" /> À pied</>
-                }
-              </button>
-            ))}
-          </div>
-        )}
-
-        {/* Route info banner */}
-        <AnimatePresence>
-          {destination && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              exit={{ opacity: 0, height: 0 }}
-              className="overflow-hidden"
-            >
-              <div
-                className="flex flex-wrap items-center gap-4 px-4 py-3 rounded-xl
-                           border border-primary-200 dark:border-primary-700
-                           bg-primary-50 dark:bg-primary-800/40"
-                aria-label={`Itinéraire vers ${destination.nom}`}
-              >
-                {routeLoading ? (
-                  <div className="flex items-center gap-2 text-sm text-primary-300">
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    Calcul de l&apos;itinéraire vers {destination.nom}…
-                  </div>
-                ) : routeError && !route ? (
-                  <div className="flex items-center gap-2 text-sm text-urgence-500">
-                    <AlertCircle className="w-4 h-4" />
-                    {routeError}
-                  </div>
-                ) : route ? (
-                  <>
-                    <div className="flex items-center gap-2 text-sm font-semibold text-primary-700 dark:text-sable">
-                      <Navigation className="w-4 h-4 text-primary-500 dark:text-mint-500" />
-                      {destination.nom}
-                    </div>
-                    <div className="flex items-center gap-4 text-sm text-primary-500 dark:text-primary-300">
-                      <span className="flex items-center gap-1">
-                        <Route className="w-4 h-4" />
-                        {distance ? (distance / 1000).toFixed(1) : '–'} km
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <Clock className="w-4 h-4" />
-                        {formatDuration(duration)}
-                      </span>
-                      {isFallback && (
-                        <span className="text-xs text-amber-700 dark:text-amber-400 bg-amber-100 dark:bg-amber-900/30 px-2 py-0.5 rounded-full">
-                          Itinéraire approximatif
-                        </span>
-                      )}
-                    </div>
-                    <button
-                      onClick={clearAll}
-                      className="ml-auto flex items-center gap-1 text-xs text-primary-300 hover:text-urgence-500 transition-colors"
-                    >
-                      <X className="w-3.5 h-3.5" /> Effacer
-                    </button>
-                  </>
-                ) : null}
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-        {/* Map */}
-        <div className="isolate z-0 lg:col-span-3 relative h-[340px] overflow-hidden rounded-2xl border border-white/50 shadow-xl sm:h-[420px] lg:h-[600px] dark:border-white/10">
-          <CentresMap
-            centres={sorted}
-            position={position || undefined}
-            onSelect={handleSelectCentre}
-            route={route}
-            isFallback={isFallback}
-            destination={destination}
+      <AnimatePresence>
+        {sidebarOpen && (
+          <motion.button
+            type="button"
+            aria-label="Fermer le panneau des centres"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setSidebarOpen(false)}
+            className="absolute inset-0 z-[650] bg-slate-950/25 backdrop-blur-[1px] lg:hidden"
           />
+        )}
+      </AnimatePresence>
 
-          {!mobileMapInteractive && (
-            <div className="absolute inset-0 z-[600] flex touch-pan-y items-end justify-center bg-gradient-to-t from-slate-950/45 via-transparent to-transparent p-4 lg:hidden">
-              <div className="w-full max-w-sm rounded-xl border border-white/70 bg-white/95 p-3 text-center shadow-xl backdrop-blur-md dark:border-white/15 dark:bg-slate-950/95">
-                <p className="text-xs leading-5 text-slate-600 dark:text-slate-300">
-                  Faites glisser votre doigt pour parcourir la page et la liste des centres.
-                </p>
-                <button
-                  type="button"
-                  onClick={() => setMobileMapInteractive(true)}
-                  className="mt-2 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg bg-primary-600 px-4 text-sm font-bold text-white transition hover:bg-primary-700 focus:outline-none focus:ring-4 focus:ring-primary-500/25"
-                >
-                  <MapPin className="h-4 w-4" />
-                  Explorer la carte
-                </button>
-              </div>
+      <aside
+        aria-label="Recherche et liste des centres de santé"
+        className={`absolute inset-y-0 left-0 z-[700] flex w-[min(90vw,410px)] flex-col border-r border-slate-200/90 bg-white/96 shadow-[14px_0_40px_rgba(15,23,42,0.18)] backdrop-blur-xl transition-transform duration-300 ease-out lg:w-[410px] dark:border-white/10 dark:bg-slate-950/96 ${
+          sidebarOpen ? 'translate-x-0' : '-translate-x-full'
+        }`}
+      >
+        <div className="shrink-0 border-b border-slate-200 px-4 pb-4 pt-5 dark:border-white/10 sm:px-5">
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0">
+              <p className="text-xs font-bold uppercase tracking-[0.16em] text-mint-600 dark:text-mint-400">
+                À proximité
+              </p>
+              <h1 className="mt-1 font-display text-2xl font-bold text-slate-950 dark:text-white">
+                Centres de santé
+              </h1>
+              <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">
+                Recherchez un établissement, puis sélectionnez-le pour afficher l’itinéraire.
+              </p>
             </div>
-          )}
-
-          {mobileMapInteractive && (
             <button
               type="button"
-              onClick={() => setMobileMapInteractive(false)}
-              className="absolute right-3 top-3 z-[600] inline-flex min-h-10 items-center gap-2 rounded-lg border border-white/80 bg-white/95 px-3 text-xs font-bold text-slate-800 shadow-lg backdrop-blur-md dark:border-white/15 dark:bg-slate-950/95 dark:text-white lg:hidden"
+              onClick={() => setSidebarOpen(false)}
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:bg-slate-100 dark:border-white/10 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+              aria-label="Réduire le panneau"
+              title="Réduire le panneau"
             >
-              <X className="h-4 w-4" />
-              Reprendre le défilement
+              <PanelLeftClose className="h-5 w-5" />
             </button>
-          )}
-          
-          {/* Contrôle au-dessus de la carte, limité à son contexte d'empilement. */}
-          {position && (
-            <div className={`absolute bottom-6 left-1/2 z-20 -translate-x-1/2 ${mobileMapInteractive ? '' : 'hidden lg:block'}`}>
-              <button
-                onClick={() => setIsTracking(!isTracking)}
-                className={`flex items-center gap-2 px-6 py-3 rounded-full font-bold text-white shadow-xl transition-all ${
-                  isTracking 
-                    ? 'bg-red-500 hover:bg-red-600 animate-pulse'
-                    : 'bg-primary-600 hover:bg-primary-700'
-                }`}
-              >
-                {isTracking ? '🛑 Arrêter le suivi' : '🚀 Se déplacer / Démarrer'}
-              </button>
-            </div>
-          )}
-        </div>
+          </div>
 
-        {/* Centre cards list */}
-        <div ref={listRef} className="space-y-3 pr-1 lg:col-span-2 lg:max-h-[600px] lg:overflow-y-auto">
-          {loading ? (
-            <LoadingSpinner label="Chargement des centres…" />
-          ) : sorted.length === 0 ? (
-            <EmptyState
-              title="Aucun centre disponible"
-              description="Le réseau de centres de santé est en cours de mise à jour."
+          <label className="relative mt-4 block">
+            <span className="sr-only">Rechercher un centre de santé</span>
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <input
+              value={searchQuery}
+              onChange={(event) => setSearchQuery(event.target.value)}
+              type="search"
+              placeholder="Nom, ville, quartier ou type"
+              className="h-11 w-full rounded-lg border border-slate-200 bg-slate-50 pl-10 pr-9 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-primary-500 focus:ring-4 focus:ring-primary-500/10 dark:border-white/10 dark:bg-slate-900 dark:text-white dark:placeholder:text-slate-500"
             />
-          ) : (
-            sorted.map((c: any) => {
-              const dist = distancesMap.get(c.id)
-              const isSelected = selected === c.id
-              const hasCoords = c.latitude != null && c.longitude != null
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery('')}
+                className="absolute right-1.5 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-md text-slate-400 transition hover:bg-slate-200 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-white"
+                aria-label="Effacer la recherche"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
+          </label>
 
-              return (
-                <div
-                  key={c.id}
-                  data-id={c.id}
-                  onClick={() => handleSelectCentre(c.id)}
-                  className={`rounded-2xl p-4 border cursor-pointer transition ${
-                    isSelected
-                      ? 'border-mint-500 bg-mint-100/30 dark:bg-mint-500/10'
-                      : 'border-primary-100 dark:border-white/10 bg-white/70 dark:bg-primary-700/40'
+          <button
+            type="button"
+            onClick={handleLocate}
+            disabled={locating}
+            aria-busy={locating}
+            className="mt-3 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg bg-primary-600 px-4 text-sm font-bold text-white shadow-sm transition hover:bg-primary-700 disabled:cursor-wait disabled:opacity-60"
+          >
+            {locating
+              ? <Loader2 className="h-4 w-4 animate-spin" />
+              : <LocateFixed className="h-4 w-4" />
+            }
+            {locating ? 'Localisation…' : (isWatching ? 'Suivi GPS en cours' : 'Me localiser')}
+          </button>
+
+          {error && (
+            <p className="mt-3 flex items-start gap-2 rounded-lg bg-red-50 px-3 py-2 text-xs leading-5 text-red-700 dark:bg-red-500/10 dark:text-red-300">
+              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+              {error}
+            </p>
+          )}
+
+          {position && selected && (
+            <div className="mt-3 flex items-center gap-2" aria-label="Mode de déplacement">
+              {(['driving', 'walking'] as TravelMode[]).map((travelMode) => (
+                <button
+                  key={travelMode}
+                  type="button"
+                  onClick={() => setMode(travelMode)}
+                  aria-pressed={mode === travelMode}
+                  className={`flex min-h-10 flex-1 items-center justify-center gap-2 rounded-lg border px-3 text-xs font-bold transition ${
+                    mode === travelMode
+                      ? 'border-primary-600 bg-primary-600 text-white'
+                      : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-100 dark:border-white/10 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800'
                   }`}
                 >
-                  {/* Photo du centre (conditionnelle) */}
-                  {(() => {
-                    const photoSrc = c.photo || c.imageUrl || (Array.isArray(c.photos) && c.photos[0]) || null;
-                    if (!photoSrc) return null;
-                    return (
-                      <div className="w-full h-32 rounded-xl overflow-hidden mb-3">
+                  {travelMode === 'driving'
+                    ? <><Car className="h-4 w-4" /> En voiture</>
+                    : <><Footprints className="h-4 w-4" /> À pied</>
+                  }
+                </button>
+              ))}
+            </div>
+          )}
+
+          <AnimatePresence initial={false}>
+            {destination && (
+              <motion.div
+                initial={{ opacity: 0, height: 0, marginTop: 0 }}
+                animate={{ opacity: 1, height: 'auto', marginTop: 12 }}
+                exit={{ opacity: 0, height: 0, marginTop: 0 }}
+                className="overflow-hidden"
+              >
+                <div
+                  className="rounded-lg border border-primary-200 bg-primary-50 p-3 dark:border-primary-700 dark:bg-primary-900/40"
+                  aria-label={`Itinéraire vers ${destination.nom}`}
+                >
+                  {routeLoading ? (
+                    <p className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Calcul de l’itinéraire…
+                    </p>
+                  ) : routeError && !route ? (
+                    <p className="flex items-start gap-2 text-xs text-red-600 dark:text-red-300">
+                      <AlertCircle className="h-4 w-4 shrink-0" />
+                      {routeError}
+                    </p>
+                  ) : route ? (
+                    <>
+                      <div className="flex items-start justify-between gap-3">
+                        <p className="flex min-w-0 items-start gap-2 text-sm font-bold text-primary-900 dark:text-white">
+                          <Navigation className="mt-0.5 h-4 w-4 shrink-0 text-primary-600 dark:text-mint-400" />
+                          <span className="line-clamp-2">{destination.nom}</span>
+                        </p>
+                        <button
+                          type="button"
+                          onClick={clearAll}
+                          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-slate-500 transition hover:bg-white hover:text-red-600 dark:hover:bg-white/10 dark:hover:text-red-300"
+                          aria-label="Effacer l’itinéraire"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      </div>
+                      <div className="mt-2 flex flex-wrap items-center gap-3 text-xs font-semibold text-slate-600 dark:text-slate-300">
+                        <span className="flex items-center gap-1">
+                          <Route className="h-4 w-4" />
+                          {distance ? (distance / 1000).toFixed(1) : '–'} km
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <Clock className="h-4 w-4" />
+                          {formatDuration(duration)}
+                        </span>
+                        {isFallback && (
+                          <span className="rounded-full bg-amber-100 px-2 py-1 text-[10px] text-amber-800 dark:bg-amber-500/15 dark:text-amber-300">
+                            Trajet approximatif
+                          </span>
+                        )}
+                      </div>
+                    </>
+                  ) : null}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+
+        <div className="flex min-h-0 flex-1 flex-col">
+          <div className="flex shrink-0 items-center justify-between border-b border-slate-100 px-4 py-3 dark:border-white/10 sm:px-5">
+            <p className="text-sm font-bold text-slate-800 dark:text-slate-100">
+              {loading
+                ? 'Recherche des centres…'
+                : `${visibleCentres.length} centre${visibleCentres.length > 1 ? 's' : ''}`
+              }
+            </p>
+            {position && (
+              <span className="text-[11px] font-semibold text-mint-700 dark:text-mint-400">
+                Par distance
+              </span>
+            )}
+          </div>
+
+          <div
+            ref={listRef}
+            className="min-h-0 flex-1 touch-pan-y space-y-3 overflow-y-auto overscroll-contain px-3 py-3 pb-[calc(6.5rem+env(safe-area-inset-bottom,0px))] sm:px-4 lg:pb-5"
+          >
+            {loading ? (
+              <div className="py-10">
+                <LoadingSpinner label="Chargement des centres…" />
+              </div>
+            ) : visibleCentres.length === 0 ? (
+              <div className="py-8">
+                <EmptyState
+                  title={searchQuery ? 'Aucun résultat' : 'Aucun centre disponible'}
+                  description={searchQuery
+                    ? 'Modifiez votre recherche pour afficher d’autres centres.'
+                    : 'Le réseau de centres de santé est en cours de mise à jour.'
+                  }
+                />
+              </div>
+            ) : (
+              visibleCentres.map((centre) => {
+                const centreDistance = distancesMap.get(centre.id)
+                const isSelected = selected === centre.id
+                const hasCoordinates = centre.latitude != null && centre.longitude != null
+                const photo = getCentrePhoto(centre)
+
+                return (
+                  <article
+                    key={centre.id}
+                    data-id={centre.id}
+                    onClick={() => handleSelectCentre(centre.id)}
+                    className={`cursor-pointer rounded-lg border p-3 transition ${
+                      isSelected
+                        ? 'border-mint-500 bg-mint-50 shadow-[0_8px_24px_rgba(16,185,129,0.12)] dark:bg-mint-500/10'
+                        : 'border-slate-200 bg-white hover:border-primary-300 hover:shadow-md dark:border-white/10 dark:bg-slate-900 dark:hover:border-primary-500/50'
+                    }`}
+                  >
+                    {photo && (
+                      <div className="mb-3 h-28 w-full overflow-hidden rounded-md bg-slate-100 dark:bg-slate-800">
                         <img
-                          src={imgUrl(typeof photoSrc === 'string' ? photoSrc : String(photoSrc)) || String(photoSrc)}
-                          alt={c.nom}
-                          className="w-full h-full object-cover"
-                          onError={(e) => { (e.target as HTMLImageElement).parentElement!.style.display = 'none'; }}
+                          src={imgUrl(photo) || photo}
+                          alt={centre.nom}
+                          className="h-full w-full object-cover"
+                          onError={(event) => {
+                            const parent = (event.target as HTMLImageElement).parentElement
+                            if (parent) parent.style.display = 'none'
+                          }}
                         />
                       </div>
-                    );
-                  })()}
+                    )}
 
-                  <div className="flex items-start justify-between gap-2">
-                    <h3 className="font-semibold text-primary-900 dark:text-sable">{c.nom}</h3>
-                    <div className="flex items-center gap-2">
-                      <button 
-                        onClick={(e) => { e.stopPropagation(); setPreviewCentre(c); }}
-                        className="p-1.5 rounded-full bg-white dark:bg-primary-800 text-primary-400 hover:text-primary-600 dark:hover:text-primary-200 border border-primary-100 dark:border-white/10 shadow-sm transition-colors"
-                        title="Voir les détails"
-                      >
-                        <Eye className="w-4 h-4" />
-                      </button>
-                      {dist != null && (
-                        <span className="text-xs font-bold text-mint-700 dark:text-mint-500 bg-mint-100 dark:bg-mint-500/10 px-2 py-0.5 rounded-full shrink-0">
-                          {dist.toFixed(1)} km
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <h2 className="line-clamp-2 text-sm font-bold text-slate-950 dark:text-white">
+                          {centre.nom}
+                        </h2>
+                        <p className="mt-1 flex items-start gap-1.5 text-xs leading-5 text-slate-500 dark:text-slate-400">
+                          <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                          <span>{centre.adresse || centre.ville || 'Adresse non renseignée'}</span>
+                        </p>
+                      </div>
+                      {centreDistance != null && (
+                        <span className="shrink-0 rounded-full bg-mint-100 px-2 py-1 text-[10px] font-bold text-mint-800 dark:bg-mint-500/15 dark:text-mint-300">
+                          {centreDistance.toFixed(1)} km
                         </span>
                       )}
                     </div>
-                  </div>
-                  <p className="text-xs text-primary-300 flex items-center gap-1 mt-1">
-                    <MapPin className="w-3 h-3" /> {c.adresse}
-                  </p>
-                  {c.telephone && (
-                    <a
-                      href={`tel:${c.telephone}`}
-                      onClick={(e: React.MouseEvent) => e.stopPropagation()}
-                      className="text-xs text-mint-600 dark:text-mint-500 flex items-center gap-1 mt-1 hover:underline"
-                    >
-                      <Phone className="w-3 h-3" /> {c.telephone}
-                    </a>
-                  )}
-                  {c.horaires && (
-                    <p className="text-xs text-primary-300 flex items-center gap-1 mt-1">
-                      <Clock className="w-3 h-3" /> {c.horaires}
-                    </p>
-                  )}
 
-                  {/* ═══ Directions button ═══ */}
-                  {position && hasCoords && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        handleSelectCentre(c.id)
-                      }}
-                      className={`mt-3 w-full flex items-center justify-center gap-1.5
-                        py-2 rounded-lg text-xs font-semibold transition-colors border ${
-                        isSelected
-                          ? 'bg-mint-500 text-white border-mint-500 hover:bg-mint-700'
-                          : 'bg-white dark:bg-primary-800 text-primary-500 dark:text-primary-200 border-primary-100 dark:border-white/10 hover:bg-primary-50 dark:hover:bg-primary-700'
-                      }`}
-                    >
-                      <Navigation className="w-3.5 h-3.5" />
-                      {isSelected ? 'Itinéraire actif' : "Voir l'itinéraire"}
-                    </button>
-                  )}
-                </div>
-              )
-            })
-          )}
+                    <div className="mt-3 flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation()
+                          setPreviewCentre(centre)
+                        }}
+                        className="inline-flex min-h-9 flex-1 items-center justify-center gap-1.5 rounded-md border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 transition hover:bg-slate-100 dark:border-white/10 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+                      >
+                        <Eye className="h-3.5 w-3.5" />
+                        Détails
+                      </button>
+                      {centre.telephone && (
+                        <a
+                          href={`tel:${centre.telephone}`}
+                          onClick={(event) => event.stopPropagation()}
+                          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-slate-200 bg-white text-mint-700 transition hover:bg-mint-50 dark:border-white/10 dark:bg-slate-800 dark:text-mint-400 dark:hover:bg-slate-700"
+                          aria-label={`Appeler ${centre.nom}`}
+                          title="Appeler"
+                        >
+                          <Phone className="h-4 w-4" />
+                        </a>
+                      )}
+                      {position && hasCoordinates && (
+                        <button
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation()
+                            handleSelectCentre(centre.id)
+                          }}
+                          className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-md border transition ${
+                            isSelected
+                              ? 'border-mint-600 bg-mint-600 text-white'
+                              : 'border-slate-200 bg-white text-primary-600 hover:bg-primary-50 dark:border-white/10 dark:bg-slate-800 dark:text-primary-300 dark:hover:bg-slate-700'
+                          }`}
+                          aria-label={isSelected ? 'Itinéraire actif' : `Itinéraire vers ${centre.nom}`}
+                          title={isSelected ? 'Itinéraire actif' : 'Afficher l’itinéraire'}
+                        >
+                          <Navigation className="h-4 w-4" />
+                        </button>
+                      )}
+                    </div>
+                  </article>
+                )
+              })
+            )}
+          </div>
         </div>
-      </div>
+      </aside>
 
-      {/* ═══ Details Modal ═══ */}
+      {!sidebarOpen && (
+        <button
+          type="button"
+          onClick={() => setSidebarOpen(true)}
+          className="absolute left-3 top-3 z-[600] inline-flex min-h-11 items-center gap-2 rounded-lg border border-white/80 bg-white/95 px-4 text-sm font-bold text-slate-800 shadow-xl backdrop-blur-md transition hover:bg-white dark:border-white/15 dark:bg-slate-950/95 dark:text-white dark:hover:bg-slate-900 lg:left-5 lg:top-5"
+          aria-label="Ouvrir la liste des centres"
+        >
+          <PanelLeftOpen className="h-5 w-5" />
+          <span>Centres</span>
+          {!loading && (
+            <span className="rounded-full bg-primary-100 px-2 py-0.5 text-[10px] text-primary-700 dark:bg-primary-500/20 dark:text-primary-200">
+              {visibleCentres.length}
+            </span>
+          )}
+        </button>
+      )}
+
+      {position && (
+        <button
+          type="button"
+          onClick={() => setIsTracking(!isTracking)}
+          className={`absolute bottom-24 right-3 z-[600] inline-flex min-h-11 items-center gap-2 rounded-lg px-4 text-xs font-bold text-white shadow-xl transition lg:bottom-5 lg:right-5 ${
+            isTracking
+              ? 'bg-red-600 hover:bg-red-700'
+              : 'bg-primary-600 hover:bg-primary-700'
+          }`}
+        >
+          <LocateFixed className={`h-4 w-4 ${isTracking ? 'animate-pulse' : ''}`} />
+          {isTracking ? 'Arrêter le suivi' : 'Suivre ma position'}
+        </button>
+      )}
+
       <Modal
-        isOpen={!!previewCentre}
+        isOpen={Boolean(previewCentre)}
         onClose={() => setPreviewCentre(null)}
         title="Détails du centre"
       >
         {previewCentre && (
           <div className="space-y-4">
-            {/* Photo principale du centre */}
-            {(() => {
-              const photoSrc = previewCentre.photo || previewCentre.imageUrl || (Array.isArray(previewCentre.photos) && previewCentre.photos[0]) || null;
-              if (!photoSrc) return null;
-              return (
-                <div className="w-full h-48 rounded-xl overflow-hidden">
-                  <img
-                    src={imgUrl(typeof photoSrc === 'string' ? photoSrc : String(photoSrc)) || String(photoSrc)}
-                    alt={previewCentre.nom}
-                    className="w-full h-full object-cover"
-                    onError={(e) => { (e.target as HTMLImageElement).parentElement!.style.display = 'none'; }}
-                  />
-                </div>
-              );
-            })()}
+            {getCentrePhoto(previewCentre) && (
+              <div className="h-48 w-full overflow-hidden rounded-lg bg-slate-100 dark:bg-slate-800">
+                <img
+                  src={imgUrl(getCentrePhoto(previewCentre)!) || getCentrePhoto(previewCentre)!}
+                  alt={previewCentre.nom}
+                  className="h-full w-full object-cover"
+                />
+              </div>
+            )}
 
             <div>
-              <h3 className="font-display font-bold text-xl text-primary-900 dark:text-sable">
+              <h2 className="font-display text-xl font-bold text-slate-950 dark:text-white">
                 {previewCentre.nom}
-              </h3>
-              <p className="text-sm font-medium text-primary-500 mt-1">
+              </h2>
+              <p className="mt-1 text-sm font-semibold text-primary-600 dark:text-primary-300">
                 {previewCentre.type_centre || 'Centre de santé'}
               </p>
             </div>
-            
-            <div className="space-y-3 bg-primary-50 dark:bg-primary-900/30 p-4 rounded-xl border border-primary-100 dark:border-white/5">
+
+            <div className="space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-4 dark:border-white/10 dark:bg-slate-900">
               <div className="flex items-start gap-3">
-                <MapPin className="w-5 h-5 text-primary-400 mt-0.5" />
+                <MapPin className="mt-0.5 h-5 w-5 shrink-0 text-primary-500" />
                 <div>
-                  <p className="text-sm font-semibold text-primary-800 dark:text-primary-100">Adresse</p>
-                  <p className="text-sm text-primary-600 dark:text-primary-300">
-                    {previewCentre.adresse}
-                    <br />
-                    {previewCentre.ville ? `${previewCentre.ville}, ` : ''}{previewCentre.region || ''}
+                  <p className="text-sm font-bold text-slate-800 dark:text-slate-100">Adresse</p>
+                  <p className="text-sm text-slate-600 dark:text-slate-300">
+                    {previewCentre.adresse || 'Non renseignée'}
+                    {(previewCentre.ville || previewCentre.region) && (
+                      <>
+                        <br />
+                        {[previewCentre.ville, previewCentre.region].filter(Boolean).join(', ')}
+                      </>
+                    )}
                   </p>
                 </div>
               </div>
-              
+
               {previewCentre.telephone && (
                 <div className="flex items-start gap-3">
-                  <Phone className="w-5 h-5 text-primary-400 mt-0.5" />
+                  <Phone className="mt-0.5 h-5 w-5 shrink-0 text-primary-500" />
                   <div>
-                    <p className="text-sm font-semibold text-primary-800 dark:text-primary-100">Téléphone</p>
-                    <a href={`tel:${previewCentre.telephone}`} className="text-sm text-mint-600 dark:text-mint-500 hover:underline">
+                    <p className="text-sm font-bold text-slate-800 dark:text-slate-100">Téléphone</p>
+                    <a
+                      href={`tel:${previewCentre.telephone}`}
+                      className="text-sm font-semibold text-mint-700 hover:underline dark:text-mint-400"
+                    >
                       {previewCentre.telephone}
                     </a>
                   </div>
                 </div>
               )}
-              
+
               {previewCentre.horaires && (
                 <div className="flex items-start gap-3">
-                  <Clock className="w-5 h-5 text-primary-400 mt-0.5" />
+                  <Clock className="mt-0.5 h-5 w-5 shrink-0 text-primary-500" />
                   <div>
-                    <p className="text-sm font-semibold text-primary-800 dark:text-primary-100">Horaires</p>
-                    <p className="text-sm text-primary-600 dark:text-primary-300">{previewCentre.horaires}</p>
+                    <p className="text-sm font-bold text-slate-800 dark:text-slate-100">Horaires</p>
+                    <p className="text-sm text-slate-600 dark:text-slate-300">{previewCentre.horaires}</p>
                   </div>
                 </div>
               )}
             </div>
 
-            {previewCentre.capacite_lits && (
-              <div className="flex justify-between items-center bg-white dark:bg-primary-800 p-3 rounded-lg border border-primary-100 dark:border-white/10">
-                <span className="text-sm text-primary-500">Capacité en lits</span>
-                <span className="font-bold text-primary-900 dark:text-sable">{previewCentre.capacite_lits}</span>
+            {previewCentre.capacite_lits != null && (
+              <div className="flex items-center justify-between rounded-lg border border-slate-200 px-4 py-3 dark:border-white/10">
+                <span className="text-sm text-slate-600 dark:text-slate-300">Capacité en lits</span>
+                <span className="font-bold text-slate-950 dark:text-white">{previewCentre.capacite_lits}</span>
               </div>
             )}
-            
+
             {previewCentre.services && (
               <div>
-                <p className="text-sm font-semibold text-primary-800 dark:text-primary-100 mb-2">Services disponibles</p>
+                <p className="mb-2 text-sm font-bold text-slate-800 dark:text-slate-100">
+                  Services disponibles
+                </p>
                 <div className="flex flex-wrap gap-2">
-                  {(Array.isArray(previewCentre.services) 
-                    ? previewCentre.services 
-                    : String(previewCentre.services).split(',')
-                  ).map((srv: string, i: number) => (
-                    <span key={i} className="text-xs bg-primary-100 dark:bg-primary-700/50 text-primary-700 dark:text-primary-200 px-2.5 py-1 rounded-full">
-                      {String(srv).trim()}
+                  {(Array.isArray(previewCentre.services)
+                    ? previewCentre.services
+                    : previewCentre.services.split(',')
+                  ).map((service) => (
+                    <span
+                      key={service}
+                      className="rounded-full bg-primary-100 px-2.5 py-1 text-xs font-semibold text-primary-700 dark:bg-primary-500/15 dark:text-primary-200"
+                    >
+                      {service.trim()}
                     </span>
                   ))}
                 </div>
               </div>
             )}
 
-            {/* 📸 Photos Gallery */}
-            {(() => {
-              const photosData = previewCentre.photos || previewCentre.images || previewCentre.imageUrl || previewCentre.photo;
-              if (!photosData) return null;
-              
-              const photosArray = Array.isArray(photosData) 
-                ? photosData 
-                : typeof photosData === 'string' 
-                  ? photosData.split(',') 
-                  : [photosData];
-
-              const validPhotos = photosArray.filter(p => typeof p === 'string' && p.trim().length > 0);
-              
-              if (validPhotos.length === 0) return null;
-
-              return (
-                <div className="mt-4">
-                  <p className="text-sm font-semibold text-primary-800 dark:text-primary-100 mb-2">Photos du centre</p>
-                  <div className="flex gap-3 overflow-x-auto pb-2 snap-x">
-                    {validPhotos.map((photoUrl: string, idx: number) => (
-                      <div key={idx} className="shrink-0 snap-start">
-                        <img 
-                          src={imgUrl(photoUrl.trim()) || photoUrl.trim()} 
-                          alt={`Photo de ${previewCentre.nom}`} 
-                          className="w-48 h-32 object-cover rounded-xl border border-primary-100 dark:border-white/10 shadow-sm"
-                          onError={(e) => {
-                            // Hide broken images gracefully
-                            (e.target as HTMLImageElement).style.display = 'none';
-                          }}
-                        />
-                      </div>
-                    ))}
-                  </div>
+            {getCentrePhotos(previewCentre).length > 1 && (
+              <div>
+                <p className="mb-2 text-sm font-bold text-slate-800 dark:text-slate-100">
+                  Photos du centre
+                </p>
+                <div className="flex snap-x gap-3 overflow-x-auto pb-2">
+                  {getCentrePhotos(previewCentre).map((photo, index) => (
+                    <img
+                      key={`${photo}-${index}`}
+                      src={imgUrl(photo) || photo}
+                      alt={`Photo ${index + 1} de ${previewCentre.nom}`}
+                      className="h-32 w-48 shrink-0 snap-start rounded-lg border border-slate-200 object-cover dark:border-white/10"
+                    />
+                  ))}
                 </div>
-              );
-            })()}
+              </div>
+            )}
           </div>
         )}
       </Modal>

@@ -6,8 +6,12 @@ import { HelpCircle } from 'lucide-react'
 
 export default function FloatingHelpButton() {
   const pathname = usePathname()
+  const isMessagingRoute =
+    pathname === '/messages' ||
+    pathname?.startsWith('/patient/messages') ||
+    pathname?.startsWith('/medecin/messages')
 
-  if (pathname === '/guide-utilisation') return null
+  if (pathname === '/guide-utilisation' || isMessagingRoute) return null
 
   return (
     <Link
@@ -18,7 +22,7 @@ export default function FloatingHelpButton() {
     >
       <HelpCircle className="h-5 w-5" />
       <span className="pointer-events-none absolute right-full mr-2 whitespace-nowrap rounded-full border border-slate-200 bg-white px-3 py-1 text-[11px] font-semibold text-slate-700 opacity-0 shadow-lg transition-opacity duration-200 group-hover:opacity-100 dark:border-white/10 dark:bg-slate-800 dark:text-slate-200">
-        Guide d'utilisation
+        Guide d&apos;utilisation
       </span>
     </Link>
   )

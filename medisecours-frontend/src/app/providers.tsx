@@ -23,6 +23,7 @@ export default function Providers({ children }: { children: React.ReactNode }) {
   const isFocusedAuthRoute = pathname === '/login' || pathname === '/register'
   const hideShell = isAdminRoute || isMedecinRoute || isFocusedAuthRoute
   const isMessagingRoute = pathname === '/messages' || pathname?.startsWith('/patient/messages')
+  const isCentresRoute = pathname === '/centres'
 
   return (
     <StableGoogleProvider>
@@ -34,8 +35,8 @@ export default function Providers({ children }: { children: React.ReactNode }) {
             <NotificationProvider>
               <Navbar />
               <main className="flex-1 flex flex-col min-h-0">{children}</main>
-              {!isMessagingRoute && <Footer compact={pathname === '/'} />}
-              <FloatingHelpButton />
+              {!isMessagingRoute && !isCentresRoute && <Footer compact={pathname === '/'} />}
+              {!isCentresRoute && <FloatingHelpButton />}
             </NotificationProvider>
           )}
         </ToastProvider>
