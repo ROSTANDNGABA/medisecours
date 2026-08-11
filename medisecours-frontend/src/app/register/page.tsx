@@ -9,10 +9,12 @@ import {
   ArrowLeft,
   ArrowRight,
   AlertCircle,
+  Camera,
   Check,
   Circle,
   Eye,
   EyeOff,
+  FileText,
   HeartPulse,
   LoaderCircle,
   Lock,
@@ -20,6 +22,7 @@ import {
   Phone,
   ShieldCheck,
   Stethoscope,
+  UploadCloud,
   User,
 } from 'lucide-react'
 import AuthLayout from '../../components/auth/AuthLayout'
@@ -28,6 +31,7 @@ import { useToast } from '../../components/ui/Toast'
 import { destinationForUser } from '../../lib/auth-routing'
 
 type AccountType = 'patient' | 'medecin'
+type IdentityDocumentType = 'CNI' | 'PASSPORT'
 
 type RegisterForm = {
   email: string
@@ -44,7 +48,10 @@ type RegisterForm = {
   numeroOrdre: string
 }
 
-type FieldErrors = Partial<Record<keyof RegisterForm | 'terms' | 'type', string>>
+type FieldErrors = Partial<Record<
+  keyof RegisterForm | 'terms' | 'type' | 'typePieceIdentite' | 'pieceIdentite' | 'pieceIdentiteVerso' | 'photoVerification',
+  string
+>>
 
 const emptyForm: RegisterForm = {
   email: '',
@@ -63,6 +70,7 @@ const emptyForm: RegisterForm = {
 
 const steps = ['Profil', 'Identité', 'Détails']
 const passwordPattern = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{8,}$/
+const maxIdentityFileSize = 5 * 1024 * 1024
 const inputClass =
   'auth-field min-h-12 w-full rounded-lg border border-slate-200 bg-slate-50 px-3.5 py-3 text-sm text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/10 aria-invalid:border-red-500 aria-invalid:ring-4 aria-invalid:ring-red-500/10 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-blue-400 dark:focus:bg-slate-900 dark:aria-invalid:border-red-400'
 
@@ -88,6 +96,10 @@ export default function RegisterPage() {
   const [acceptedTerms, setAcceptedTerms] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [typePieceIdentite, setTypePieceIdentite] = useState<IdentityDocumentType>('CNI')
+  const [pieceIdentite, setPieceIdentite] = useState<File | null>(null)
+  const [pieceIdentiteVerso, setPieceIdentiteVerso] = useState<File | null>(null)
+  const [photoVerification, setPhotoVerification] = useState<File | null>(null)
   const { register, loginWithGoogle } = useAuth()
   const toast = useToast()
   const router = useRouter()
@@ -163,6 +175,17 @@ export default function RegisterPage() {
       if (!isValidOrderNumber(form.numeroOrdre)) {
         nextErrors.numeroOrdre = 'Recopiez le numéro officiel, avec ses lettres, chiffres et tirets.'
       }
+      if (!pieceIdentite) {
+        nextErrors.pieceIdentite = typePieceIdentite === 'CNI'
+          ? 'Ajoutez une photo lisible du recto de votre CNI.'
+          : 'Ajoutez une image lisible de la page d’identité du passeport.'
+      }
+      if (typePieceIdentite === 'CNI' && !pieceIdentiteVerso) {
+        nextErrors.pieceIdentiteVerso = 'Ajoutez une photo lisible du verso de votre CNI.'
+      }
+      if (!photoVerification) {
+        nextErrors.photoVerification = 'Ajoutez une photo récente de votre visage.'
+      }
     }
 
     if (!isValidPhone(form.telephone)) {
@@ -181,6 +204,32 @@ export default function RegisterPage() {
     setType(accountType)
     setErrors({})
     setStep(1)
+  }
+
+  const selectIdentityFile = (
+    field: 'pieceIdentite' | 'pieceIdentiteVerso' | 'photoVerification',
+    file: File | undefined,
+  ) => {
+    if (!file) return
+
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp']
+
+    if (!allowedTypes.includes(file.type)) {
+      setErrors((current) => ({
+        ...current,
+        [field]: 'Utilisez une image JPEG, PNG ou WebP.',
+      }))
+      return
+    }
+    if (file.size > maxIdentityFileSize) {
+      setErrors((current) => ({ ...current, [field]: 'Le fichier ne doit pas dépasser 5 Mo.' }))
+      return
+    }
+
+    if (field === 'pieceIdentite') setPieceIdentite(file)
+    else if (field === 'pieceIdentiteVerso') setPieceIdentiteVerso(file)
+    else setPhotoVerification(file)
+    setErrors((current) => ({ ...current, [field]: undefined }))
   }
 
   const next = () => {
@@ -217,17 +266,27 @@ export default function RegisterPage() {
               allergies: form.allergies.trim(),
               contactsUrgence: form.contactsUrgence.trim(),
             }
-          : {
-              ...common,
-              telephone: form.telephone.trim(),
-              specialite: form.specialite.trim(),
-              numeroOrdre: form.numeroOrdre.trim(),
-            }
+          : (() => {
+              const data = new FormData()
+              Object.entries({
+                ...common,
+                telephone: form.telephone.trim(),
+                specialite: form.specialite.trim(),
+                numeroOrdre: form.numeroOrdre.trim(),
+                typePieceIdentite,
+              }).forEach(([key, value]) => data.append(key, value))
+              data.append('pieceIdentite', pieceIdentite as File)
+              if (typePieceIdentite === 'CNI') {
+                data.append('pieceIdentiteVerso', pieceIdentiteVerso as File)
+              }
+              data.append('photoVerification', photoVerification as File)
+              return data
+            })()
 
       await register(payload)
       toast.success(
         type === 'medecin'
-          ? 'Compte créé. Votre profil médecin doit maintenant être validé.'
+          ? 'Compte créé. Votre profil professionnel est maintenant en cours de vérification.'
           : 'Compte créé. Un e-mail de confirmation vous a été envoyé.',
       )
       router.push('/login?registered=1')
@@ -341,7 +400,7 @@ export default function RegisterPage() {
                 </div>
                 <span className="block font-display text-base font-bold text-slate-950 dark:text-white">Médecin</span>
                 <span className="mt-1 block text-xs leading-5 text-slate-500 dark:text-slate-400">
-                  Profil professionnel soumis à la validation d’un administrateur.
+                  Profil professionnel soumis à une vérification avant activation.
                 </span>
               </button>
             </div>
@@ -583,7 +642,7 @@ export default function RegisterPage() {
               <>
                 <div className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-xs leading-5 text-amber-950 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-200">
                   <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" />
-                  Le compte restera en attente jusqu’à la vérification de vos informations par un administrateur.
+                  Le compte restera en attente jusqu’à la fin de la vérification de vos informations.
                 </div>
                 <Field
                   label="Spécialité médicale"
@@ -606,7 +665,7 @@ export default function RegisterPage() {
                 <Field
                   label="Téléphone professionnel (facultatif)"
                   error={errors.telephone}
-                  hint="Utilisez un numéro joignable par la clinique ou l’administrateur."
+                  hint="Utilisez un numéro professionnel auquel vous êtes facilement joignable."
                 >
                   <div className="relative">
                     <Phone className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
@@ -637,6 +696,70 @@ export default function RegisterPage() {
                     placeholder="Ex. ONMC-2026-0001"
                   />
                 </Field>
+                <div className="rounded-lg border border-slate-200 p-4 dark:border-slate-700">
+                  <div className="mb-4">
+                    <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+                      Vérification de votre identité
+                    </h3>
+                    <p className="mt-1 text-[11px] leading-4 text-slate-500 dark:text-slate-400">
+                      Ces fichiers sont privés et utilisés uniquement pour vérifier votre identité professionnelle.
+                    </p>
+                  </div>
+
+                  <Field label="Type de pièce d’identité" error={errors.typePieceIdentite} required>
+                    <div className="grid grid-cols-2 gap-2">
+                      {([
+                        ['CNI', 'Carte nationale'],
+                        ['PASSPORT', 'Passeport'],
+                      ] as const).map(([value, label]) => (
+                        <button
+                          key={value}
+                          type="button"
+                          onClick={() => setTypePieceIdentite(value)}
+                          className={`min-h-11 rounded-lg border px-3 text-sm font-semibold transition ${
+                            typePieceIdentite === value
+                              ? 'border-blue-600 bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300'
+                              : 'border-slate-200 text-slate-600 hover:border-blue-400 dark:border-slate-700 dark:text-slate-300'
+                          }`}
+                        >
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                  </Field>
+
+                  <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                    <IdentityFileField
+                      label={typePieceIdentite === 'CNI' ? 'Recto de la CNI' : 'Page d’identité du passeport'}
+                      description="Document entier, net, sans reflet et avec tous les bords visibles."
+                      accept="image/jpeg,image/png,image/webp"
+                      file={pieceIdentite}
+                      error={errors.pieceIdentite}
+                      icon={FileText}
+                      onChange={(file) => selectIdentityFile('pieceIdentite', file)}
+                    />
+                    {typePieceIdentite === 'CNI' && (
+                      <IdentityFileField
+                        label="Verso de la CNI"
+                        description="Photographiez le verso entier, net et sans reflet."
+                        accept="image/jpeg,image/png,image/webp"
+                        file={pieceIdentiteVerso}
+                        error={errors.pieceIdentiteVerso}
+                        icon={FileText}
+                        onChange={(file) => selectIdentityFile('pieceIdentiteVerso', file)}
+                      />
+                    )}
+                    <IdentityFileField
+                      label="Photo récente du visage"
+                      description="Visage de face, bien éclairé, sans filtre."
+                      accept="image/jpeg,image/png,image/webp"
+                      file={photoVerification}
+                      error={errors.photoVerification}
+                      icon={Camera}
+                      onChange={(file) => selectIdentityFile('photoVerification', file)}
+                    />
+                  </div>
+                </div>
               </>
             )}
           </motion.div>
@@ -684,6 +807,62 @@ export default function RegisterPage() {
         </Link>
       </p>
     </AuthLayout>
+  )
+}
+
+function IdentityFileField({
+  label,
+  description,
+  accept,
+  file,
+  error,
+  icon: Icon,
+  onChange,
+}: {
+  label: string
+  description: string
+  accept: string
+  file: File | null
+  error?: string
+  icon: React.ComponentType<{ className?: string }>
+  onChange: (file?: File) => void
+}) {
+  return (
+    <div>
+      <span className="mb-2 block text-sm font-semibold text-slate-700 dark:text-slate-200">
+        {label}<span className="ml-1 text-red-500">*</span>
+      </span>
+      <label className={`flex min-h-36 cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed px-4 py-4 text-center transition ${
+        error
+          ? 'border-red-400 bg-red-50/60 dark:bg-red-950/20'
+          : file
+            ? 'border-emerald-400 bg-emerald-50/60 dark:bg-emerald-950/20'
+            : 'border-slate-300 bg-slate-50 hover:border-blue-500 hover:bg-blue-50/60 dark:border-slate-700 dark:bg-slate-900 dark:hover:border-blue-400'
+      }`}>
+        <input
+          type="file"
+          accept={accept}
+          className="sr-only"
+          onChange={(event) => onChange(event.target.files?.[0])}
+        />
+        <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-lg bg-white text-blue-600 shadow-sm dark:bg-slate-800 dark:text-blue-400">
+          {file ? <Check className="h-5 w-5 text-emerald-600" /> : <Icon className="h-5 w-5" />}
+        </div>
+        <span className="max-w-full break-all text-xs font-bold text-slate-800 dark:text-slate-100">
+          {file?.name || 'Choisir un fichier'}
+        </span>
+        <span className="mt-1 text-[10px] leading-4 text-slate-500 dark:text-slate-400">
+          {file ? `${(file.size / 1024 / 1024).toFixed(2)} Mo` : description}
+        </span>
+        {!file && <UploadCloud className="mt-2 h-4 w-4 text-slate-400" />}
+      </label>
+      {error && (
+        <p className="mt-1.5 flex gap-1.5 text-xs font-medium text-red-600 dark:text-red-400">
+          <AlertCircle className="mt-px h-3.5 w-3.5 shrink-0" />
+          {error}
+        </p>
+      )}
+    </div>
   )
 }
 

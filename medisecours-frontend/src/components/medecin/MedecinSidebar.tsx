@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import {
   HeartPulse, LayoutDashboard, Users, CalendarClock, FileText, MessageCircle,
-  BarChart3, Bell, Settings, Plus, LogOut,
+  BarChart3, Bell, Settings, Plus, LogOut, HelpCircle,
 } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 import Avatar from '../ui/Avatar'
@@ -22,6 +22,7 @@ const NAV_BOTTOM = [
   { href: '/medecin/rapports', label: 'Rapports', icon: BarChart3 },
   { href: '/medecin/notifications', label: 'Notifications', icon: Bell, badge: 'notifications' },
   { href: '/medecin/profil', label: 'Profil', icon: Settings },
+  { href: '/guide-utilisation', label: 'Guide', icon: HelpCircle },
 ]
 
 export default function MedecinSidebar({ setMobileOpen }: { setMobileOpen: (open: boolean) => void }) {

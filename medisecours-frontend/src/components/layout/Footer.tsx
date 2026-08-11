@@ -22,6 +22,7 @@ export default function Footer({ compact = false }: { compact?: boolean }) {
             <Link href="/premiers-soins" className="hover:text-emerald-600 dark:hover:text-emerald-300">Premiers soins</Link>
             <Link href="/centres" className="hover:text-emerald-600 dark:hover:text-emerald-300">Centres</Link>
             <Link href="/medecins" className="hover:text-emerald-600 dark:hover:text-emerald-300">Médecins</Link>
+            <Link href="/guide-utilisation" className="hover:text-emerald-600 dark:hover:text-emerald-300">Guide d’utilisation</Link>
             <Link href="/login" className="hover:text-emerald-600 dark:hover:text-emerald-300">Connexion</Link>
           </nav>
         </div>
@@ -125,6 +126,7 @@ export default function Footer({ compact = false }: { compact?: boolean }) {
                 <ul className="space-y-4 text-sm text-slate-500 dark:text-slate-400">
                   <li><Link href="/premiers-soins" className="hover:text-emerald-500 transition-colors">Gestes de secours</Link></li>
                   <li><Link href="/categories" className="hover:text-emerald-500 transition-colors">Catégories médicales</Link></li>
+                  <li><Link href="/guide-utilisation" className="hover:text-emerald-500 transition-colors">Guide d’utilisation</Link></li>
                 </ul>
               </div>
            </div>

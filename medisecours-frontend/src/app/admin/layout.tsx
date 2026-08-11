@@ -27,6 +27,7 @@ import api from '../../api/axios'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import NotificationBell from '../../components/ui/NotificationBell'
 import DashboardThemeToggle from '../../components/ui/DashboardThemeToggle'
+import FloatingHelpButton from '../../components/layout/FloatingHelpButton'
 
 const NAV_GROUPS = [
   {
@@ -432,6 +433,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           </SidebarBlock>
         </div>
       </div>
+      <FloatingHelpButton />
     </div>
   )
 }

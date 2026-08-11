@@ -10,6 +10,7 @@ import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import MedecinSidebar from '../../components/medecin/MedecinSidebar'
 import MedecinHeader from '../../components/medecin/MedecinHeader'
 import { NotificationProvider } from '../../contexts/NotificationContext'
+import FloatingHelpButton from '../../components/layout/FloatingHelpButton'
 import { swrConfig } from '../../lib/fetcher'
 
 const PAGE_TITLES = {
@@ -113,6 +114,7 @@ export default function MedecinLayout({ children }: { children: React.ReactNode 
             </header>
             <main className="flex-1 overflow-y-auto">{children}</main>
           </div>
+          <FloatingHelpButton />
         </SWRConfig>
       </NotificationProvider>
     </div>

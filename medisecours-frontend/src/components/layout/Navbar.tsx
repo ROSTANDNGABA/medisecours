@@ -57,7 +57,7 @@ export default function Navbar() {
   /* ─── Mobile bottom tab bar items ─── */
   const publicMobileNav: NavLink[] = [
     { to: '/', label: 'Accueil', icon: Home },
-    { to: '/premiers-soins', label: 'Secours', icon: Cross },
+    { to: '/premiers-soins', label: 'Premiers soins', icon: Cross },
     { to: '/maladies', label: 'Orientation', icon: Activity },
     { to: '/centres', label: 'Centres', icon: MapPin },
     { to: '/login', label: 'Connexion', icon: UserCircle },
@@ -65,7 +65,7 @@ export default function Navbar() {
 
   const patientMobileNav: NavLink[] = [
     { to: '/', label: 'Accueil', icon: Home },
-    { to: '/premiers-soins', label: 'Secours', icon: Cross },
+    { to: '/premiers-soins', label: 'Premiers soins', icon: Cross },
     { to: '/maladies', label: 'Orientation', icon: Activity },
     { to: '/medecins', label: 'Médecins', icon: Stethoscope },
     { to: '/patient/consultations', label: 'Rendez-vous', icon: FileText },

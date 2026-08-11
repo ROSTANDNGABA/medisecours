@@ -158,22 +158,22 @@ class GoogleAuthController extends AbstractController
         // ── Vérification du statut du compte ────────────────────────────────
         if ($user->isBanni()) {
             return new JsonResponse(
-                ['error' => 'Votre compte a été banni. Contactez l\'administrateur.'],
+                ['error' => 'Votre compte a été suspendu. Contactez le support.'],
                 Response::HTTP_FORBIDDEN
             );
         }
 
         if (!$user->isActif()) {
             return new JsonResponse(
-                ['error' => 'Votre compte est désactivé. Contactez l\'administrateur.'],
+                ['error' => 'Votre compte est désactivé. Contactez le support.'],
                 Response::HTTP_FORBIDDEN
             );
         }
 
-        // Un médecin doit être validé par l'admin avant de pouvoir se connecter
+        // Le profil professionnel doit être vérifié avant l'ouverture de l'accès médecin.
         if ($user instanceof Medecin && !$user->isEstValide()) {
             return new JsonResponse([
-                'error' => 'Votre compte médecin est en attente de validation par l\'administrateur. Vous recevrez un email dès que votre compte sera activé.',
+                'error' => 'Votre compte médecin est en attente de vérification. Vous recevrez un email dès que votre accès sera activé.',
             ], Response::HTTP_FORBIDDEN);
         }
 

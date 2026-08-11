@@ -8,6 +8,7 @@ import { NotificationProvider } from '../contexts/NotificationContext'
 import { ToastProvider } from '../components/ui/Toast'
 import Navbar from '../components/layout/Navbar'
 import Footer from '../components/layout/Footer'
+import FloatingHelpButton from '../components/layout/FloatingHelpButton'
 
 const GOOGLE_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || ''
 
@@ -34,6 +35,7 @@ export default function Providers({ children }: { children: React.ReactNode }) {
               <Navbar />
               <main className="flex-1 flex flex-col min-h-0">{children}</main>
               {!isMessagingRoute && <Footer compact={pathname === '/'} />}
+              <FloatingHelpButton />
             </NotificationProvider>
           )}
         </ToastProvider>

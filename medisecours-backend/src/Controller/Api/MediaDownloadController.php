@@ -73,7 +73,13 @@ final class MediaDownloadController extends AbstractController
         if (!$user) {
             return false;
         }
-        if ($this->isGranted('ROLE_ADMIN') || $media->getUploadedBy() === $user) {
+        if ($this->isGranted('ROLE_ADMIN')) {
+            return true;
+        }
+        if ($media->isIdentityVerificationMedia()) {
+            return false;
+        }
+        if ($media->getUploadedBy() === $user) {
             return true;
         }
 

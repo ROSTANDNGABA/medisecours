@@ -44,6 +44,21 @@ class Medecin extends User
     #[Groups(['user:read'])]
     private bool $estValide = false;
 
+    #[ORM\Column(length: 20, nullable: true)]
+    private ?string $typePieceIdentite = null;
+
+    #[ORM\OneToOne(targetEntity: MediaObject::class, cascade: ['persist'])]
+    #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
+    private ?MediaObject $pieceIdentite = null;
+
+    #[ORM\OneToOne(targetEntity: MediaObject::class, cascade: ['persist'])]
+    #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
+    private ?MediaObject $pieceIdentiteVerso = null;
+
+    #[ORM\OneToOne(targetEntity: MediaObject::class, cascade: ['persist'])]
+    #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
+    private ?MediaObject $photoVerificationIdentite = null;
+
     /**
      * Disponibilités structurées en JSON.
      * Format : [{"jour": "lundi", "debut": "08:00", "fin": "17:00"}]
@@ -102,6 +117,65 @@ class Medecin extends User
         $this->estValide = $estValide;
 
         return $this;
+    }
+
+    public function getTypePieceIdentite(): ?string
+    {
+        return $this->typePieceIdentite;
+    }
+
+    public function setTypePieceIdentite(?string $typePieceIdentite): static
+    {
+        $this->typePieceIdentite = $typePieceIdentite;
+
+        return $this;
+    }
+
+    public function getPieceIdentite(): ?MediaObject
+    {
+        return $this->pieceIdentite;
+    }
+
+    public function setPieceIdentite(?MediaObject $pieceIdentite): static
+    {
+        $this->pieceIdentite = $pieceIdentite;
+
+        return $this;
+    }
+
+    public function getPieceIdentiteVerso(): ?MediaObject
+    {
+        return $this->pieceIdentiteVerso;
+    }
+
+    public function setPieceIdentiteVerso(?MediaObject $pieceIdentiteVerso): static
+    {
+        $this->pieceIdentiteVerso = $pieceIdentiteVerso;
+
+        return $this;
+    }
+
+    public function getPhotoVerificationIdentite(): ?MediaObject
+    {
+        return $this->photoVerificationIdentite;
+    }
+
+    public function setPhotoVerificationIdentite(?MediaObject $photoVerificationIdentite): static
+    {
+        $this->photoVerificationIdentite = $photoVerificationIdentite;
+
+        return $this;
+    }
+
+    public function hasCompleteIdentityVerificationFile(): bool
+    {
+        if (!in_array($this->typePieceIdentite, ['CNI', 'PASSPORT'], true)) {
+            return false;
+        }
+
+        return $this->pieceIdentite !== null
+            && $this->photoVerificationIdentite !== null
+            && ($this->typePieceIdentite !== 'CNI' || $this->pieceIdentiteVerso !== null);
     }
 
     /**

@@ -85,7 +85,7 @@ function LoginForm() {
         if (typeof serverMessage === 'string' && serverMessage.toLowerCase().includes('confirmez')) {
           setNeedsVerification(true)
         }
-        toast.error(serverMessage || 'Accès refusé. Contactez l’administrateur.')
+        toast.error(serverMessage || 'Accès refusé. Vérifiez l’état de votre compte ou contactez le support.')
       } else if (status === 429) {
         toast.error(serverMessage || 'Trop de tentatives. Réessayez dans une minute.')
       } else {
@@ -211,7 +211,7 @@ function LoginForm() {
             </p>
           ) : (
             <p id="login-email-hint" className="mt-1.5 text-[11px] leading-4 text-slate-400 dark:text-slate-500">
-              Utilisez l’adresse e-mail associée à votre compte patient, médecin ou administrateur.
+              Utilisez l’adresse e-mail associée à votre compte patient ou médecin.
             </p>
           )}
         </div>

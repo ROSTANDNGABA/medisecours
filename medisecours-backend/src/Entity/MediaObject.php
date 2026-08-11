@@ -22,7 +22,7 @@ use Vich\UploaderBundle\Mapping\Annotation as Vich;
 #[ApiResource(
     operations: [
         new GetCollection(security: "is_granted('ROLE_ADMIN')"),
-        new Get(security: "object.isPublic() or is_granted('ROLE_ADMIN') or object.getUploadedBy() == user"),
+        new Get(security: "object.isPublic() or is_granted('ROLE_ADMIN') or (not object.isIdentityVerificationMedia() and object.getUploadedBy() == user)"),
         new Post(
             security: "is_granted('ROLE_ADMIN')",
             processor: MediaObjectProcessor::class,
@@ -32,7 +32,7 @@ use Vich\UploaderBundle\Mapping\Annotation as Vich;
             ],
             denormalizationContext: ['groups' => ['media:write']],
         ),
-        new Delete(security: "is_granted('ROLE_ADMIN') or object.getUploadedBy() == user")
+        new Delete(security: "is_granted('ROLE_ADMIN') or (not object.isIdentityVerificationMedia() and object.getUploadedBy() == user)")
     ],
     normalizationContext: ['groups' => ['media:read']],
     denormalizationContext: ['groups' => ['media:write']],
@@ -42,6 +42,10 @@ use Vich\UploaderBundle\Mapping\Annotation as Vich;
 )]
 class MediaObject
 {
+    public const PURPOSE_GENERAL = 'general';
+    public const PURPOSE_IDENTITY_DOCUMENT = 'identity_document';
+    public const PURPOSE_IDENTITY_PHOTO = 'identity_photo';
+
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]
@@ -104,6 +108,9 @@ class MediaObject
 
     #[ORM\Column(type: 'boolean', options: ['default' => true])]
     private bool $isPublic = true;
+
+    #[ORM\Column(length: 40, options: ['default' => self::PURPOSE_GENERAL])]
+    private string $purpose = self::PURPOSE_GENERAL;
 
     public function __construct()
     {
@@ -205,6 +212,26 @@ class MediaObject
         $this->isPublic = $isPublic;
 
         return $this;
+    }
+
+    public function getPurpose(): string
+    {
+        return $this->purpose;
+    }
+
+    public function setPurpose(string $purpose): static
+    {
+        $this->purpose = $purpose;
+
+        return $this;
+    }
+
+    public function isIdentityVerificationMedia(): bool
+    {
+        return in_array($this->purpose, [
+            self::PURPOSE_IDENTITY_DOCUMENT,
+            self::PURPOSE_IDENTITY_PHOTO,
+        ], true);
     }
 
     public function setSize(?int $size): static

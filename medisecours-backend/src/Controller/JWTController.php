@@ -9,13 +9,16 @@ use App\Entity\Patient;
 use App\Entity\User;
 use App\Service\UserSerializer;
 use App\Service\EmailVerificationService;
+use App\Service\IdentityDocumentStorage;
 use App\Service\SessionService;
 use Doctrine\ORM\EntityManagerInterface;
 use Lexik\Bundle\JWTAuthenticationBundle\Services\JWTTokenManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
+use Symfony\Component\HttpFoundation\File\UploadedFile;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpKernel\Exception\UnprocessableEntityHttpException;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 use Symfony\Component\RateLimiter\RateLimiterFactory;
 use Symfony\Component\Routing\Annotation\Route;
@@ -84,10 +87,10 @@ class JWTController extends AbstractController
             ], Response::HTTP_FORBIDDEN);
         }
 
-        // Un médecin doit être validé par l'admin avant de pouvoir se connecter
+        // Le profil professionnel doit être vérifié avant l'ouverture de l'accès médecin.
         if ($user instanceof Medecin && !$user->isEstValide()) {
             return new JsonResponse([
-                'error' => 'Votre compte médecin est en attente de validation par l\'administrateur. Vous recevrez un email dès que votre compte sera activé.',
+                'error' => 'Votre compte médecin est en attente de vérification. Vous recevrez un email dès que votre accès sera activé.',
             ], Response::HTTP_FORBIDDEN);
         }
 
@@ -183,6 +186,7 @@ class JWTController extends AbstractController
         UserPasswordHasherInterface $passwordHasher,
         EntityManagerInterface $entityManager,
         EmailVerificationService $emailVerificationService,
+        IdentityDocumentStorage $identityDocumentStorage,
         #[Autowire(service: 'limiter.auth_register')] RateLimiterFactory $registerLimiter
     ): JsonResponse {
         $limiter = $registerLimiter->create($request->getClientIp());
@@ -193,7 +197,9 @@ class JWTController extends AbstractController
             );
         }
 
-        $data = json_decode($request->getContent(), true);
+        $data = str_starts_with((string) $request->headers->get('Content-Type'), 'multipart/form-data')
+            ? $request->request->all()
+            : json_decode($request->getContent(), true);
 
         if (!is_array($data) || !isset($data['email'], $data['password'])) {
             return new JsonResponse(['error' => 'Email et mot de passe obligatoires.'], Response::HTTP_BAD_REQUEST);
@@ -260,11 +266,53 @@ class JWTController extends AbstractController
         }
 
         if ($user instanceof Medecin) {
-            if (isset($data['specialite'])) {
-                $user->setSpecialite((string) $data['specialite']);
+            $specialite = trim((string) ($data['specialite'] ?? ''));
+            $numeroOrdre = trim((string) ($data['numeroOrdre'] ?? ''));
+            $typePieceIdentite = strtoupper(trim((string) ($data['typePieceIdentite'] ?? '')));
+            $pieceIdentite = $request->files->get('pieceIdentite');
+            $pieceIdentiteVerso = $request->files->get('pieceIdentiteVerso');
+            $photoVerification = $request->files->get('photoVerification');
+
+            if ($specialite === '' || $numeroOrdre === '') {
+                return new JsonResponse([
+                    'error' => 'La spécialité et le numéro d’ordre sont obligatoires pour un médecin.',
+                ], Response::HTTP_UNPROCESSABLE_ENTITY);
             }
-            if (isset($data['numeroOrdre'])) {
-                $user->setNumeroOrdre((string) $data['numeroOrdre']);
+            if (!in_array($typePieceIdentite, ['CNI', 'PASSPORT'], true)) {
+                return new JsonResponse([
+                    'error' => 'Choisissez une pièce d’identité valide : CNI ou passeport.',
+                ], Response::HTTP_UNPROCESSABLE_ENTITY);
+            }
+            if (!$pieceIdentite instanceof UploadedFile || !$photoVerification instanceof UploadedFile) {
+                return new JsonResponse([
+                    'error' => 'La pièce d’identité et la photo récente du médecin sont obligatoires.',
+                ], Response::HTTP_UNPROCESSABLE_ENTITY);
+            }
+            if ($typePieceIdentite === 'CNI' && !$pieceIdentiteVerso instanceof UploadedFile) {
+                return new JsonResponse([
+                    'error' => 'Les photos recto et verso de la CNI sont obligatoires.',
+                ], Response::HTTP_UNPROCESSABLE_ENTITY);
+            }
+
+            $user
+                ->setSpecialite($specialite)
+                ->setNumeroOrdre($numeroOrdre)
+                ->setTypePieceIdentite($typePieceIdentite);
+
+            try {
+                $user
+                    ->setPieceIdentite($identityDocumentStorage->createIdentityDocument($pieceIdentite, $user))
+                    ->setPhotoVerificationIdentite($identityDocumentStorage->createVerificationPhoto($photoVerification, $user));
+                if ($pieceIdentiteVerso instanceof UploadedFile) {
+                    $user->setPieceIdentiteVerso(
+                        $identityDocumentStorage->createIdentityDocument($pieceIdentiteVerso, $user)
+                    );
+                }
+            } catch (UnprocessableEntityHttpException $exception) {
+                return new JsonResponse(
+                    ['error' => $exception->getMessage()],
+                    Response::HTTP_UNPROCESSABLE_ENTITY
+                );
             }
         }
 

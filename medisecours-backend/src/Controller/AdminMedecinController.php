@@ -52,6 +52,12 @@ class AdminMedecinController extends AbstractController
             $data['estValide'] = !$user->isEstValide();
         }
 
+        if ($data['estValide'] === true && !$user->hasCompleteIdentityVerificationFile()) {
+            return new JsonResponse([
+                'error' => 'Ce médecin ne peut pas être validé : son dossier d’identité est incomplet.',
+            ], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
         $user->setEstValide($data['estValide']);
         if (!$data['estValide']) {
             $this->sessionService->revokeUserSessions($user);
@@ -192,6 +198,28 @@ class AdminMedecinController extends AbstractController
             'actif'       => $medecin->isActif(),
             'banni'       => $medecin->isBanni(),
             'roles'       => $medecin->getRoles(),
+            'verificationIdentite' => [
+                'complet' => $medecin->hasCompleteIdentityVerificationFile(),
+                'typePiece' => $medecin->getTypePieceIdentite(),
+                'recto' => $this->serializeIdentityMedia($medecin->getPieceIdentite()),
+                'verso' => $this->serializeIdentityMedia($medecin->getPieceIdentiteVerso()),
+                'photo' => $this->serializeIdentityMedia($medecin->getPhotoVerificationIdentite()),
+            ],
+        ];
+    }
+
+    private function serializeIdentityMedia(?\App\Entity\MediaObject $media): ?array
+    {
+        if ($media === null || $media->getId() === null) {
+            return null;
+        }
+
+        return [
+            'id' => $media->getId(),
+            'nom' => $media->getOriginalName(),
+            'mimeType' => $media->getMimeType(),
+            'taille' => $media->getSize(),
+            'url' => '/api/media_objects/'.$media->getId().'/download',
         ];
     }
 
