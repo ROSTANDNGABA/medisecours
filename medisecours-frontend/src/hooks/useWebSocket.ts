@@ -160,7 +160,7 @@ export function useWebSocket(userId: string, token: string, handlers: {
             const locale = payload?.locale
             if (locale === 'fr' || locale === 'en') {
               changeLanguage(locale as AppLocale)
-              globalMutate()
+              void globalMutate(() => true)
             }
             if (h.onLanguageChanged) h.onLanguageChanged(payload)
           }

@@ -83,7 +83,7 @@ export function changeLanguage(locale: AppLocale) {
   applyDocumentLanguage(locale)
   notifyLocaleChange(locale)
   void i18n.changeLanguage(locale)
-  globalMutate()
+  void globalMutate(() => true)
 }
 
 export default i18n
