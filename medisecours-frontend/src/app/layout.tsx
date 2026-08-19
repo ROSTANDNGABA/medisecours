@@ -1,5 +1,6 @@
 import "./globals.css"
 import Providers from "./providers"
+import ThemeInit from "../components/ui/ThemeInit"
 
 export const metadata = {
   title: "MediSecours+ | Les premiers gestes qui sauvent",
@@ -14,19 +15,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       data-scroll-behavior="smooth"
       suppressHydrationWarning
     >
-      <head>
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
-              try {
-                var theme = localStorage.getItem('medisecours_theme');
-                document.documentElement.classList.toggle('dark', theme === 'dark');
-              } catch (_) {}
-            `,
-          }}
-        />
-      </head>
       <body className="min-h-dvh flex flex-col">
+        <ThemeInit />
         <Providers>{children}</Providers>
       </body>
     </html>

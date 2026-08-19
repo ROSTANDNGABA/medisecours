@@ -6,6 +6,7 @@ namespace App\Controller;
 
 use App\Entity\Maladie;
 use App\Repository\MaladieRepository;
+use App\Service\ContentLocalizer;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -20,6 +21,7 @@ final class PublicConditionController extends AbstractController
         private readonly MaladieRepository $repository,
         #[Autowire(service: 'limiter.api_public')]
         private readonly RateLimiterFactory $publicApiLimiter,
+        private readonly ContentLocalizer $localizer,
     ) {
     }
 
@@ -27,7 +29,7 @@ final class PublicConditionController extends AbstractController
     public function list(Request $request): JsonResponse
     {
         if ($this->rateLimited($request)) {
-            return $this->json(['message' => 'Trop de demandes. Réessayez dans quelques instants.'], Response::HTTP_TOO_MANY_REQUESTS);
+            return $this->json(['message' => $this->rateLimitMessage()], Response::HTTP_TOO_MANY_REQUESTS);
         }
 
         $page = max(1, $request->query->getInt('page', 1));
@@ -54,7 +56,7 @@ final class PublicConditionController extends AbstractController
     public function detail(int $id, Request $request): JsonResponse
     {
         if ($this->rateLimited($request)) {
-            return $this->json(['message' => 'Trop de demandes. Réessayez dans quelques instants.'], Response::HTTP_TOO_MANY_REQUESTS);
+            return $this->json(['message' => $this->rateLimitMessage()], Response::HTTP_TOO_MANY_REQUESTS);
         }
 
         $condition = $this->repository->findPatientCatalogOne($id);
@@ -75,11 +77,11 @@ final class PublicConditionController extends AbstractController
     {
         return [
             'id' => $maladie->getId(),
-            'nom' => $maladie->getNom(),
-            'description' => $maladie->getDescription(),
-            'symptomes' => $maladie->getSymptomes(),
-            'precautions' => $maladie->getPrecautions(),
-            'causes' => $maladie->getCauses(),
+            'nom' => $this->localizer->pick($maladie->getNom(), $maladie->getNomEn()),
+            'description' => $this->localizer->pickNullable($maladie->getDescription(), $maladie->getDescriptionEn()),
+            'symptomes' => $this->localizer->pickNullable($maladie->getSymptomes(), $maladie->getSymptomesEn()),
+            'precautions' => $this->localizer->pickNullable($maladie->getPrecautions(), $maladie->getPrecautionsEn()),
+            'causes' => $this->localizer->pickNullable($maladie->getCauses(), $maladie->getCausesEn()),
             'niveauGravite' => $maladie->getNiveauGravite(),
             'urgence' => $maladie->isUrgence(),
             'contagieux' => $maladie->isContagieux(),
@@ -87,9 +89,16 @@ final class PublicConditionController extends AbstractController
             'imageUrl' => $maladie->getImageUrl(),
             'categorie' => $maladie->getCategorie() ? [
                 'id' => $maladie->getCategorie()->getId(),
-                'nom' => $maladie->getCategorie()->getNom(),
+                'nom' => $this->localizer->pick($maladie->getCategorie()->getNom(), $maladie->getCategorie()->getNomEn()),
             ] : null,
         ];
+    }
+
+    private function rateLimitMessage(): string
+    {
+        return $this->localizer->isEnglish()
+            ? 'Too many requests. Please try again in a few moments.'
+            : 'Trop de demandes. Réessayez dans quelques instants.';
     }
 
     private function rateLimited(Request $request): bool

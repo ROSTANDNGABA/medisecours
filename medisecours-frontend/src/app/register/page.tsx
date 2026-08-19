@@ -29,6 +29,7 @@ import AuthLayout from '../../components/auth/AuthLayout'
 import { useAuth } from '../../hooks/useAuth'
 import { useToast } from '../../components/ui/Toast'
 import { destinationForUser } from '../../lib/auth-routing'
+import { useTranslation } from 'react-i18next'
 
 type AccountType = 'patient' | 'medecin'
 type IdentityDocumentType = 'CNI' | 'PASSPORT'
@@ -68,7 +69,7 @@ const emptyForm: RegisterForm = {
   numeroOrdre: '',
 }
 
-const steps = ['Profil', 'Identité', 'Détails']
+const steps = ['visitor.register.stepProfile', 'visitor.register.stepIdentity', 'visitor.register.stepDetails']
 const passwordPattern = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{8,}$/
 const maxIdentityFileSize = 5 * 1024 * 1024
 const inputClass =
@@ -101,6 +102,7 @@ export default function RegisterPage() {
   const [pieceIdentiteVerso, setPieceIdentiteVerso] = useState<File | null>(null)
   const [photoVerification, setPhotoVerification] = useState<File | null>(null)
   const { register, loginWithGoogle } = useAuth()
+  const { t } = useTranslation()
   const toast = useToast()
   const router = useRouter()
 
@@ -113,26 +115,26 @@ export default function RegisterPage() {
     let error: string | undefined
     const value = form[key].trim()
 
-    if (key === 'prenom' && value.length < 2) error = 'Saisissez votre prénom complet.'
-    if (key === 'nom' && value.length < 2) error = 'Saisissez votre nom complet.'
-    if (key === 'email' && !/^\S+@\S+\.\S+$/.test(value)) error = 'Exemple attendu : nom@domaine.com.'
+    if (key === 'prenom' && value.length < 2) error = t('visitor.register.errFirstName')
+    if (key === 'nom' && value.length < 2) error = t('visitor.register.errLastName')
+    if (key === 'email' && !/^\S+@\S+\.\S+$/.test(value)) error = t('visitor.register.errEmailFormat')
     if (key === 'password' && !passwordPattern.test(form.password)) {
-      error = 'Le mot de passe ne respecte pas encore tous les critères.'
+      error = t('visitor.register.errPasswordCriteria')
     }
     if (key === 'confirmPassword' && form.confirmPassword !== form.password) {
-      error = 'La confirmation doit être identique au mot de passe.'
+      error = t('visitor.register.errPasswordMatch')
     }
     if (key === 'telephone' && !isValidPhone(value)) {
-      error = 'Utilisez 9 chiffres au Cameroun ou le format international, par exemple +237 6 99 00 00 00.'
+      error = t('visitor.register.errPhone')
     }
     if (key === 'groupeSanguin' && value && !/^(A|B|AB|O)[+-]$/i.test(value)) {
-      error = 'Utilisez un groupe valide, par exemple O+, A- ou AB+.'
+      error = t('visitor.register.errBloodGroup')
     }
     if (key === 'specialite' && type === 'medecin' && value.length < 2) {
-      error = 'Indiquez la spécialité figurant sur vos documents professionnels.'
+      error = t('visitor.register.errSpeciality')
     }
     if (key === 'numeroOrdre' && type === 'medecin' && !isValidOrderNumber(value)) {
-      error = 'Recopiez le numéro officiel, avec ses lettres, chiffres et tirets.'
+      error = t('visitor.register.errOrderNumber')
     }
 
     setErrors((current) => ({ ...current, [key]: error }))
@@ -140,26 +142,26 @@ export default function RegisterPage() {
   }
 
   const passwordChecks = [
-    { label: '8 caractères minimum', valid: form.password.length >= 8 },
-    { label: 'Une lettre majuscule', valid: /[A-Z]/.test(form.password) },
-    { label: 'Une lettre minuscule', valid: /[a-z]/.test(form.password) },
-    { label: 'Un chiffre', valid: /\d/.test(form.password) },
-    { label: 'Un symbole, par exemple ! @ # ?', valid: /[\W_]/.test(form.password) },
+    { label: t('visitor.register.pwMinLength'), valid: form.password.length >= 8 },
+    { label: t('visitor.register.pwUppercase'), valid: /[A-Z]/.test(form.password) },
+    { label: t('visitor.register.pwLowercase'), valid: /[a-z]/.test(form.password) },
+    { label: t('visitor.register.pwDigit'), valid: /\d/.test(form.password) },
+    { label: t('visitor.register.pwSymbol'), valid: /[\W_]/.test(form.password) },
   ]
 
   const validateIdentity = () => {
     const nextErrors: FieldErrors = {}
 
-    if (form.prenom.trim().length < 2) nextErrors.prenom = 'Saisissez votre prénom complet.'
-    if (form.nom.trim().length < 2) nextErrors.nom = 'Saisissez votre nom complet.'
-    if (!/^\S+@\S+\.\S+$/.test(form.email.trim())) nextErrors.email = 'Exemple attendu : nom@domaine.com.'
+    if (form.prenom.trim().length < 2) nextErrors.prenom = t('visitor.register.errFirstName')
+    if (form.nom.trim().length < 2) nextErrors.nom = t('visitor.register.errLastName')
+    if (!/^\S+@\S+\.\S+$/.test(form.email.trim())) nextErrors.email = t('visitor.register.errEmailFormat')
     if (!passwordPattern.test(form.password)) {
-      nextErrors.password = 'Le mot de passe ne respecte pas encore tous les critères.'
+      nextErrors.password = t('visitor.register.errPasswordCriteria')
     }
     if (form.confirmPassword !== form.password) {
-      nextErrors.confirmPassword = 'La confirmation doit être identique au mot de passe.'
+      nextErrors.confirmPassword = t('visitor.register.errPasswordMatch')
     }
-    if (!acceptedTerms) nextErrors.terms = 'Vous devez accepter les conditions pour continuer.'
+    if (!acceptedTerms) nextErrors.terms = t('visitor.register.errTerms')
 
     setErrors(nextErrors)
     return Object.keys(nextErrors).length === 0
@@ -170,30 +172,30 @@ export default function RegisterPage() {
 
     if (type === 'medecin') {
       if (form.specialite.trim().length < 2) {
-        nextErrors.specialite = 'Indiquez la spécialité figurant sur vos documents professionnels.'
+        nextErrors.specialite = t('visitor.register.errSpeciality')
       }
       if (!isValidOrderNumber(form.numeroOrdre)) {
-        nextErrors.numeroOrdre = 'Recopiez le numéro officiel, avec ses lettres, chiffres et tirets.'
+        nextErrors.numeroOrdre = t('visitor.register.errOrderNumber')
       }
       if (!pieceIdentite) {
         nextErrors.pieceIdentite = typePieceIdentite === 'CNI'
-          ? 'Ajoutez une photo lisible du recto de votre CNI.'
-          : 'Ajoutez une image lisible de la page d’identité du passeport.'
+          ? t('visitor.register.errCniFront')
+          : t('visitor.register.errPassportPage')
       }
       if (typePieceIdentite === 'CNI' && !pieceIdentiteVerso) {
-        nextErrors.pieceIdentiteVerso = 'Ajoutez une photo lisible du verso de votre CNI.'
+        nextErrors.pieceIdentiteVerso = t('visitor.register.errCniBack')
       }
       if (!photoVerification) {
-        nextErrors.photoVerification = 'Ajoutez une photo récente de votre visage.'
+        nextErrors.photoVerification = t('visitor.register.errFacePhoto')
       }
     }
 
     if (!isValidPhone(form.telephone)) {
-      nextErrors.telephone = 'Utilisez 9 chiffres au Cameroun ou le format international, par exemple +237 6 99 00 00 00.'
+      nextErrors.telephone = t('visitor.register.errPhone')
     }
 
     if (form.groupeSanguin.trim() && !/^(A|B|AB|O)[+-]$/i.test(form.groupeSanguin.trim())) {
-      nextErrors.groupeSanguin = 'Format attendu : A+, A-, B+, B-, AB+, AB-, O+ ou O-.'
+      nextErrors.groupeSanguin = t('visitor.register.errBloodGroupFormat')
     }
 
     setErrors(nextErrors)
@@ -217,12 +219,12 @@ export default function RegisterPage() {
     if (!allowedTypes.includes(file.type)) {
       setErrors((current) => ({
         ...current,
-        [field]: 'Utilisez une image JPEG, PNG ou WebP.',
+        [field]: t('visitor.register.errImageType'),
       }))
       return
     }
     if (file.size > maxIdentityFileSize) {
-      setErrors((current) => ({ ...current, [field]: 'Le fichier ne doit pas dépasser 5 Mo.' }))
+      setErrors((current) => ({ ...current, [field]: t('visitor.register.errFileTooLarge') }))
       return
     }
 
@@ -286,8 +288,8 @@ export default function RegisterPage() {
       await register(payload)
       toast.success(
         type === 'medecin'
-          ? 'Compte créé. Votre profil professionnel est maintenant en cours de vérification.'
-          : 'Compte créé. Un e-mail de confirmation vous a été envoyé.',
+          ? t('visitor.register.toastDoctorCreated')
+          : t('visitor.register.toastPatientCreated'),
       )
       router.push('/login?registered=1')
     } catch (error: any) {
@@ -295,13 +297,13 @@ export default function RegisterPage() {
       const serverMessage = error.response?.data?.error || error.response?.data?.message
 
       if (status === 409) {
-        toast.error(serverMessage || 'Un compte existe déjà avec cette adresse e-mail.')
+        toast.error(serverMessage || t('visitor.register.toastEmailTaken'))
       } else if (status === 422) {
-        toast.error(serverMessage || 'Certaines informations sont invalides.')
+        toast.error(serverMessage || t('visitor.register.toastInvalidInfo'))
       } else if (status === 429) {
-        toast.error(serverMessage || 'Trop de créations de compte. Réessayez plus tard.')
+        toast.error(serverMessage || t('visitor.register.toastTooMany'))
       } else {
-        toast.error(serverMessage || 'Le service d’inscription est temporairement indisponible.')
+        toast.error(serverMessage || t('visitor.register.toastServiceDown'))
       }
     } finally {
       setLoading(false)
@@ -310,18 +312,18 @@ export default function RegisterPage() {
 
   const handleGoogle = async (credentialResponse: { credential?: string }) => {
     if (!credentialResponse.credential) {
-      toast.error('Google n’a pas transmis de jeton de connexion.')
+      toast.error(t('visitor.login.googleNoToken'))
       return
     }
 
     setLoading(true)
     try {
       const loggedUser = await loginWithGoogle(credentialResponse.credential)
-      toast.success('Connexion Google réussie.')
+      toast.success(t('visitor.login.googleSuccess'))
       router.push(destinationForUser(loggedUser))
     } catch (error: any) {
       const message = error.response?.data?.error || error.response?.data?.message
-      toast.error(message || 'L’inscription avec Google a échoué.')
+      toast.error(message || t('visitor.register.googleSignupFailed'))
     } finally {
       setLoading(false)
     }
@@ -329,9 +331,9 @@ export default function RegisterPage() {
 
   return (
     <AuthLayout
-      eyebrow="Créer votre espace"
-      title="Créer un compte"
-      description="Choisissez votre profil puis renseignez uniquement les informations nécessaires à votre prise en charge."
+      eyebrow={t('visitor.register.eyebrow')}
+      title={t('visitor.register.title')}
+      description={t('visitor.register.description')}
     >
       <div className="mb-7 flex items-start">
         {steps.map((label, index) => {
@@ -355,7 +357,7 @@ export default function RegisterPage() {
                     active ? 'text-blue-700 dark:text-blue-400' : 'text-slate-400'
                   }`}
                 >
-                  {label}
+                  {t(label)}
                 </span>
               </div>
               {index < steps.length - 1 && (
@@ -384,9 +386,9 @@ export default function RegisterPage() {
                 <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-lg bg-blue-100 text-blue-700 group-hover:bg-blue-600 group-hover:text-white dark:bg-blue-950 dark:text-blue-300">
                   <User className="h-5 w-5" />
                 </div>
-                <span className="block font-display text-base font-bold text-slate-950 dark:text-white">Patient</span>
+                <span className="block font-display text-base font-bold text-slate-950 dark:text-white">{t('visitor.register.patientCardTitle')}</span>
                 <span className="mt-1 block text-xs leading-5 text-slate-500 dark:text-slate-400">
-                  Premiers soins, centres, consultations et messagerie.
+                  {t('visitor.register.patientCardDesc')}
                 </span>
               </button>
 
@@ -398,28 +400,28 @@ export default function RegisterPage() {
                 <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-lg bg-cyan-100 text-cyan-700 group-hover:bg-cyan-600 group-hover:text-white dark:bg-cyan-950 dark:text-cyan-300">
                   <Stethoscope className="h-5 w-5" />
                 </div>
-                <span className="block font-display text-base font-bold text-slate-950 dark:text-white">Médecin</span>
+                <span className="block font-display text-base font-bold text-slate-950 dark:text-white">{t('visitor.register.doctorCardTitle')}</span>
                 <span className="mt-1 block text-xs leading-5 text-slate-500 dark:text-slate-400">
-                  Profil professionnel soumis à une vérification avant activation.
+                  {t('visitor.register.doctorCardDesc')}
                 </span>
               </button>
             </div>
 
             <div className="flex items-center gap-3">
               <div className="h-px flex-1 bg-slate-200 dark:bg-slate-800" />
-              <span className="text-xs font-medium text-slate-400">ou</span>
+              <span className="text-xs font-medium text-slate-400">{t('visitor.register.or')}</span>
               <div className="h-px flex-1 bg-slate-200 dark:bg-slate-800" />
             </div>
 
             <div className={`flex flex-col items-center gap-2 ${loading ? 'pointer-events-none opacity-60' : ''}`}>
               <GoogleLogin
                 onSuccess={handleGoogle}
-                onError={() => toast.error('L’inscription Google a échoué.')}
+                onError={() => toast.error(t('visitor.register.googleSignupFailed'))}
                 text="signup_with"
                 shape="rectangular"
               />
               <p className="text-center text-[11px] text-slate-400">
-                L’inscription Google crée uniquement un compte patient.
+                {t('visitor.register.googlePatientNote')}
               </p>
             </div>
           </motion.div>
@@ -434,10 +436,10 @@ export default function RegisterPage() {
             className="space-y-4"
           >
             <p className="text-xs text-slate-500 dark:text-slate-400">
-              Les champs marqués d’un <span className="font-bold text-red-500">*</span> sont obligatoires.
+              {t('visitor.register.requiredFieldsNote')} <span className="font-bold text-red-500">*</span> {t('visitor.register.requiredFieldsNoteEnd')}
             </p>
             <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="Prénom" error={errors.prenom} hint="Tel qu’il figure sur vos documents." required>
+              <Field label={t('visitor.register.firstNameLabel')} error={errors.prenom} hint={t('visitor.register.firstNameHint')} required>
                 <div className="relative">
                   <User className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                   <input
@@ -447,11 +449,11 @@ export default function RegisterPage() {
                     autoComplete="given-name"
                     aria-invalid={Boolean(errors.prenom)}
                     className={`${inputClass} pl-10`}
-                    placeholder="Votre prénom"
+                    placeholder={t('visitor.register.firstNamePlaceholder')}
                   />
                 </div>
               </Field>
-              <Field label="Nom" error={errors.nom} hint="Votre nom de famille complet." required>
+              <Field label={t('visitor.register.lastNameLabel')} error={errors.nom} hint={t('visitor.register.lastNameHint')} required>
                 <input
                   value={form.nom}
                   onChange={setField('nom')}
@@ -459,15 +461,15 @@ export default function RegisterPage() {
                   autoComplete="family-name"
                   aria-invalid={Boolean(errors.nom)}
                   className={inputClass}
-                  placeholder="Votre nom"
+                  placeholder={t('visitor.register.lastNamePlaceholder')}
                 />
               </Field>
             </div>
 
             <Field
-              label="Adresse e-mail"
+              label={t('visitor.register.emailLabel')}
               error={errors.email}
-              hint="Elle servira à la connexion et à la confirmation du compte."
+              hint={t('visitor.register.emailHint')}
               required
             >
               <div className="relative">
@@ -481,12 +483,12 @@ export default function RegisterPage() {
                   inputMode="email"
                   aria-invalid={Boolean(errors.email)}
                   className={`${inputClass} pl-10`}
-                  placeholder="vous@exemple.com"
+                  placeholder={t('visitor.register.emailPlaceholder')}
                 />
               </div>
             </Field>
 
-            <Field label="Mot de passe" error={errors.password} required>
+            <Field label={t('visitor.register.passwordLabel')} error={errors.password} required>
               <>
                 <div className="relative">
                   <Lock className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
@@ -498,18 +500,18 @@ export default function RegisterPage() {
                     autoComplete="new-password"
                     aria-invalid={Boolean(errors.password)}
                     className={`${inputClass} pl-10 pr-12`}
-                    placeholder="Créez un mot de passe robuste"
+                    placeholder={t('visitor.register.passwordPlaceholder')}
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword((visible) => !visible)}
                     className="absolute right-1.5 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-md text-slate-400 hover:bg-slate-200 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-white"
-                    aria-label={showPassword ? 'Masquer le mot de passe' : 'Afficher le mot de passe'}
+                    aria-label={showPassword ? t('visitor.register.hidePasswordAria') : t('visitor.register.showPasswordAria')}
                   >
                     {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </button>
                 </div>
-                <div className="mt-2 grid gap-x-3 gap-y-1 sm:grid-cols-2" aria-label="Critères du mot de passe">
+                <div className="mt-2 grid gap-x-3 gap-y-1 sm:grid-cols-2" aria-label={t('visitor.register.pwCriteriaAria')}>
                   {passwordChecks.map((check) => (
                     <div
                       key={check.label}
@@ -526,9 +528,9 @@ export default function RegisterPage() {
             </Field>
 
             <Field
-              label="Confirmer le mot de passe"
+              label={t('visitor.register.confirmPasswordLabel')}
               error={errors.confirmPassword}
-              hint="Recopiez exactement le mot de passe choisi."
+              hint={t('visitor.register.confirmPasswordHint')}
               required
             >
               <input
@@ -539,7 +541,7 @@ export default function RegisterPage() {
                 autoComplete="new-password"
                 aria-invalid={Boolean(errors.confirmPassword)}
                 className={inputClass}
-                placeholder="Saisissez-le une seconde fois"
+                placeholder={t('visitor.register.confirmPasswordPlaceholder')}
               />
             </Field>
 
@@ -554,7 +556,7 @@ export default function RegisterPage() {
                 className="mt-0.5 h-4 w-4 shrink-0 accent-blue-600"
               />
               <span>
-                J’accepte la politique de confidentialité et les conditions d’utilisation de MediSecours.
+                {t('visitor.register.termsLabel')}
               </span>
             </label>
             {errors.terms && <p className="text-xs font-medium text-red-600 dark:text-red-400">{errors.terms}</p>}
@@ -573,12 +575,12 @@ export default function RegisterPage() {
               <>
                 <div className="flex items-start gap-3 rounded-lg border border-blue-100 bg-blue-50 px-4 py-3 text-xs leading-5 text-blue-900 dark:border-blue-900/50 dark:bg-blue-950/30 dark:text-blue-200">
                   <HeartPulse className="mt-0.5 h-4 w-4 shrink-0" />
-                  Ces informations sont facultatives et servent à améliorer votre prise en charge.
+                  {t('visitor.register.patientInfoNote')}
                 </div>
                 <Field
-                  label="Téléphone (facultatif)"
+                  label={t('visitor.register.phoneOptionalLabel')}
                   error={errors.telephone}
-                  hint="Cameroun : 6 99 00 00 00. International : +237 6 99 00 00 00."
+                  hint={t('visitor.register.phoneHint')}
                 >
                   <div className="relative">
                     <Phone className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
@@ -590,51 +592,51 @@ export default function RegisterPage() {
                       inputMode="tel"
                       aria-invalid={Boolean(errors.telephone)}
                       className={`${inputClass} pl-10`}
-                      placeholder="+237 6 99 00 00 00"
+                      placeholder={t('visitor.register.phonePlaceholder')}
                     />
                   </div>
                 </Field>
                 <div className="grid gap-4 sm:grid-cols-2">
-                  <Field label="Quartier (facultatif)" hint="Indiquez votre quartier ou votre zone de résidence habituelle.">
+                  <Field label={t('visitor.register.quartierLabel')} hint={t('visitor.register.quartierHint')}>
                     <input
                       value={form.quartier}
                       onChange={setField('quartier')}
                       autoComplete="address-level3"
                       className={inputClass}
-                      placeholder="Ex. Bonamoussadi"
+                      placeholder={t('visitor.register.quartierPlaceholder')}
                     />
                   </Field>
-                  <Field label="Groupe sanguin (facultatif)" error={errors.groupeSanguin} hint="Exemples : O+, A-, AB+.">
+                  <Field label={t('visitor.register.bloodGroupLabel')} error={errors.groupeSanguin} hint={t('visitor.register.bloodGroupHint')}>
                     <input
                       value={form.groupeSanguin}
                       onChange={setField('groupeSanguin')}
                       onBlur={() => validateField('groupeSanguin')}
                       aria-invalid={Boolean(errors.groupeSanguin)}
                       className={inputClass}
-                      placeholder="Ex. O+"
+                      placeholder={t('visitor.register.bloodGroupPlaceholder')}
                     />
                   </Field>
                 </div>
                 <Field
-                  label="Allergies connues (facultatif)"
-                  hint="Séparez plusieurs allergies par des virgules. Laissez vide si vous n’en connaissez aucune."
+                  label={t('visitor.register.allergiesLabel')}
+                  hint={t('visitor.register.allergiesHint')}
                 >
                   <input
                     value={form.allergies}
                     onChange={setField('allergies')}
                     className={inputClass}
-                    placeholder="Séparez les allergies par des virgules"
+                    placeholder={t('visitor.register.allergiesPlaceholder')}
                   />
                 </Field>
                 <Field
-                  label="Contact d’urgence (facultatif)"
-                  hint="Indiquez le nom, le lien avec vous et un numéro joignable."
+                  label={t('visitor.register.emergencyContactLabel')}
+                  hint={t('visitor.register.emergencyContactHint')}
                 >
                   <input
                     value={form.contactsUrgence}
                     onChange={setField('contactsUrgence')}
                     className={inputClass}
-                    placeholder="Nom et numéro de téléphone"
+                    placeholder={t('visitor.register.emergencyContactPlaceholder')}
                   />
                 </Field>
               </>
@@ -642,12 +644,12 @@ export default function RegisterPage() {
               <>
                 <div className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-xs leading-5 text-amber-950 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-200">
                   <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" />
-                  Le compte restera en attente jusqu’à la fin de la vérification de vos informations.
+                  {t('visitor.register.doctorPendingNote')}
                 </div>
                 <Field
-                  label="Spécialité médicale"
+                  label={t('visitor.register.specialityLabel')}
                   error={errors.specialite}
-                  hint="Utilisez l’intitulé figurant sur votre justificatif professionnel."
+                  hint={t('visitor.register.specialityHint')}
                   required
                 >
                   <div className="relative">
@@ -658,14 +660,14 @@ export default function RegisterPage() {
                       onBlur={() => validateField('specialite')}
                       aria-invalid={Boolean(errors.specialite)}
                       className={`${inputClass} pl-10`}
-                      placeholder="Ex. Cardiologie"
+                      placeholder={t('visitor.register.specialityPlaceholder')}
                     />
                   </div>
                 </Field>
                 <Field
-                  label="Téléphone professionnel (facultatif)"
+                  label={t('visitor.register.phoneProLabel')}
                   error={errors.telephone}
-                  hint="Utilisez un numéro professionnel auquel vous êtes facilement joignable."
+                  hint={t('visitor.register.phoneProHint')}
                 >
                   <div className="relative">
                     <Phone className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
@@ -677,14 +679,14 @@ export default function RegisterPage() {
                       inputMode="tel"
                       aria-invalid={Boolean(errors.telephone)}
                       className={`${inputClass} pl-10`}
-                      placeholder="+237 6 99 00 00 00"
+                      placeholder={t('visitor.register.phonePlaceholder')}
                     />
                   </div>
                 </Field>
                 <Field
-                  label="Numéro d’ordre professionnel"
+                  label={t('visitor.register.orderNumberLabel')}
                   error={errors.numeroOrdre}
-                  hint="Recopiez-le exactement comme sur votre carte ou attestation d’inscription à l’ordre."
+                  hint={t('visitor.register.orderNumberHint')}
                   required
                 >
                   <input
@@ -693,24 +695,24 @@ export default function RegisterPage() {
                     onBlur={() => validateField('numeroOrdre')}
                     aria-invalid={Boolean(errors.numeroOrdre)}
                     className={inputClass}
-                    placeholder="Ex. ONMC-2026-0001"
+                    placeholder={t('visitor.register.orderNumberPlaceholder')}
                   />
                 </Field>
                 <div className="rounded-lg border border-slate-200 p-4 dark:border-slate-700">
                   <div className="mb-4">
                     <h3 className="text-sm font-bold text-slate-900 dark:text-white">
-                      Vérification de votre identité
+                      {t('visitor.register.identityVerificationTitle')}
                     </h3>
                     <p className="mt-1 text-[11px] leading-4 text-slate-500 dark:text-slate-400">
-                      Ces fichiers sont privés et utilisés uniquement pour vérifier votre identité professionnelle.
+                      {t('visitor.register.identityVerificationNote')}
                     </p>
                   </div>
 
-                  <Field label="Type de pièce d’identité" error={errors.typePieceIdentite} required>
+                  <Field label={t('visitor.register.idTypeLabel')} error={errors.typePieceIdentite} required>
                     <div className="grid grid-cols-2 gap-2">
                       {([
-                        ['CNI', 'Carte nationale'],
-                        ['PASSPORT', 'Passeport'],
+                        ['CNI', t('visitor.register.cni')],
+                        ['PASSPORT', t('visitor.register.passport')],
                       ] as const).map(([value, label]) => (
                         <button
                           key={value}
@@ -730,8 +732,8 @@ export default function RegisterPage() {
 
                   <div className="mt-4 grid gap-4 sm:grid-cols-2">
                     <IdentityFileField
-                      label={typePieceIdentite === 'CNI' ? 'Recto de la CNI' : 'Page d’identité du passeport'}
-                      description="Document entier, net, sans reflet et avec tous les bords visibles."
+                      label={typePieceIdentite === 'CNI' ? t('visitor.register.cniFrontLabel') : t('visitor.register.passportPageLabel')}
+                      description={t('visitor.register.cniFrontDesc')}
                       accept="image/jpeg,image/png,image/webp"
                       file={pieceIdentite}
                       error={errors.pieceIdentite}
@@ -740,8 +742,8 @@ export default function RegisterPage() {
                     />
                     {typePieceIdentite === 'CNI' && (
                       <IdentityFileField
-                        label="Verso de la CNI"
-                        description="Photographiez le verso entier, net et sans reflet."
+                        label={t('visitor.register.cniBackLabel')}
+                        description={t('visitor.register.cniBackDesc')}
                         accept="image/jpeg,image/png,image/webp"
                         file={pieceIdentiteVerso}
                         error={errors.pieceIdentiteVerso}
@@ -750,8 +752,8 @@ export default function RegisterPage() {
                       />
                     )}
                     <IdentityFileField
-                      label="Photo récente du visage"
-                      description="Visage de face, bien éclairé, sans filtre."
+                      label={t('visitor.register.facePhotoLabel')}
+                      description={t('visitor.register.facePhotoDesc')}
                       accept="image/jpeg,image/png,image/webp"
                       file={photoVerification}
                       error={errors.photoVerification}
@@ -775,7 +777,7 @@ export default function RegisterPage() {
             className="inline-flex min-h-11 items-center gap-2 rounded-lg px-3 text-sm font-semibold text-slate-600 transition hover:bg-slate-100 hover:text-slate-950 disabled:opacity-50 dark:text-slate-300 dark:hover:bg-slate-900 dark:hover:text-white"
           >
             <ArrowLeft className="h-4 w-4" />
-            Retour
+            {t('visitor.register.back')}
           </button>
           {step < 2 ? (
             <button
@@ -783,7 +785,7 @@ export default function RegisterPage() {
               onClick={next}
               className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-blue-600 px-5 text-sm font-bold text-white transition hover:bg-blue-700 focus:outline-none focus:ring-4 focus:ring-blue-500/20"
             >
-              Continuer
+              {t('visitor.register.continue')}
               <ArrowRight className="h-4 w-4" />
             </button>
           ) : (
@@ -794,16 +796,16 @@ export default function RegisterPage() {
               className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-blue-600 px-5 text-sm font-bold text-white transition hover:bg-blue-700 focus:outline-none focus:ring-4 focus:ring-blue-500/20 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {loading && <LoaderCircle className="h-4 w-4 animate-spin" />}
-              {loading ? 'Création…' : 'Créer mon compte'}
+              {loading ? t('visitor.register.creating') : t('visitor.register.createAccountButton')}
             </button>
           )}
         </div>
       )}
 
       <p className="mt-7 text-center text-sm text-slate-500 dark:text-slate-400">
-        Déjà inscrit ?{' '}
+        {t('visitor.register.alreadyRegistered')}{' '}
         <Link href="/login" className="font-bold text-blue-600 hover:text-blue-800 dark:text-blue-400">
-          Se connecter
+          {t('visitor.register.login')}
         </Link>
       </p>
     </AuthLayout>
@@ -827,6 +829,7 @@ function IdentityFileField({
   icon: React.ComponentType<{ className?: string }>
   onChange: (file?: File) => void
 }) {
+  const { t } = useTranslation()
   return (
     <div>
       <span className="mb-2 block text-sm font-semibold text-slate-700 dark:text-slate-200">
@@ -849,10 +852,10 @@ function IdentityFileField({
           {file ? <Check className="h-5 w-5 text-emerald-600" /> : <Icon className="h-5 w-5" />}
         </div>
         <span className="max-w-full break-all text-xs font-bold text-slate-800 dark:text-slate-100">
-          {file?.name || 'Choisir un fichier'}
+          {file?.name || t('visitor.register.chooseFile')}
         </span>
         <span className="mt-1 text-[10px] leading-4 text-slate-500 dark:text-slate-400">
-          {file ? `${(file.size / 1024 / 1024).toFixed(2)} Mo` : description}
+          {file ? `${(file.size / 1024 / 1024).toFixed(2)} ${t('visitor.register.megabytes')}` : description}
         </span>
         {!file && <UploadCloud className="mt-2 h-4 w-4 text-slate-400" />}
       </label>
@@ -879,6 +882,7 @@ function Field({
   required?: boolean
   children: React.ReactNode
 }) {
+  const { t } = useTranslation()
   return (
     <div>
       <label className="mb-2 block text-sm font-semibold text-slate-700 dark:text-slate-200">
@@ -886,7 +890,7 @@ function Field({
         {required && (
           <>
             <span className="ml-1 text-red-500" aria-hidden="true">*</span>
-            <span className="sr-only"> obligatoire</span>
+            <span className="sr-only"> {t('visitor.register.required')}</span>
           </>
         )}
       </label>

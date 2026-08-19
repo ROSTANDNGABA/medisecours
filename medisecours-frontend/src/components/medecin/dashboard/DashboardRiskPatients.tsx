@@ -2,16 +2,18 @@
 
 import { useRouter } from 'next/navigation'
 import { AlertTriangle, AlertOctagon, AlertCircle, ChevronRight } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import type { Consultation } from '../../../types/api'
 
 const PRIORITE_CONFIG = {
-  CRITIQUE: { label: 'Critique', color: '#EF4444', bg: '#FEF2F2', icon: AlertOctagon },
-  URGENTE: { label: 'Urgente', color: '#F59E0B', bg: '#FFFBEB', icon: AlertTriangle },
-  NORMALE: { label: 'Normale', color: '#3B6EF8', bg: '#EFF6FF', icon: AlertCircle },
+  CRITIQUE: { labelKey: 'medecin.dashboard.risk.critical', color: '#EF4444', bg: '#FEF2F2', icon: AlertOctagon },
+  URGENTE: { labelKey: 'medecin.dashboard.risk.urgent', color: '#F59E0B', bg: '#FFFBEB', icon: AlertTriangle },
+  NORMALE: { labelKey: 'medecin.dashboard.risk.normal', color: '#3B6EF8', bg: '#EFF6FF', icon: AlertCircle },
 }
 
 export default function DashboardRiskPatients({ riskConsultations }: { riskConsultations: Consultation[] }) {
   const router = useRouter()
+  const { t } = useTranslation()
 
   const riskItems = riskConsultations || []
 
@@ -30,8 +32,8 @@ export default function DashboardRiskPatients({ riskConsultations }: { riskConsu
     <div className="rounded-2xl bg-white p-5 shadow-[0_2px_12px_rgba(0,0,0,0.06)]">
       <div className="flex items-center justify-between mb-3">
         <div>
-          <h3 className="text-sm font-bold text-[#0F2C52]">Patients à risque</h3>
-          <p className="text-xs text-[#6B7280]">Cas prioritaires</p>
+          <h3 className="text-sm font-bold text-[#0F2C52]">{t('medecin.dashboard.risk.title')}</h3>
+          <p className="text-xs text-[#6B7280]">{t('medecin.dashboard.risk.subtitle')}</p>
         </div>
         {hasRisk && (
           <div className="flex gap-1">
@@ -66,10 +68,10 @@ export default function DashboardRiskPatients({ riskConsultations }: { riskConsu
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold text-[#374151] truncate">
-                    {typeof c.patient === 'object' ? `${c.patient?.prenom ?? ''} ${c.patient?.nom ?? ''}` : 'Patient'}
+                    {typeof c.patient === 'object' ? `${c.patient?.prenom ?? ''} ${c.patient?.nom ?? ''}` : t('medecin.dashboard.risk.patientFallback')}
                   </p>
                   <p className="text-[11px] text-[#6B7280] truncate">
-                    {c.motif || 'Motif non précisé'} · <span style={{ color: cfg.color }} className="font-semibold">{cfg.label}</span>
+                    {c.motif || t('medecin.dashboard.risk.noMotif')} · <span style={{ color: cfg.color }} className="font-semibold">{t(cfg.labelKey)}</span>
                   </p>
                 </div>
                 <ChevronRight className="h-4 w-4 text-[#D1D5DB]" />
@@ -81,7 +83,7 @@ export default function DashboardRiskPatients({ riskConsultations }: { riskConsu
         <div className="flex h-[160px] items-center justify-center">
           <div className="text-center">
             <AlertCircle className="mx-auto mb-2 h-8 w-8 text-[#D1D5DB]" />
-            <p className="text-sm text-[#9CA3AF]">Aucun patient à risque</p>
+            <p className="text-sm text-[#9CA3AF]">{t('medecin.dashboard.risk.none')}</p>
           </div>
         </div>
       )}

@@ -1,6 +1,7 @@
 'use client'
 import { Save, X } from 'lucide-react'
 import { createPortal } from 'react-dom'
+import { useTranslation } from 'react-i18next'
 import { availableIcons, getIconNameForCategory } from '../../lib/iconMapping'
 import { CategoryIcon } from '../ui/CategoryIcon'
 
@@ -23,6 +24,7 @@ export default function CategoryEditModal({
   onClose: () => void;
   saving: boolean;
 }) {
+  const { t } = useTranslation()
   const isNew = !editing.id
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -50,8 +52,8 @@ export default function CategoryEditModal({
           <div className="flex items-center gap-4">
             <CategoryIcon iconName={editing.icone || undefined} categoryName={editing.nom || undefined} size="lg" />
             <div>
-              <h2 className="text-lg font-bold text-white">{isNew ? 'Nouvelle catégorie' : 'Modifier la catégorie'}</h2>
-              <p className="mt-0.5 text-sm text-white/60">{isNew ? 'Créez une nouvelle catégorie médicale' : 'Ajustez les informations de la catégorie'}</p>
+              <h2 className="text-lg font-bold text-white">{isNew ? t('admin.categorieModal.titleNew') : t('admin.categorieModal.titleEdit')}</h2>
+              <p className="mt-0.5 text-sm text-white/60">{isNew ? t('admin.categorieModal.subtitleNew') : t('admin.categorieModal.subtitleEdit')}</p>
             </div>
           </div>
         </div>
@@ -60,7 +62,7 @@ export default function CategoryEditModal({
           <div className="flex-1 overflow-y-auto px-6 py-5">
             <div className="space-y-4">
               <div>
-                <label className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.18em] text-[#7a8578]">Icône</label>
+                <label className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.18em] text-[#7a8578]">{t('admin.categorieModal.icone')}</label>
                 <div className="flex max-h-28 flex-wrap gap-1.5 overflow-y-auto rounded-2xl border border-[#dfe5db] bg-[#f8faf6] p-2">
                   {availableIcons.map((name) => (
                     <button
@@ -80,18 +82,18 @@ export default function CategoryEditModal({
               </div>
 
               <div>
-                <label className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.18em] text-[#7a8578]">Nom</label>
+                <label className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.18em] text-[#7a8578]">{t('admin.categorieModal.nom')}</label>
                 <input
                   type="text"
                   value={editing.nom || ''}
                   onChange={(e) => onFieldChange('nom', e.target.value)}
-                  placeholder="ex: Cardiologie"
+                  placeholder={t('admin.categorieModal.placeholderNom')}
                   className="w-full rounded-2xl border border-[#dfe5db] bg-[#f8faf6] px-4 py-3 text-sm text-[#223023] outline-none transition focus:border-[#bfd0bd] focus:bg-white"
                 />
               </div>
 
               <div>
-                <label className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.18em] text-[#7a8578]">Couleur</label>
+                <label className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.18em] text-[#7a8578]">{t('admin.categorieModal.couleur')}</label>
                 <div className="flex flex-wrap gap-2">
                   {colorOptions.map((c) => (
                     <button
@@ -108,12 +110,12 @@ export default function CategoryEditModal({
               </div>
 
               <div>
-                <label className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.18em] text-[#7a8578]">Description</label>
+                <label className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.18em] text-[#7a8578]">{t('admin.categorieModal.description')}</label>
                 <textarea
                   value={editing.description || ''}
                   onChange={(e) => onFieldChange('description', e.target.value)}
                   rows={2}
-                  placeholder="Description de la catégorie..."
+                  placeholder={t('admin.categorieModal.placeholderDescription')}
                   className="w-full rounded-2xl border border-[#dfe5db] bg-[#f8faf6] px-4 py-3 text-sm text-[#223023] outline-none transition focus:border-[#bfd0bd] focus:bg-white"
                 />
               </div>
@@ -127,7 +129,7 @@ export default function CategoryEditModal({
                 onClick={onClose}
                 className="rounded-2xl border border-[#dfe5db] bg-white px-5 py-2.5 text-sm font-semibold text-[#566355] transition hover:bg-[#edf2ea]"
               >
-                Annuler
+                {t('admin.categorieModal.cancel')}
               </button>
               <button
                 type="submit"
@@ -135,7 +137,7 @@ export default function CategoryEditModal({
                 className="inline-flex items-center gap-2 rounded-2xl bg-[#2f6b45] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-[#1f4a2e] disabled:opacity-50"
               >
                 <Save className="h-4 w-4" />
-                {saving ? 'Enregistrement...' : 'Enregistrer'}
+                {saving ? t('admin.categorieModal.saving') : t('admin.categorieModal.save')}
               </button>
             </div>
           </div>

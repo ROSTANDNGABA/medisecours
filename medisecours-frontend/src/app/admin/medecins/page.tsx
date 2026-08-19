@@ -3,6 +3,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
+import { useTranslation } from 'react-i18next'
 import {
   CheckCircle2, XCircle, Eye, Mail, Phone, Shield,
   Stethoscope, Users, Clock, AlertCircle, X, Upload,
@@ -17,14 +18,13 @@ import EmptyState from '../../../components/ui/EmptyState'
 import Avatar from '../../../components/ui/Avatar'
 import { useToast } from '../../../components/ui/Toast'
 
-// ── Onglets ──────────────────────────────────────────────────────────────────
-const TABS = [
-  { key: 'tous',       label: 'Tous les médecins',  icon: Users },
-  { key: 'valides',    label: 'Validés',             icon: CheckCircle2 },
-  { key: 'en_attente', label: 'En attente',          icon: Clock },
-]
-
 export default function MedecinsPage() {
+  const { t } = useTranslation()
+  const TABS = [
+    { key: 'tous',       label: t('admin.medecins.tabTous'),       icon: Users },
+    { key: 'valides',    label: t('admin.medecins.tabValides'),    icon: CheckCircle2 },
+    { key: 'en_attente', label: t('admin.medecins.tabEnAttente'),  icon: Clock },
+  ]
   const [medecins,     setMedecins]     = useState([])
   const [loading,      setLoading]      = useState(true)
   const [tab,          setTab]          = useState('tous')
@@ -46,9 +46,9 @@ export default function MedecinsPage() {
         const data = res.data?.medecins ?? []
         setMedecins(Array.isArray(data) ? data : [])
       })
-      .catch(() => toast.error('Impossible de charger les médecins.'))
+      .catch(() => toast.error(t('admin.medecins.toastLoadError')))
       .finally(() => setLoading(false))
-  }, [toast])
+  }, [toast, t])
 
   useEffect(() => { load() }, [load])
 
@@ -76,7 +76,7 @@ export default function MedecinsPage() {
   // ── Validation ──────────────────────────────────────────────────────────────
   const handleValidate = async (med) => {
     if (!med.verificationIdentite?.complet || !reviewCompleted) {
-      toast.error('Terminez les trois contrôles avant de valider ce médecin.')
+      toast.error(t('admin.medecins.toastChecklist'))
       return
     }
     setActionId(med.id)
@@ -88,9 +88,9 @@ export default function MedecinsPage() {
       )
       setMedecins((prev) => prev.map((m) => m.id === med.id ? { ...m, estValide: true } : m))
       setViewModal((prev) => prev?.id === med.id ? { ...prev, estValide: true } : prev)
-      toast.success(`Dr ${med.prenom} ${med.nom} validé. Email envoyé.`)
+      toast.success(t('admin.medecins.toastValidateSuccess', { nom: `${med.prenom} ${med.nom}` }))
     } catch (error) {
-      toast.error(error.response?.data?.error || 'Échec de la validation.')
+      toast.error(error.response?.data?.error || t('admin.medecins.toastValidateError'))
     } finally {
       setActionId(null)
     }
@@ -106,7 +106,7 @@ export default function MedecinsPage() {
   const handleReject = async () => {
     if (!rejectModal) return
     if (!motif.trim()) {
-      toast.error('Veuillez saisir un motif de refus.')
+      toast.error(t('admin.medecins.toastMotif'))
       return
     }
     const med = rejectModal
@@ -119,26 +119,26 @@ export default function MedecinsPage() {
       )
       setMedecins((prev) => prev.map((m) => m.id === med.id ? { ...m, estValide: false } : m))
       setViewModal((prev) => prev?.id === med.id ? { ...prev, estValide: false } : prev)
-      toast.success(`Dr ${med.prenom} ${med.nom} non-validé. Email avec motif envoyé.`)
+      toast.success(t('admin.medecins.toastRejectSuccess', { nom: `${med.prenom} ${med.nom}` }))
       setRejectModal(null)
       setMotif('')
     } catch {
-      toast.error('Échec du refus.')
+      toast.error(t('admin.medecins.toastRejectError'))
     } finally {
       setActionId(null)
     }
   }
 
-  if (loading) return <LoadingSpinner label="Chargement des médecins…" />
+  if (loading) return <LoadingSpinner label={t('admin.medecins.loading')} />
 
   return (
     <div className="max-w-7xl mx-auto space-y-6">
 
       {/* Header stats */}
       <div className="grid grid-cols-3 gap-4">
-        <StatCard label="Total" value={medecins.length}   color="#1E3A5F" icon={Users} />
-        <StatCard label="Validés" value={valides.length}  color="#10B981" icon={CheckCircle2} />
-        <StatCard label="En attente" value={enAttente.length} color="#F59E0B" icon={Clock} badge={enAttente.length > 0} />
+        <StatCard label={t('admin.medecins.statTotal')} value={medecins.length}   color="#1E3A5F" icon={Users} />
+        <StatCard label={t('admin.medecins.statValides')} value={valides.length}  color="#10B981" icon={CheckCircle2} />
+        <StatCard label={t('admin.medecins.statEnAttente')} value={enAttente.length} color="#F59E0B" icon={Clock} badge={enAttente.length > 0} />
       </div>
 
       {/* Bouton import */}
@@ -147,7 +147,7 @@ export default function MedecinsPage() {
           href="/admin/medecins/import"
           className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary-500 hover:bg-primary-700 text-white text-sm font-semibold shadow-sm transition"
         >
-          <Upload className="w-4 h-4" /> Importer CSV / Excel
+          <Upload className="w-4 h-4" /> {t('admin.medecins.importCsv')}
         </Link>
       </div>
 
@@ -178,8 +178,8 @@ export default function MedecinsPage() {
       {displayed.length === 0 ? (
         <EmptyState
           icon={Stethoscope}
-          title="Aucun médecin dans cet onglet"
-          description="Les médecins apparaîtront ici après inscription."
+          title={t('admin.medecins.emptyTitle')}
+          description={t('admin.medecins.emptyDesc')}
         />
       ) : (
         <div className="rounded-2xl bg-white dark:bg-primary-800 border border-primary-100 dark:border-white/5 overflow-hidden shadow-sm">
@@ -187,12 +187,12 @@ export default function MedecinsPage() {
             <table className="w-full text-sm">
               <thead className="bg-primary-50 dark:bg-primary-900/40 text-primary-700 dark:text-sable">
                 <tr>
-                  <th className="text-left px-6 py-4 font-semibold">Médecin</th>
-                  <th className="text-left px-6 py-4 font-semibold">Spécialité</th>
-                  <th className="text-left px-6 py-4 font-semibold">N° Ordre</th>
-                  <th className="text-left px-6 py-4 font-semibold">Contact</th>
-                  <th className="text-left px-6 py-4 font-semibold">Statut</th>
-                  <th className="px-6 py-4 text-right font-semibold">Actions</th>
+                  <th className="text-left px-6 py-4 font-semibold">{t('admin.medecins.thMedecin')}</th>
+                  <th className="text-left px-6 py-4 font-semibold">{t('admin.medecins.thSpecialite')}</th>
+                  <th className="text-left px-6 py-4 font-semibold">{t('admin.medecins.thNumeroOrdre')}</th>
+                  <th className="text-left px-6 py-4 font-semibold">{t('admin.medecins.thContact')}</th>
+                  <th className="text-left px-6 py-4 font-semibold">{t('admin.medecins.thStatut')}</th>
+                  <th className="px-6 py-4 text-right font-semibold">{t('admin.medecins.thActions')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -230,11 +230,11 @@ export default function MedecinsPage() {
                         <div className="flex flex-col items-start gap-1.5">
                           {med.estValide ? (
                             <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-mint-100 text-mint-700">
-                              <CheckCircle2 className="w-3 h-3" /> Validé
+                              <CheckCircle2 className="w-3 h-3" /> {t('admin.medecins.valide')}
                             </span>
                           ) : (
                             <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-700">
-                              <Clock className="w-3 h-3" /> En attente
+                              <Clock className="w-3 h-3" /> {t('admin.medecins.enAttente')}
                             </span>
                           )}
                           <span className={`inline-flex items-center gap-1 text-[10px] font-semibold ${
@@ -243,7 +243,7 @@ export default function MedecinsPage() {
                             {med.verificationIdentite?.complet
                               ? <FileCheck2 className="h-3 w-3" />
                               : <FileWarning className="h-3 w-3" />}
-                            Dossier {med.verificationIdentite?.complet ? 'complet' : 'incomplet'}
+                            {med.verificationIdentite?.complet ? t('admin.medecins.dossierComplet') : t('admin.medecins.dossierIncomplet')}
                           </span>
                         </div>
                       </td>
@@ -253,7 +253,7 @@ export default function MedecinsPage() {
                           <button
                             onClick={() => openReviewModal(med)}
                             className="p-2 rounded-lg hover:bg-primary-100 dark:hover:bg-primary-700 text-primary-500 transition"
-                            title="Voir le profil"
+                            title={t('admin.medecins.voirProfil')}
                           >
                             <Eye className="w-4 h-4" />
                           </button>
@@ -262,10 +262,10 @@ export default function MedecinsPage() {
                             <button
                               onClick={() => openReviewModal(med)}
                               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-primary-500 hover:bg-primary-700 text-white text-xs font-semibold transition"
-                              title="Ouvrir le dossier de vérification"
+                              title={t('admin.medecins.ouvrirDossier')}
                             >
                               <UserCheck className="w-3.5 h-3.5" />
-                              Vérifier
+                              {t('admin.medecins.verifier')}
                             </button>
                           )}
                           {/* Invalider */}
@@ -274,18 +274,18 @@ export default function MedecinsPage() {
                               onClick={() => openRejectModal(med)}
                               disabled={actionId === med.id}
                               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-urgence-500/10 hover:bg-urgence-500/20 text-urgence-500 text-xs font-semibold disabled:opacity-60 transition"
-                              title="Invalider ce médecin"
+                              title={t('admin.medecins.rejectTitle', { action: t('admin.medecins.invalider') })}
                             >
-                              <XCircle className="w-3.5 h-3.5" /> Invalider
+                              <XCircle className="w-3.5 h-3.5" /> {t('admin.medecins.invalider')}
                             </button>
                           ) : (
                             <button
                               onClick={() => openRejectModal(med)}
                               disabled={actionId === med.id}
                               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-urgence-200 text-urgence-500 text-xs font-semibold hover:bg-urgence-50 disabled:opacity-60 transition"
-                              title="Refuser ce médecin"
+                              title={t('admin.medecins.rejectTitle', { action: t('admin.medecins.refuser') })}
                             >
-                              <XCircle className="w-3.5 h-3.5" /> Refuser
+                              <XCircle className="w-3.5 h-3.5" /> {t('admin.medecins.refuser')}
                             </button>
                           )}
                         </div>
@@ -314,7 +314,7 @@ export default function MedecinsPage() {
               <motion.section
                 role="dialog"
                 aria-modal="true"
-                aria-label="Vérification du médecin"
+                aria-label={t('admin.medecins.reviewTitle')}
                 initial={{ opacity: 0, scale: 0.97, y: 16 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.97, y: 16 }}
@@ -331,16 +331,16 @@ export default function MedecinsPage() {
                         </h3>
                         {viewModal.estValide ? (
                           <span className="inline-flex items-center gap-1 rounded-full bg-mint-100 px-2.5 py-1 text-[10px] font-bold text-mint-700">
-                            <CheckCircle2 className="h-3 w-3" /> Validé
+                            <CheckCircle2 className="h-3 w-3" /> {t('admin.medecins.valide')}
                           </span>
                         ) : (
                           <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-1 text-[10px] font-bold text-amber-700">
-                            <Clock className="h-3 w-3" /> À vérifier
+                            <Clock className="h-3 w-3" /> {t('admin.medecins.aVerifier')}
                           </span>
                         )}
                       </div>
                       <p className="truncate text-xs text-primary-300">
-                        {viewModal.specialite || 'Spécialité non renseignée'} · {viewModal.email}
+                        {viewModal.specialite || t('admin.medecins.specialiteNonRenseignee')} · {viewModal.email}
                       </p>
                     </div>
                   </div>
@@ -348,7 +348,7 @@ export default function MedecinsPage() {
                     type="button"
                     onClick={() => setViewModal(null)}
                     className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-primary-300 transition hover:bg-primary-50 hover:text-primary-700 dark:hover:bg-primary-800 dark:hover:text-white"
-                    aria-label="Fermer la vérification"
+                    aria-label={t('admin.medecins.closeReview')}
                   >
                     <X className="h-5 w-5" />
                   </button>
@@ -358,21 +358,21 @@ export default function MedecinsPage() {
                   <div className="grid min-h-full lg:grid-cols-[320px_minmax(0,1fr)]">
                     <aside className="border-b border-primary-100 bg-primary-50/70 p-4 dark:border-white/10 dark:bg-primary-950/30 sm:p-6 lg:border-b-0 lg:border-r">
                       <p className="mb-3 text-[11px] font-bold uppercase text-primary-300">
-                        Informations déclarées
+                        {t('admin.medecins.infoDeclarees')}
                       </p>
                       <dl className="divide-y divide-primary-100 border-y border-primary-100 dark:divide-white/10 dark:border-white/10">
                         {[
-                          { icon: Stethoscope, label: 'Spécialité', value: viewModal.specialite },
-                          { icon: Shield, label: 'Numéro d’ordre', value: viewModal.numeroOrdre },
-                          { icon: Mail, label: 'Adresse e-mail', value: viewModal.email },
-                          { icon: Phone, label: 'Téléphone', value: viewModal.telephone },
+                          { icon: Stethoscope, label: t('admin.medecins.specialite'), value: viewModal.specialite },
+                          { icon: Shield, label: t('admin.medecins.numeroOrdre'), value: viewModal.numeroOrdre },
+                          { icon: Mail, label: t('admin.medecins.email'), value: viewModal.email },
+                          { icon: Phone, label: t('admin.medecins.telephone'), value: viewModal.telephone },
                         ].map(({ icon: Icon, label, value }) => (
                           <div key={label} className="flex gap-3 py-3">
                             <Icon className="mt-0.5 h-4 w-4 shrink-0 text-primary-300" />
                             <div className="min-w-0">
                               <dt className="text-[10px] font-bold uppercase text-primary-300">{label}</dt>
                               <dd className="mt-0.5 break-words text-sm font-semibold text-primary-900 dark:text-sable">
-                                {value || 'Non renseigné'}
+                                {value || t('admin.medecins.nonRenseigne')}
                               </dd>
                             </div>
                           </div>
@@ -383,8 +383,8 @@ export default function MedecinsPage() {
                         <div className="mt-6">
                           <div className="mb-3 flex items-center justify-between">
                             <div>
-                              <p className="text-sm font-bold text-primary-900 dark:text-sable">Checklist de contrôle</p>
-                              <p className="text-[11px] text-primary-300">Confirmez chaque point après vérification.</p>
+                              <p className="text-sm font-bold text-primary-900 dark:text-sable">{t('admin.medecins.checklistTitle')}</p>
+                              <p className="text-[11px] text-primary-300">{t('admin.medecins.checklistSubtitle')}</p>
                             </div>
                             <span className="text-xs font-bold text-primary-500">
                               {Object.values(reviewChecks).filter(Boolean).length}/3
@@ -394,20 +394,20 @@ export default function MedecinsPage() {
                             <ReviewCheck
                               checked={reviewChecks.documentsLisibles}
                               onChange={(checked) => setReviewChecks((current) => ({ ...current, documentsLisibles: checked }))}
-                              title="Documents lisibles"
-                              description="Les informations et les photos sont nettes, entières et sans zone masquée."
+                              title={t('admin.medecins.reviewDocsTitle')}
+                              description={t('admin.medecins.reviewDocsDesc')}
                             />
                             <ReviewCheck
                               checked={reviewChecks.identiteCorrespondante}
                               onChange={(checked) => setReviewChecks((current) => ({ ...current, identiteCorrespondante: checked }))}
-                              title="Identité correspondante"
-                              description="Le nom et le visage concordent entre la pièce et la photo récente."
+                              title={t('admin.medecins.reviewIdentiteTitle')}
+                              description={t('admin.medecins.reviewIdentiteDesc')}
                             />
                             <ReviewCheck
                               checked={reviewChecks.ordreVerifie}
                               onChange={(checked) => setReviewChecks((current) => ({ ...current, ordreVerifie: checked }))}
-                              title="Numéro d’ordre vérifié"
-                              description="Le numéro professionnel et la spécialité ont été contrôlés."
+                              title={t('admin.medecins.reviewOrdreTitle')}
+                              description={t('admin.medecins.reviewOrdreDesc')}
                             />
                           </div>
                         </div>
@@ -418,10 +418,10 @@ export default function MedecinsPage() {
                       <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
                         <div>
                           <h4 className="font-display text-lg font-bold text-primary-900 dark:text-sable">
-                            Comparaison des justificatifs
+                            {t('admin.medecins.comparaisonTitle')}
                           </h4>
                           <p className="mt-1 max-w-2xl text-xs leading-5 text-primary-300">
-                            Comparez le nom, les traits du visage et la cohérence des informations avant toute décision.
+                            {t('admin.medecins.comparaisonDesc')}
                           </p>
                         </div>
                         <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold ${
@@ -432,24 +432,24 @@ export default function MedecinsPage() {
                           {viewModal.verificationIdentite?.complet
                             ? <FileCheck2 className="h-3.5 w-3.5" />
                             : <FileWarning className="h-3.5 w-3.5" />}
-                          {viewModal.verificationIdentite?.complet ? 'Dossier complet' : 'Dossier incomplet'}
+                          {viewModal.verificationIdentite?.complet ? t('admin.medecins.dossierComplet') : t('admin.medecins.dossierIncomplet')}
                         </span>
                       </div>
 
                       {viewModal.verificationIdentite?.complet ? (
                         <div className="grid items-start gap-4 xl:grid-cols-2">
                           <ProtectedIdentityMedia
-                            label={viewModal.verificationIdentite.typePiece === 'CNI' ? 'Recto de la CNI' : 'Page d’identité du passeport'}
+                            label={viewModal.verificationIdentite.typePiece === 'CNI' ? t('admin.medecins.rectoCNI') : t('admin.medecins.passeport')}
                             media={viewModal.verificationIdentite.recto}
                           />
                           {viewModal.verificationIdentite.typePiece === 'CNI' && (
                             <ProtectedIdentityMedia
-                              label="Verso de la CNI"
+                              label={t('admin.medecins.versoCNI')}
                               media={viewModal.verificationIdentite.verso}
                             />
                           )}
                           <ProtectedIdentityMedia
-                            label="Photo récente du médecin"
+                            label={t('admin.medecins.photoRecente')}
                             media={viewModal.verificationIdentite.photo}
                             portrait
                           />
@@ -457,9 +457,9 @@ export default function MedecinsPage() {
                       ) : (
                         <div className="flex min-h-64 flex-col items-center justify-center border border-dashed border-rose-300 bg-rose-50 p-8 text-center dark:border-rose-900 dark:bg-rose-950/20">
                           <FileWarning className="mb-3 h-8 w-8 text-rose-500" />
-                          <p className="font-bold text-rose-800 dark:text-rose-200">Justificatifs manquants</p>
+                          <p className="font-bold text-rose-800 dark:text-rose-200">{t('admin.medecins.justificatifsManquants')}</p>
                           <p className="mt-1 max-w-md text-sm text-rose-700 dark:text-rose-300">
-                            Ce médecin ne peut pas être validé tant que son dossier ne contient pas toutes les images requises.
+                            {t('admin.medecins.justificatifsManquantsDesc')}
                           </p>
                         </div>
                       )}
@@ -469,7 +469,7 @@ export default function MedecinsPage() {
 
                 <footer className="flex shrink-0 flex-col-reverse gap-2 border-t border-primary-100 bg-white px-4 py-3 dark:border-white/10 dark:bg-primary-900 sm:flex-row sm:items-center sm:justify-between sm:px-6">
                   <p className="text-[11px] text-primary-300">
-                    La validation autorise le médecin à accéder à son espace professionnel.
+                    {t('admin.medecins.footerValidationNote')}
                   </p>
                   <div className="flex gap-2">
                     <button
@@ -478,7 +478,7 @@ export default function MedecinsPage() {
                       className="inline-flex min-h-10 flex-1 items-center justify-center gap-2 rounded-lg border border-urgence-200 px-4 text-sm font-bold text-urgence-500 transition hover:bg-urgence-50 sm:flex-none"
                     >
                       <XCircle className="h-4 w-4" />
-                      {viewModal.estValide ? 'Invalider' : 'Refuser'}
+                      {viewModal.estValide ? t('admin.medecins.invalider') : t('admin.medecins.refuser')}
                     </button>
                     {!viewModal.estValide && (
                       <button
@@ -490,7 +490,7 @@ export default function MedecinsPage() {
                         {actionId === viewModal.id
                           ? <LoaderCircle className="h-4 w-4 animate-spin" />
                           : <CheckCircle2 className="h-4 w-4" />}
-                        {actionId === viewModal.id ? 'Validation…' : 'Valider le médecin'}
+                        {actionId === viewModal.id ? t('admin.medecins.validationProgress') : t('admin.medecins.validateBtn')}
                         {actionId !== viewModal.id && <ChevronRight className="h-4 w-4" />}
                       </button>
                     )}
@@ -527,7 +527,7 @@ export default function MedecinsPage() {
                     </div>
                     <div>
                       <h4 className="font-display font-bold text-primary-900 dark:text-sable">
-                        {rejectModal.estValide ? 'Invalider' : 'Refuser'} ce médecin
+                        {t('admin.medecins.rejectTitle', { action: rejectModal.estValide ? t('admin.medecins.invalider') : t('admin.medecins.refuser') })}
                       </h4>
                       <p className="text-xs text-primary-300">
                         Dr {rejectModal.prenom} {rejectModal.nom}
@@ -541,17 +541,17 @@ export default function MedecinsPage() {
 
                 <div className="mb-5">
                   <label className="text-sm font-semibold text-primary-700 dark:text-sable block mb-2">
-                    Motif <span className="text-urgence-500">*</span>
+                    {t('admin.medecins.motifLabel')} <span className="text-urgence-500">*</span>
                   </label>
                   <textarea
                     value={motif}
                     onChange={(e) => setMotif(e.target.value)}
-                    placeholder="Ex : Numéro d'ordre introuvable dans le registre de l'Ordre des Médecins du Cameroun…"
+                    placeholder={t('admin.medecins.motifPlaceholder')}
                     rows={4}
                     className="w-full px-4 py-3 rounded-xl border border-primary-100 dark:border-white/10 bg-white/80 dark:bg-primary-900/40 focus:outline-none focus:ring-2 focus:ring-urgence-500 text-sm resize-none"
                   />
                   <p className="text-xs text-primary-300 mt-1">
-                    Ce motif sera envoyé par email au médecin.
+                    {t('admin.medecins.motifHint')}
                   </p>
                 </div>
 
@@ -560,7 +560,7 @@ export default function MedecinsPage() {
                     onClick={() => { setRejectModal(null); setMotif('') }}
                     className="flex-1 px-4 py-2.5 rounded-xl border border-primary-100 dark:border-white/10 text-primary-700 dark:text-sable font-semibold hover:bg-primary-50 transition text-sm"
                   >
-                    Annuler
+                    {t('common.cancel')}
                   </button>
                   <button
                     onClick={handleReject}
@@ -568,7 +568,7 @@ export default function MedecinsPage() {
                     className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-urgence-500 hover:bg-urgence-700 text-white font-semibold disabled:opacity-60 transition text-sm"
                   >
                     <Mail className="w-4 h-4" />
-                    {actionId === rejectModal.id ? 'Envoi…' : 'Envoyer le refus'}
+                    {actionId === rejectModal.id ? t('admin.medecins.sendingRefus') : t('admin.medecins.sendRefus')}
                   </button>
                 </div>
               </div>
@@ -604,6 +604,7 @@ function ReviewCheck({ checked, onChange, title, description }) {
 }
 
 function ProtectedIdentityMedia({ label, media, portrait = false }) {
+  const { t } = useTranslation()
   const [objectUrl, setObjectUrl] = useState(null)
   const [failed, setFailed] = useState(false)
 
@@ -642,7 +643,7 @@ function ProtectedIdentityMedia({ label, media, portrait = false }) {
             target="_blank"
             rel="noreferrer"
             className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-primary-500 hover:bg-primary-100 dark:hover:bg-primary-700"
-            title="Ouvrir le justificatif"
+            title={t('admin.medecins.openJustificatif')}
           >
             <Download className="h-4 w-4" />
           </a>
@@ -650,7 +651,7 @@ function ProtectedIdentityMedia({ label, media, portrait = false }) {
       </div>
       <div className={`flex items-center justify-center p-3 ${portrait ? 'min-h-72' : 'min-h-60'}`}>
         {!objectUrl && !failed && <LoaderCircle className="h-6 w-6 animate-spin text-primary-300" />}
-        {failed && <p className="text-xs font-semibold text-rose-600">Impossible de charger ce justificatif.</p>}
+        {failed && <p className="text-xs font-semibold text-rose-600">{t('admin.medecins.loadError')}</p>}
         {objectUrl && isImage && (
           <div className={`relative w-full ${portrait ? 'h-80' : 'h-64'}`}>
             <Image
@@ -670,7 +671,7 @@ function ProtectedIdentityMedia({ label, media, portrait = false }) {
             className="inline-flex items-center gap-2 rounded-xl bg-primary-500 px-4 py-2.5 text-sm font-semibold text-white"
           >
             <ImageIcon className="h-4 w-4" />
-            Ouvrir le document PDF
+            {t('admin.medecins.openPdf')}
           </a>
         )}
       </div>

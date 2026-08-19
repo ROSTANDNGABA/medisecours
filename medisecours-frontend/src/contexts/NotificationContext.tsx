@@ -18,6 +18,7 @@ import { useConsultationCount } from '../hooks/useConsultationCount'
 import { useWebSocket } from '../hooks/useWebSocket'
 import useSWR, { mutate as globalMutate } from 'swr'
 import api from '../api/axios'
+import { changeLanguage } from '../i18n'
 import {
   CONVERSATIONS_KEY,
   NOTIFICATIONS_KEY,
@@ -367,6 +368,11 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       profileChangeHandlers.current.forEach((h) => h(payload))
       // Revalide les conversations SWR pour récupérer le nouveau photoProfil
       globalMutate(CONVERSATIONS_KEY)
+    },
+    onLanguageChanged: (payload: any) => {
+      if (payload?.locale === 'fr' || payload?.locale === 'en') {
+        changeLanguage(payload.locale)
+      }
     }
   })
 

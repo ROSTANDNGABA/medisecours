@@ -5,12 +5,14 @@ import Link from 'next/link'
 import { motion } from 'framer-motion'
 import { HeartPulse, Mail, ArrowLeft, CheckCircle } from 'lucide-react'
 import api from '../../api/axios'
+import { useTranslation } from 'react-i18next'
 
 /**
  * Page de demande de réinitialisation de mot de passe.
  * Envoie un email avec un lien vers /reset-password?token=xxx
  */
 export default function ForgotPasswordPage() {
+  const { t } = useTranslation()
   const [email, setEmail] = useState('')
   const [loading, setLoading] = useState(false)
   const [sent, setSent] = useState(false)
@@ -21,7 +23,7 @@ export default function ForgotPasswordPage() {
     setError('')
 
     if (!email || !/^\S+@\S+\.\S+$/.test(email)) {
-      setError('Veuillez saisir une adresse email valide.')
+      setError(t('visitor.forgotPassword.invalidEmail'))
       return
     }
 
@@ -31,9 +33,9 @@ export default function ForgotPasswordPage() {
       setSent(true)
     } catch (err: any) {
       if (err.response?.status === 429) {
-        setError('Trop de demandes. Veuillez patienter une heure avant de réessayer.')
+        setError(t('visitor.forgotPassword.rateLimited'))
       } else {
-        setError('Une erreur est survenue. Veuillez réessayer.')
+        setError(t('visitor.forgotPassword.genericError'))
       }
     } finally {
       setLoading(false)
@@ -56,17 +58,17 @@ export default function ForgotPasswordPage() {
           {!sent ? (
             <>
               <h1 className="font-display font-bold text-2xl text-primary-900 dark:text-sable">
-                Mot de passe oublié ?
+                {t('visitor.forgotPassword.title')}
               </h1>
               <p className="text-sm text-primary-300 text-center mt-1">
-                Saisissez votre email. Si un compte existe, vous recevrez un lien de réinitialisation.
+                {t('visitor.forgotPassword.description')}
               </p>
             </>
           ) : (
             <>
               <CheckCircle className="w-12 h-12 text-mint-500 mb-2" />
               <h1 className="font-display font-bold text-2xl text-primary-900 dark:text-sable">
-                Email envoyé
+                {t('visitor.forgotPassword.sentTitle')}
               </h1>
             </>
           )}
@@ -76,7 +78,7 @@ export default function ForgotPasswordPage() {
           <form onSubmit={handleSubmit} className="space-y-4" noValidate>
             <div>
               <label className="text-sm font-medium text-primary-700 dark:text-sable">
-                Adresse email
+                {t('visitor.forgotPassword.emailLabel')}
               </label>
               <div className="relative mt-1">
                 <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-primary-300" />
@@ -84,7 +86,7 @@ export default function ForgotPasswordPage() {
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="vous@exemple.com"
+                  placeholder={t('visitor.forgotPassword.emailPlaceholder')}
                   className="w-full pl-10 pr-3 py-2.5 rounded-xl border border-primary-100 dark:border-white/10 bg-white/80 dark:bg-primary-900/40 focus:outline-none focus:ring-2 focus:ring-mint-500"
                   autoFocus
                 />
@@ -97,23 +99,24 @@ export default function ForgotPasswordPage() {
               disabled={loading}
               className="w-full py-3 rounded-xl bg-mint-500 hover:bg-mint-700 text-white font-semibold shadow-lg transition disabled:opacity-60"
             >
-              {loading ? 'Envoi en cours…' : 'Envoyer le lien'}
+              {loading ? t('visitor.forgotPassword.sending') : t('visitor.forgotPassword.sendLink')}
             </button>
           </form>
         ) : (
           <div className="text-center space-y-3">
             <p className="text-primary-400 text-sm">
-              Si l&apos;adresse <strong className="text-primary-700 dark:text-sable">{email}</strong> est
-              associée à un compte MediSecours+, vous recevrez un email avec les instructions.
+              {t('visitor.forgotPassword.sentDesc1')} <strong className="text-primary-700 dark:text-sable">{email}</strong>{' '}
+              {t('visitor.forgotPassword.sentDesc2')}
             </p>
             <p className="text-xs text-primary-300">
-              Le lien est valable <strong>1 heure</strong>. Vérifiez également vos spams.
+              {t('visitor.forgotPassword.validityNote1')} <strong>{t('visitor.forgotPassword.linkValidDuration')}</strong>.{' '}
+              {t('visitor.forgotPassword.validityNote2')}
             </p>
             <button
               onClick={() => { setSent(false); setEmail('') }}
               className="text-sm text-mint-500 hover:text-mint-700 underline underline-offset-2"
             >
-              Utiliser un autre email
+              {t('visitor.forgotPassword.useAnotherEmail')}
             </button>
           </div>
         )}
@@ -124,7 +127,7 @@ export default function ForgotPasswordPage() {
             className="inline-flex items-center gap-1.5 text-sm text-primary-400 hover:text-primary-700"
           >
             <ArrowLeft className="w-4 h-4" />
-            Retour à la connexion
+            {t('visitor.forgotPassword.backToLogin')}
           </Link>
         </div>
       </motion.div>

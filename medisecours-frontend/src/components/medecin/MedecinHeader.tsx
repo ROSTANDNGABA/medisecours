@@ -2,6 +2,8 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
+import { useTranslation } from 'react-i18next'
+import type { TFunction } from 'i18next'
 import { Search, ChevronDown, User, Loader2, Stethoscope, Building2, Activity, MessageCircle, Bell, MessageSquare, Clock, LogOut } from 'lucide-react'
 import Avatar from '../ui/Avatar'
 import CertifiedBadge from '../ui/CertifiedBadge'
@@ -10,6 +12,7 @@ import api from '../../api/axios'
 import { imgUrl } from '../../lib/config'
 import { useNotification } from '../../contexts/NotificationContext'
 import DashboardThemeToggle from '../ui/DashboardThemeToggle'
+import LanguageSwitcher from '../ui/LanguageSwitcher'
 
 type SearchCategory = 'patients' | 'consultations' | 'messages' | 'maladies' | 'centres'
 
@@ -41,56 +44,57 @@ interface SearchResults {
   centres?: SearchItem[]
 }
 
-const CATEGORY_CONFIG: Record<SearchCategory, { label: string; icon: React.ElementType; color: string; href: (item: SearchItem) => string }> = {
+const CATEGORY_CONFIG: Record<SearchCategory, { labelKey: string; icon: React.ElementType; color: string; href: (item: SearchItem) => string }> = {
   patients: {
-    label: 'Patients',
+    labelKey: 'medecin.header.catPatients',
     icon: User,
     color: '#3B6EF8',
     href: (item) => `/medecin/patients?id=${item.id}`,
   },
   consultations: {
-    label: 'Consultations',
+    labelKey: 'medecin.header.catConsultations',
     icon: Stethoscope,
     color: '#F59E0B',
     href: (item) => `/medecin/consultations?id=${item.id}`,
   },
   messages: {
-    label: 'Messages',
+    labelKey: 'medecin.header.catMessages',
     icon: MessageCircle,
     color: '#10B981',
     href: (item) => `/medecin/messages?id=${item.id}`,
   },
   maladies: {
-    label: 'Maladies',
+    labelKey: 'medecin.header.catMaladies',
     icon: Activity,
     color: '#EF4444',
     href: (item) => `/maladies/${item.id}`,
   },
   centres: {
-    label: 'Centres de santé',
+    labelKey: 'medecin.header.catCentres',
     icon: Building2,
     color: '#8B5CF6',
     href: () => `/centres`,
   },
 }
 
-function timeAgo(dateString: string) {
+function timeAgo(dateString: string, t: TFunction) {
   if (!dateString) return ''
   const diff = Date.now() - new Date(dateString).getTime()
   const minutes = Math.floor(diff / 60000)
-  if (minutes < 1) return "À l'instant"
-  if (minutes < 60) return `Il y a ${minutes} min`
+  if (minutes < 1) return t('medecin.header.justNow')
+  if (minutes < 60) return t('medecin.header.minutesAgo', { count: minutes })
   const hours = Math.floor(minutes / 60)
-  if (hours < 24) return `Il y a ${hours}h`
+  if (hours < 24) return t('medecin.header.hoursAgo', { count: hours })
   const days = Math.floor(hours / 24)
-  if (days < 30) return `Il y a ${days}j`
-  return `Il y a ${Math.floor(days / 30)}mois`
+  if (days < 30) return t('medecin.header.daysAgo', { count: days })
+  return t('medecin.header.monthsAgo', { count: Math.floor(days / 30) })
 }
 
 export default function MedecinHeader() {
   const { user, logout } = useAuth()
   const router = useRouter()
   const pathname = usePathname()
+  const { t } = useTranslation()
   const estSurPageNotifications = pathname?.includes('/medecin/notifications')
   const {
     notifications, notifLoading, notifOpen, notificationCount, msgDisplayCount,
@@ -182,14 +186,14 @@ export default function MedecinHeader() {
             }
           }}
           onFocus={() => setShowResults(true)}
-          placeholder="Rechercher patients, consultations, maladies..."
+          placeholder={t('medecin.header.searchPlaceholder')}
           className="w-[320px] xl:w-[420px] rounded-full bg-[#F3F4F6] py-2 pl-10 pr-4 text-sm text-[#374151] placeholder-[#9CA3AF] outline-none transition focus:bg-white focus:ring-2 focus:ring-[#3B6EF8]/20"
         />
         {showResults && debouncedQuery.trim().length >= 2 && (
           <div className="absolute right-0 top-full mt-2 w-full min-w-[360px] rounded-xl border border-[#E5E7EB] bg-white shadow-lg max-h-[70vh] overflow-y-auto">
             {loading && (
               <div className="flex items-center justify-center gap-2 px-4 py-6 text-sm text-[#9CA3AF]">
-                <Loader2 className="h-4 w-4 animate-spin" /> Recherche en cours...
+                <Loader2 className="h-4 w-4 animate-spin" /> {t('medecin.header.searching')}
               </div>
             )}
             {!loading && hasResults && (
@@ -199,7 +203,7 @@ export default function MedecinHeader() {
                   <div key={key}>
                     <div className="sticky top-0 bg-white z-10 px-4 py-1.5 border-b border-[#E5E7EB] flex items-center gap-2">
                       <config.icon className="h-3.5 w-3.5" style={{ color: config.color }} />
-                      <span className="text-[10px] font-semibold uppercase tracking-[0.12em]" style={{ color: config.color }}>{config.label}</span>
+                      <span className="text-[10px] font-semibold uppercase tracking-[0.12em]" style={{ color: config.color }}>{t(config.labelKey)}</span>
                       <span className="ml-auto text-[10px] text-[#9CA3AF]">{results![key]!.length}</span>
                     </div>
                     {results![key]!.map((item) => (
@@ -218,7 +222,7 @@ export default function MedecinHeader() {
                           )}
                           {key === 'consultations' && (
                             <>
-                              <p className="font-medium truncate">{item.motif || 'Sans motif'}</p>
+                              <p className="font-medium truncate">{item.motif || t('medecin.header.noMotif')}</p>
                               <p className="text-xs text-[#9CA3AF] truncate">
                                 {item.patient_prenom} {item.patient_nom} · <span className={`inline-block w-2 h-2 rounded-full ${item.statut === 'TERMINEE' ? 'bg-green-500' : item.statut === 'EN_COURS' ? 'bg-yellow-500' : item.statut === 'ANNULEE' ? 'bg-red-500' : 'bg-blue-500'}`} /> {item.statut?.toLowerCase()}
                               </p>
@@ -234,7 +238,7 @@ export default function MedecinHeader() {
                             <>
                               <p className="font-medium truncate">{item.nom}</p>
                               <p className="text-xs text-[#9CA3AF] truncate">
-                                {item.niveauGravite} {item.urgence ? '· Urgence' : ''}
+                                {item.niveauGravite} {item.urgence ? ` · ${t('medecin.header.urgency')}` : ''}
                               </p>
                             </>
                           )}
@@ -252,26 +256,28 @@ export default function MedecinHeader() {
             )}
             {!loading && debouncedQuery.trim().length >= 2 && results && !hasResults && (
               <div className="px-4 py-6 text-center text-sm text-[#9CA3AF]">
-                Aucun résultat pour &quot;{debouncedQuery}&quot;
+                {t('medecin.header.noResults', { query: debouncedQuery })}
               </div>
             )}
           </div>
         )}
         {showResults && debouncedQuery.trim().length > 0 && debouncedQuery.trim().length < 2 && (
           <div className="absolute right-0 top-full mt-2 w-full min-w-[320px] rounded-xl border border-[#E5E7EB] bg-white shadow-lg">
-            <div className="px-4 py-6 text-center text-sm text-[#9CA3AF]">Tapez au moins 2 caractères</div>
+            <div className="px-4 py-6 text-center text-sm text-[#9CA3AF]">{t('medecin.header.minChars')}</div>
           </div>
         )}
       </div>
 
       <DashboardThemeToggle />
 
+      <LanguageSwitcher />
+
       {/* Notification icon + dropdown */}
       <div ref={notifRef} className="relative">
         <button
           onClick={openNotif}
           className={`relative flex h-10 w-10 items-center justify-center rounded-xl transition ${notifOpen ? 'bg-[#F0F4FF]' : 'hover:bg-[#F3F4F6]'}`}
-          aria-label="Notifications"
+          aria-label={t('medecin.header.notifications')}
         >
           <Bell className={`h-5 w-5 ${notifOpen ? 'text-[#3B6EF8]' : 'text-[#6B7280]'}`} />
           {!estSurPageNotifications && notificationCount > 0 && (
@@ -283,21 +289,21 @@ export default function MedecinHeader() {
         {notifOpen && (
           <div className="absolute right-0 top-full mt-2 w-[380px] origin-top-right rounded-xl border border-[#E5E7EB] bg-white shadow-xl">
             <div className="flex items-center justify-between border-b border-[#E5E7EB] px-4 py-3">
-              <h3 className="text-sm font-bold text-[#0F2C52]">Notifications</h3>
+              <h3 className="text-sm font-bold text-[#0F2C52]">{t('medecin.header.notifications')}</h3>
               <div className="flex items-center gap-3">
                 {notifications.some(n => n.unread) && (
                   <button
                     onClick={() => clearAllNotifications()}
                     className="text-xs font-semibold text-[#3B6EF8] hover:underline"
                   >
-                    Tout marquer comme lu
+                    {t('medecin.header.markAllRead')}
                   </button>
                 )}
                 <button
                   onClick={() => { closeNotif(); router.push('/medecin/notifications') }}
                   className="text-xs font-semibold text-[#3B6EF8] hover:underline"
                 >
-                  Voir tout
+                  {t('medecin.header.seeAll')}
                 </button>
               </div>
             </div>
@@ -309,7 +315,7 @@ export default function MedecinHeader() {
               ) : notifications.length === 0 ? (
                 <div className="px-4 py-8 text-center">
                   <Bell className="mx-auto mb-2 h-8 w-8 text-[#D1D5DB]" />
-                  <p className="text-sm text-[#9CA3AF]">Aucune notification</p>
+                  <p className="text-sm text-[#9CA3AF]">{t('medecin.header.noNotifications')}</p>
                 </div>
               ) : (
                 <div className="py-1">
@@ -327,14 +333,14 @@ export default function MedecinHeader() {
                           <p className={`truncate text-sm ${n.unread ? 'font-bold text-[#0F2C52]' : 'font-medium text-[#374151]'}`}>{n.title}</p>
                           <span className="flex shrink-0 items-center gap-1 text-[10px] text-[#9CA3AF]">
                             <Clock className="h-3 w-3" />
-                            {timeAgo(n.time)}
+                            {timeAgo(n.time, t)}
                           </span>
                         </div>
                         <p className="mt-0.5 line-clamp-2 text-xs leading-relaxed text-[#6B7280]">
-                          {n.description || 'Une nouvelle information est disponible.'}
+                          {n.description || t('medecin.header.newInfo')}
                         </p>
                         <span className="mt-1 inline-flex text-[11px] font-semibold text-[#315FD6]">
-                          {n.type === 'message' ? 'Voir la conversation' : 'Voir les détails'}
+                          {n.type === 'message' ? t('medecin.header.viewConversation') : t('medecin.header.viewDetails')}
                         </span>
                       </div>
                     </button>
@@ -371,20 +377,20 @@ export default function MedecinHeader() {
                 <p className="text-sm font-semibold text-[#0F2C52]">Dr. {user?.prenom} {user?.nom}</p>
                 {user?.estValide && <CertifiedBadge className="h-4 w-4" />}
               </div>
-              <p className="text-xs text-[#6B7280]">Médecin</p>
+              <p className="text-xs text-[#6B7280]">{t('medecin.header.doctor')}</p>
             </div>
             <button
               onClick={() => { router.push('/medecin/profil'); setProfileOpen(false) }}
               className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm text-[#374151] hover:bg-[#F3F4F6] transition"
             >
-              <User className="h-4 w-4 text-[#9CA3AF]" /> Profil
+              <User className="h-4 w-4 text-[#9CA3AF]" /> {t('medecin.header.profile')}
             </button>
             <div className="border-t border-[#E5E7EB]" />
             <button
               onClick={() => { logout(); router.push('/login'); setProfileOpen(false) }}
               className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm text-[#DC2626] hover:bg-[#FEF2F2] transition"
             >
-              <LogOut className="h-4 w-4" /> Déconnexion
+              <LogOut className="h-4 w-4" /> {t('medecin.header.logout')}
             </button>
           </div>
         )}

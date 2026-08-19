@@ -1,6 +1,7 @@
 // @ts-nocheck
 'use client'
 import { useState, useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   AlertTriangle, AlertOctagon, Stethoscope, FlaskConical,
@@ -23,11 +24,11 @@ const GRAVITY_STYLES = {
 }
 
 const INFO_FIELDS = [
-  { key: 'description', label: 'Description', icon: Stethoscope },
-  { key: 'symptomes', label: 'Symptômes', icon: AlertOctagon },
-  { key: 'causes', label: 'Causes', icon: FlaskConical },
-  { key: 'traitement', label: 'Traitement', icon: Pill },
-  { key: 'precautions', label: 'Précautions', icon: ShieldAlert },
+  { key: 'description', labelKey: 'infoDescription', icon: Stethoscope },
+  { key: 'symptomes', labelKey: 'infoSymptomes', icon: AlertOctagon },
+  { key: 'causes', labelKey: 'infoCauses', icon: FlaskConical },
+  { key: 'traitement', labelKey: 'infoTraitement', icon: Pill },
+  { key: 'precautions', labelKey: 'infoPrecautions', icon: ShieldAlert },
 ]
 
 function imgUrl(img) {
@@ -47,6 +48,7 @@ export default function DiseaseDetailModal({ maladie, onClose, onMutate }) {
   const [premiersSoins, setPremiersSoins] = useState(maladie.premiersSoins || [])
   const fileInputRef = useRef(null)
   const toast = useToast()
+  const { t } = useTranslation()
 
   const handleUpload = async () => {
     if (!selectedFiles || selectedFiles.length === 0) return
@@ -60,10 +62,10 @@ export default function DiseaseDetailModal({ maladie, onClose, onMutate }) {
       const newImages = res.data?.images ?? []
       setImages((prev) => [...prev, ...newImages])
       setSelectedFiles(null)
-      toast.success(`${newImages.length} image(s) ajoutée(s).`)
+      toast.success(t('admin.maladieDetail.toastAdded', { count: newImages.length }))
       if (onMutate) onMutate()
     } catch (err) {
-      toast.error(err?.response?.data?.error || "Erreur lors de l'upload.")
+      toast.error(err?.response?.data?.error || t('admin.maladieDetail.toastUploadError'))
     } finally {
       setIsUploading(false)
     }
@@ -74,10 +76,10 @@ export default function DiseaseDetailModal({ maladie, onClose, onMutate }) {
       await api.delete(`/api/admin/maladies/${maladie.id}/images/${imageId}`)
       setImages((prev) => prev.filter((img) => img.id !== imageId))
       if (carouselIndex >= images.length - 1) setCarouselIndex(Math.max(0, images.length - 2))
-      toast.success('Image supprimée.')
+      toast.success(t('admin.maladieDetail.toastDeleteImageSuccess'))
       if (onMutate) onMutate()
     } catch {
-      toast.error("Erreur lors de la suppression.")
+      toast.error(t('admin.maladieDetail.toastDeleteImageError'))
     }
   }
 
@@ -87,14 +89,14 @@ export default function DiseaseDetailModal({ maladie, onClose, onMutate }) {
   }
 
   const handleDeletePs = async (psId) => {
-    if (!confirm('Supprimer ce premier soin ?')) return
+    if (!confirm(t('admin.maladieDetail.confirmDeletePs'))) return
     try {
       await api.delete(`/api/admin/premiers-soins/${psId}`)
       setPremiersSoins((prev) => prev.filter((ps) => ps.id !== psId))
-      toast.success('Premier soin supprimé.')
+      toast.success(t('admin.maladieDetail.toastPsDeleted'))
       if (onMutate) onMutate()
     } catch {
-      toast.error("Erreur lors de la suppression.")
+      toast.error(t('admin.maladieDetail.toastPsError'))
     }
   }
 
@@ -151,7 +153,7 @@ export default function DiseaseDetailModal({ maladie, onClose, onMutate }) {
                   <button
                     onClick={(e) => { e.stopPropagation(); handleDeleteImage(images[carouselIndex].id) }}
                     className="absolute top-3 right-3 p-2 rounded-full bg-black/40 text-white hover:bg-red-500 transition"
-                    title="Supprimer cette image"
+                    title={t('admin.maladieDetail.supprimerImage')}
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>
@@ -161,7 +163,7 @@ export default function DiseaseDetailModal({ maladie, onClose, onMutate }) {
               <div className="w-full h-full flex items-center justify-center">
                 <div className="text-center">
                   <ImageIcon className="w-10 h-10 mx-auto text-[#aab3a8] mb-2" />
-                  <p className="text-sm text-[#aab3a8]">Aucune image</p>
+                  <p className="text-sm text-[#aab3a8]">{t('admin.maladieDetail.aucuneImage')}</p>
                 </div>
               </div>
             )}
@@ -196,17 +198,17 @@ export default function DiseaseDetailModal({ maladie, onClose, onMutate }) {
                 )}
                 {maladie.urgence && (
                   <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-700">
-                    <HeartPulse className="w-3 h-3" /> Urgence
+                    <HeartPulse className="w-3 h-3" /> {t('admin.maladieDetail.urgence')}
                   </span>
                 )}
                 {maladie.contagieux && (
                   <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-700">
-                    <Bug className="w-3 h-3" /> Contagieux
+                    <Bug className="w-3 h-3" /> {t('admin.maladieDetail.contagieux')}
                   </span>
                 )}
                 {maladie.isAccident && (
                   <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-orange-100 text-orange-700">
-                    <Bone className="w-3 h-3" /> Accident
+                    <Bone className="w-3 h-3" /> {t('admin.maladieDetail.accident')}
                   </span>
                 )}
               </div>
@@ -214,11 +216,11 @@ export default function DiseaseDetailModal({ maladie, onClose, onMutate }) {
 
             {/* Info sections */}
             <div className="space-y-3">
-              {INFO_FIELDS.filter((f) => maladie[f.key]).map(({ key, label, icon: Icon }) => (
+              {INFO_FIELDS.filter((f) => maladie[f.key]).map(({ key, labelKey, icon: Icon }) => (
                 <div key={key} className="flex items-start gap-3 p-4 rounded-2xl bg-[#f8faf6] border border-[#eef2ec]">
                   <Icon className="w-5 h-5 text-[#2f6b45] shrink-0 mt-0.5" />
                   <div>
-                    <p className="text-[10px] font-semibold text-[#7a8578] uppercase tracking-[0.18em]">{label}</p>
+                    <p className="text-[10px] font-semibold text-[#7a8578] uppercase tracking-[0.18em]">{t(`admin.maladieDetail.${labelKey}`)}</p>
                     <p className="mt-1 text-sm text-[#223023] leading-relaxed whitespace-pre-wrap">{maladie[key]}</p>
                   </div>
                 </div>
@@ -230,7 +232,7 @@ export default function DiseaseDetailModal({ maladie, onClose, onMutate }) {
               <div className="flex items-start gap-3 p-4 rounded-2xl bg-[#f8faf6] border border-[#eef2ec] mt-3">
                 <Bone className="w-5 h-5 text-[#2f6b45] shrink-0 mt-0.5" />
                 <div>
-                  <p className="text-[10px] font-semibold text-[#7a8578] uppercase tracking-[0.18em]">Type d&apos;accident</p>
+                  <p className="text-[10px] font-semibold text-[#7a8578] uppercase tracking-[0.18em]">{t('admin.maladieDetail.typeAccident')}</p>
                   <p className="mt-1 text-sm text-[#223023]">{maladie.typeAccident}</p>
                 </div>
               </div>
@@ -241,12 +243,12 @@ export default function DiseaseDetailModal({ maladie, onClose, onMutate }) {
               <Baby className="w-5 h-5 text-[#2f6b45] shrink-0 mt-0.5" />
               <div className="flex-1 min-w-0">
                 <div className="flex items-center justify-between gap-2">
-                  <p className="text-[10px] font-semibold text-[#7a8578] uppercase tracking-[0.18em]">Premiers soins</p>
+                  <p className="text-[10px] font-semibold text-[#7a8578] uppercase tracking-[0.18em]">{t('admin.maladieDetail.premiersSoins')}</p>
                   <button
                     onClick={() => setEditingPs({ titre: '', description: '', symptomes: null, niveauUrgence: 'MOYEN' })}
                     className="inline-flex items-center gap-1 text-[10px] font-semibold text-[#2f6b45] hover:text-[#1f4a2e] transition shrink-0"
                   >
-                    <Plus className="w-3 h-3" /> Ajouter
+                    <Plus className="w-3 h-3" /> {t('admin.maladieDetail.ajouter')}
                   </button>
                 </div>
                 {premiersSoins.length > 0 ? (
@@ -267,14 +269,14 @@ export default function DiseaseDetailModal({ maladie, onClose, onMutate }) {
                               <button
                                 onClick={() => setEditingPs({ ...ps })}
                                 className="p-1 rounded-lg hover:bg-[#edf2ea] text-[#7a8578] hover:text-[#223023]"
-                                title="Modifier"
+                                title={t('admin.maladieDetail.modifier')}
                               >
                                 <Pencil className="w-3.5 h-3.5" />
                               </button>
                               <button
                                 onClick={() => handleDeletePs(ps.id)}
                                 className="p-1 rounded-lg hover:bg-red-50 text-[#7a8578] hover:text-red-500"
-                                title="Supprimer"
+                                title={t('admin.maladieDetail.supprimer')}
                               >
                                 <Trash2 className="w-3.5 h-3.5" />
                               </button>
@@ -285,7 +287,7 @@ export default function DiseaseDetailModal({ maladie, onClose, onMutate }) {
                     ))}
                   </ol>
                 ) : (
-                  <p className="mt-2 text-xs text-[#aab3a8]">Aucun premier soin défini</p>
+                  <p className="mt-2 text-xs text-[#aab3a8]">{t('admin.maladieDetail.aucunPremierSoin')}</p>
                 )}
               </div>
             </div>
@@ -308,11 +310,11 @@ export default function DiseaseDetailModal({ maladie, onClose, onMutate }) {
                   onClick={() => fileInputRef.current?.click()}
                   className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-2xl border-2 border-dashed border-[#dfe5db] text-[#7a8578] hover:border-[#bfd0bd] hover:text-[#2f6b45] transition text-sm font-semibold"
                 >
-                  <Upload className="w-4 h-4" /> Ajouter des images
+                  <Upload className="w-4 h-4" /> {t('admin.maladieDetail.ajouterImages')}
                 </button>
               ) : (
                 <div className="space-y-2">
-                  <p className="text-xs text-[#7a8578]">{selectedFiles.length} fichier(s) sélectionné(s)</p>
+                  <p className="text-xs text-[#7a8578]">{t('admin.maladieDetail.selectedFiles', { count: selectedFiles.length })}</p>
                   <div className="flex gap-2">
                     <button
                       onClick={handleUpload}
@@ -320,7 +322,7 @@ export default function DiseaseDetailModal({ maladie, onClose, onMutate }) {
                       className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-2xl bg-[#2f6b45] hover:bg-[#1f4a2e] text-white text-sm font-semibold disabled:opacity-60 transition"
                     >
                       <Upload className="w-4 h-4" />
-                      {isUploading ? 'Upload…' : 'Uploader'}
+                      {isUploading ? t('admin.maladieDetail.uploading') : t('admin.maladieDetail.uploader')}
                     </button>
                     <button
                       onClick={() => { setSelectedFiles(null); if (fileInputRef.current) fileInputRef.current.value = '' }}

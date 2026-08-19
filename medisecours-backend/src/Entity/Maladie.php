@@ -70,6 +70,9 @@ class Maladie
     #[Groups(['maladie:read', 'maladie:write'])]
     private ?string $nom = null;
 
+    #[ORM\Column(length: 255, nullable: true)]
+    private ?string $nomEn = null;
+
     #[ORM\Column(type: Types::TEXT)]
     #[Assert\NotBlank(message: 'La description est obligatoire')]
     #[Assert\Length(min: 10, max: 10000, minMessage: 'La description doit contenir au moins {{ limit }} caractères', maxMessage: 'La description ne peut pas dépasser {{ limit }} caractères')]
@@ -77,9 +80,15 @@ class Maladie
     private ?string $description = null;
 
     #[ORM\Column(type: Types::TEXT, nullable: true)]
+    private ?string $descriptionEn = null;
+
+    #[ORM\Column(type: Types::TEXT, nullable: true)]
     #[Assert\Length(max: 10000, maxMessage: 'Les symptômes ne peuvent pas dépasser {{ limit }} caractères')]
     #[Groups(['maladie:read', 'maladie:write'])]
     private ?string $symptomes = null;
+
+    #[ORM\Column(type: Types::TEXT, nullable: true)]
+    private ?string $symptomesEn = null;
 
     #[ORM\Column(type: Types::TEXT, nullable: true)]
     #[Assert\Length(max: 10000, maxMessage: 'Les précautions ne peuvent pas dépasser {{ limit }} caractères')]
@@ -87,9 +96,15 @@ class Maladie
     private ?string $precautions = null;
 
     #[ORM\Column(type: Types::TEXT, nullable: true)]
+    private ?string $precautionsEn = null;
+
+    #[ORM\Column(type: Types::TEXT, nullable: true)]
     #[Assert\Length(max: 10000, maxMessage: 'Le traitement ne peut pas dépasser {{ limit }} caractères')]
     #[Groups(['maladie:read', 'maladie:write'])]
     private ?string $traitement = null;
+
+    #[ORM\Column(type: Types::TEXT, nullable: true)]
+    private ?string $traitementEn = null;
 
     #[ORM\Column(length: 50)]
     #[Assert\NotBlank(message: 'Le niveau de gravité est obligatoire')]
@@ -127,6 +142,9 @@ class Maladie
     #[Groups(['maladie:read', 'maladie:write'])]
     private ?string $causes = null;
 
+    #[ORM\Column(type: Types::TEXT, nullable: true)]
+    private ?string $causesEn = null;
+
     #[ORM\Column(nullable: true)]
     #[Groups(['maladie:read', 'maladie:write'])]
     private ?bool $isAccident = false;
@@ -134,6 +152,9 @@ class Maladie
     #[ORM\Column(length: 255, nullable: true)]
     #[Groups(['maladie:read', 'maladie:write'])]
     private ?string $typeAccident = null;
+
+    #[ORM\Column(length: 255, nullable: true)]
+    private ?string $typeAccidentEn = null;
 
     #[ORM\Column(length: 500, nullable: true)]
     #[Groups(['maladie:read', 'maladie:write'])]
@@ -194,6 +215,18 @@ class Maladie
         return $this;
     }
 
+    public function getNomEn(): ?string
+    {
+        return $this->nomEn;
+    }
+
+    public function setNomEn(?string $nomEn): static
+    {
+        $this->nomEn = $nomEn;
+
+        return $this;
+    }
+
     public function getDescription(): ?string
     {
         return $this->description;
@@ -202,6 +235,18 @@ class Maladie
     public function setDescription(string $description): static
     {
         $this->description = $description;
+
+        return $this;
+    }
+
+    public function getDescriptionEn(): ?string
+    {
+        return $this->descriptionEn;
+    }
+
+    public function setDescriptionEn(?string $descriptionEn): static
+    {
+        $this->descriptionEn = $descriptionEn;
 
         return $this;
     }
@@ -218,6 +263,18 @@ class Maladie
         return $this;
     }
 
+    public function getSymptomesEn(): ?string
+    {
+        return $this->symptomesEn;
+    }
+
+    public function setSymptomesEn(?string $symptomesEn): static
+    {
+        $this->symptomesEn = $symptomesEn;
+
+        return $this;
+    }
+
     public function getPrecautions(): ?string
     {
         return $this->precautions;
@@ -230,6 +287,18 @@ class Maladie
         return $this;
     }
 
+    public function getPrecautionsEn(): ?string
+    {
+        return $this->precautionsEn;
+    }
+
+    public function setPrecautionsEn(?string $precautionsEn): static
+    {
+        $this->precautionsEn = $precautionsEn;
+
+        return $this;
+    }
+
     public function getTraitement(): ?string
     {
         return $this->traitement;
@@ -238,6 +307,18 @@ class Maladie
     public function setTraitement(?string $traitement): static
     {
         $this->traitement = $traitement;
+
+        return $this;
+    }
+
+    public function getTraitementEn(): ?string
+    {
+        return $this->traitementEn;
+    }
+
+    public function setTraitementEn(?string $traitementEn): static
+    {
+        $this->traitementEn = $traitementEn;
 
         return $this;
     }
@@ -326,6 +407,18 @@ class Maladie
         return $this;
     }
 
+    public function getCausesEn(): ?string
+    {
+        return $this->causesEn;
+    }
+
+    public function setCausesEn(?string $causesEn): static
+    {
+        $this->causesEn = $causesEn;
+
+        return $this;
+    }
+
     public function isIsAccident(): ?bool
     {
         return $this->isAccident;
@@ -346,6 +439,18 @@ class Maladie
     public function setTypeAccident(?string $typeAccident): static
     {
         $this->typeAccident = $typeAccident;
+
+        return $this;
+    }
+
+    public function getTypeAccidentEn(): ?string
+    {
+        return $this->typeAccidentEn;
+    }
+
+    public function setTypeAccidentEn(?string $typeAccidentEn): static
+    {
+        $this->typeAccidentEn = $typeAccidentEn;
 
         return $this;
     }

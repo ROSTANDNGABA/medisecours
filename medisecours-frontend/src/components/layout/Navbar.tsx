@@ -1,19 +1,22 @@
 'use client'
 import { Suspense, type ReactNode } from 'react'
 import Link from 'next/link'
+
 import Image from 'next/image'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { 
   Sun, Moon,
   MessageCircle, UserCircle, LogOut, 
   Home, Grid, Activity, MapPin, 
-  ChevronDown, ArrowRight, FileText,
-  Cross, Stethoscope, FolderOpen
+  ArrowRight, FileText,
+  Cross, Stethoscope, FolderOpen, Pill
 } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 import { useUnreadCount } from '../../hooks/useUnreadCount'
 import { useTheme } from '../../hooks/useTheme'
+import { useTranslation } from 'react-i18next'
 import { resolveImgPath } from '../../lib/config'
+import LanguageSwitcher from '../ui/LanguageSwitcher'
 
 function ConversationAware({ children }: { children: (inConversation: boolean) => ReactNode }) {
   const searchParams = useSearchParams()
@@ -23,6 +26,7 @@ function ConversationAware({ children }: { children: (inConversation: boolean) =
 export default function Navbar() {
   const { dark, toggleTheme: toggleDark } = useTheme()
   const { isAuthenticated, user, isAdmin, logout } = useAuth()
+  const { t } = useTranslation()
   const pathname = usePathname()
   const router = useRouter()
   const { unreadCount } = useUnreadCount()
@@ -34,43 +38,43 @@ export default function Navbar() {
   const isActive = (to: string) => (to === '/' ? pathname === '/' : pathname.startsWith(to))
 
   /* ─── Desktop links ─── */
-  type NavLink = { to: string; label: string; icon: any; hasDropdown?: boolean; badge?: number }
+  type NavLink = { to: string; label: string; icon: any; badge?: number }
   const publicLinks: NavLink[] = [
-    { to: '/', label: 'Accueil', icon: Home },
-    { to: '/premiers-soins', label: 'Premiers soins', icon: Cross },
-    { to: '/maladies', label: 'Orientation', icon: Activity },
-    { to: '/medecins', label: 'Médecins', icon: Stethoscope },
-    { to: '/centres', label: 'Centres', icon: MapPin },
+    { to: '/', label: t('visitor.nav.home'), icon: Home },
+    { to: '/premiers-soins', label: t('visitor.nav.firstAid'), icon: Cross },
+    { to: '/maladies', label: t('visitor.nav.orientation'), icon: Activity },
+    { to: '/medecins', label: t('visitor.nav.doctors'), icon: Stethoscope },
+    { to: '/centres', label: t('visitor.nav.centres'), icon: MapPin },
   ]
 
   const patientLinks: NavLink[] = [
-    { to: '/', label: 'Accueil', icon: Home },
-    { to: '/premiers-soins', label: 'Premiers soins', icon: Cross },
-    { to: '/maladies', label: 'Orientation', icon: Activity },
-    { to: '/medecins', label: 'Médecins', icon: Stethoscope },
-    { to: '/patient/consultations', label: 'Consultations', icon: FileText, hasDropdown: true },
-    { to: '/centres', label: 'Centres', icon: MapPin },
-    { to: '/messages', label: 'Messagerie', icon: MessageCircle, badge: unreadCount },
+    { to: '/', label: t('visitor.nav.home'), icon: Home },
+    { to: '/premiers-soins', label: t('visitor.nav.firstAid'), icon: Cross },
+    { to: '/maladies', label: t('visitor.nav.orientation'), icon: Activity },
+    { to: '/medecins', label: t('visitor.nav.doctors'), icon: Stethoscope },
+    { to: '/patient/consultations', label: t('visitor.nav.consultations'), icon: FileText },
+    { to: '/centres', label: t('visitor.nav.centres'), icon: MapPin },
+    { to: '/messages', label: t('visitor.nav.messaging'), icon: MessageCircle, badge: unreadCount },
   ]
 
   const activeLinks = isAuthenticated && !isAdmin ? patientLinks : publicLinks
 
   /* ─── Mobile bottom tab bar items ─── */
   const publicMobileNav: NavLink[] = [
-    { to: '/', label: 'Accueil', icon: Home },
-    { to: '/premiers-soins', label: 'Premiers soins', icon: Cross },
-    { to: '/maladies', label: 'Orientation', icon: Activity },
-    { to: '/centres', label: 'Centres', icon: MapPin },
-    { to: '/login', label: 'Connexion', icon: UserCircle },
+    { to: '/', label: t('visitor.nav.home'), icon: Home },
+    { to: '/premiers-soins', label: t('visitor.nav.firstAid'), icon: Cross },
+    { to: '/maladies', label: t('visitor.nav.orientation'), icon: Activity },
+    { to: '/centres', label: t('visitor.nav.centres'), icon: MapPin },
+    { to: '/login', label: t('visitor.nav.login'), icon: UserCircle },
   ]
 
   const patientMobileNav: NavLink[] = [
-    { to: '/', label: 'Accueil', icon: Home },
-    { to: '/premiers-soins', label: 'Premiers soins', icon: Cross },
-    { to: '/maladies', label: 'Orientation', icon: Activity },
-    { to: '/medecins', label: 'Médecins', icon: Stethoscope },
-    { to: '/patient/consultations', label: 'Rendez-vous', icon: FileText },
-    { to: '/centres', label: 'Centres', icon: MapPin },
+    { to: '/', label: t('visitor.nav.home'), icon: Home },
+    { to: '/premiers-soins', label: t('visitor.nav.firstAid'), icon: Cross },
+    { to: '/maladies', label: t('visitor.nav.orientation'), icon: Activity },
+    { to: '/medecins', label: t('visitor.nav.doctors'), icon: Stethoscope },
+    { to: '/patient/consultations', label: t('visitor.nav.appointments'), icon: FileText },
+    { to: '/centres', label: t('visitor.nav.centres'), icon: MapPin },
   ]
 
   const mobileNavItems: NavLink[] = isAuthenticated && !isAdmin ? patientMobileNav : publicMobileNav
@@ -87,7 +91,7 @@ export default function Navbar() {
           <Link
             href="/"
             className="flex h-12 w-[132px] shrink-0 items-center justify-center overflow-hidden rounded-xl transition-colors dark:bg-white/90 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.95),0_4px_14px_rgba(0,0,0,0.16)] 2xl:h-[52px] 2xl:w-[148px]"
-            aria-label="MediSecours - Accueil"
+            aria-label={t('visitor.nav.homeAria')}
           >
             <Image
               src="/brand/medisecours-logo.png"
@@ -122,10 +126,6 @@ export default function Navbar() {
                       {l.badge > 99 ? '99+' : l.badge}
                     </span>
                   )}
-                  
-                  {l.hasDropdown && (
-                    <ChevronDown className="w-3.5 h-3.5 ml-0.5 opacity-50" />
-                  )}
 
                   {active && (
                     <span className="absolute bottom-0.5 left-1/2 -translate-x-1/2 w-1.5 h-1.5 bg-indigo-600 dark:bg-indigo-400 rounded-full shadow-[0_0_8px_rgba(79,70,229,0.8)]" />
@@ -143,7 +143,7 @@ export default function Navbar() {
                     : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'
                 }`}
               >
-                <Grid className="w-4 h-4" /> Admin
+                <Grid className="w-4 h-4" /> {t('visitor.nav.admin')}
                 {isActive('/admin') && <span className="absolute bottom-0.5 left-1/2 -translate-x-1/2 w-1.5 h-1.5 bg-indigo-600 rounded-full" />}
               </Link>
             )}
@@ -151,11 +151,12 @@ export default function Navbar() {
 
           {/* Right: Actions */}
           <div className="flex shrink-0 items-center gap-1.5 pr-1">
+            <LanguageSwitcher />
             {!isAuthenticated && (
               <button
                 onClick={toggleDark}
                 className="flex items-center justify-center w-9 h-9 rounded-full border border-white/70 dark:border-white/10 bg-white/45 dark:bg-white/5 text-gray-500 dark:text-gray-300 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_4px_12px_rgba(30,58,95,0.08)] hover:bg-white/70 dark:hover:bg-white/10 hover:text-indigo-600 transition-colors"
-                aria-label="Basculer le mode sombre"
+                aria-label={t('visitor.nav.toggleTheme')}
               >
                 {dark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
               </button>
@@ -175,15 +176,15 @@ export default function Navbar() {
                       {initials || <UserCircle className="w-4 h-4" />}
                     </span>
                   </div>
-                  <span className="hidden 2xl:inline text-[13px] font-semibold">Mon Profil</span>
+                  <span className="hidden 2xl:inline text-[13px] font-semibold">{t('visitor.nav.myProfile')}</span>
                   <ArrowRight className="hidden 2xl:block w-3.5 h-3.5 opacity-70 group-hover:translate-x-0.5 transition-transform" />
                 </Link>
                 
                 <button
                   onClick={() => { logout(); router.push('/') }}
                   className="flex items-center justify-center w-9 h-9 rounded-full border border-white/70 dark:border-white/10 bg-white/45 dark:bg-white/5 text-gray-500 dark:text-gray-300 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_4px_12px_rgba(30,58,95,0.08)] hover:bg-red-50/80 hover:text-red-600 dark:hover:bg-red-500/10 dark:hover:text-red-400 transition-colors"
-                  aria-label="Se déconnecter"
-                  title="Déconnexion"
+                  aria-label={t('visitor.nav.logout')}
+                  title={t('visitor.nav.logoutTitle')}
                 >
                   <LogOut className="w-4 h-4" />
                 </button>
@@ -193,7 +194,7 @@ export default function Navbar() {
                 href="/login"
                 className="group relative flex items-center gap-2 px-5 py-2 border border-white/25 bg-[linear-gradient(135deg,rgba(37,99,235,0.92),rgba(79,70,229,0.84))] backdrop-blur-xl text-white rounded-full shadow-[inset_0_1px_0_rgba(255,255,255,0.35),0_6px_18px_rgba(79,70,229,0.3)] transition-all duration-200 hover:brightness-105 hover:-translate-y-0.5"
               >
-                <span className="text-[13px] font-semibold">Connexion</span>
+                <span className="text-[13px] font-semibold">{t('visitor.nav.login')}</span>
                 <ArrowRight className="w-4 h-4 opacity-70 group-hover:translate-x-0.5 transition-transform" />
               </Link>
             )}
@@ -216,7 +217,7 @@ export default function Navbar() {
           <Link
             href="/"
             className="flex h-11 w-[108px] shrink-0 items-center justify-center overflow-hidden rounded-xl transition-colors dark:bg-white/90 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.95),0_3px_12px_rgba(0,0,0,0.14)] sm:h-12 sm:w-[142px]"
-            aria-label="MediSecours - Accueil"
+            aria-label={t('visitor.nav.homeAria')}
           >
             <Image
               src="/brand/medisecours-logo.png"
@@ -229,11 +230,12 @@ export default function Navbar() {
           </Link>
 
           <div className="flex shrink-0 items-center gap-1 sm:gap-2">
+            <LanguageSwitcher />
             {!isAuthenticated && (
               <button
                 onClick={toggleDark}
                 className="flex h-8 w-8 items-center justify-center rounded-full border border-white/70 bg-white/45 text-gray-500 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)] transition-colors hover:bg-white/70 hover:text-indigo-600 dark:border-white/10 dark:bg-white/5 dark:text-gray-300 dark:hover:bg-white/10 sm:h-9 sm:w-9"
-                aria-label="Basculer le mode sombre"
+                aria-label={t('visitor.nav.toggleTheme')}
               >
                 {dark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
               </button>
@@ -249,7 +251,7 @@ export default function Navbar() {
                         ? 'border-indigo-200 bg-indigo-100/80 text-indigo-600 dark:border-indigo-400/20 dark:bg-indigo-500/20 dark:text-indigo-300'
                         : 'border-white/70 bg-white/45 text-gray-500 hover:bg-white/70 hover:text-indigo-600 dark:border-white/10 dark:bg-white/5 dark:text-gray-300 dark:hover:bg-white/10'
                     }`}
-                    aria-label={unreadCount > 0 ? `Messages, ${unreadCount} non lu${unreadCount > 1 ? 's' : ''}` : 'Messages'}
+                    aria-label={unreadCount > 0 ? t('visitor.nav.unreadMessages', { count: unreadCount }) : t('visitor.nav.messagesAria')}
                   >
                     <MessageCircle className="h-4 w-4" />
                     {unreadCount > 0 && !estDansLaMessagerie && (
@@ -262,7 +264,7 @@ export default function Navbar() {
                 <Link
                   href="/profil"
                   className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-full border border-white/70 bg-white/45 text-gray-500 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)] transition-colors hover:bg-white/70 hover:text-indigo-600 dark:border-white/10 dark:bg-white/5 dark:text-gray-300 dark:hover:bg-white/10 sm:h-9 sm:w-9"
-                  aria-label="Profil"
+                  aria-label={t('visitor.nav.profile')}
                 >
                   {user?.photoProfil ? (
                     <img src={resolveImgPath(user.photoProfil)} alt="" className="w-full h-full object-cover" />
@@ -273,7 +275,7 @@ export default function Navbar() {
                 <button
                   onClick={() => { logout(); router.push('/') }}
                   className="flex h-8 w-8 items-center justify-center rounded-full border border-white/70 bg-white/45 text-gray-500 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)] transition-colors hover:bg-red-50/80 hover:text-red-500 dark:border-white/10 dark:bg-white/5 dark:text-gray-300 dark:hover:bg-red-500/10 sm:h-9 sm:w-9"
-                  aria-label="Se déconnecter"
+                  aria-label={t('visitor.nav.logout')}
                 >
                   <LogOut className="w-4 h-4" />
                 </button>

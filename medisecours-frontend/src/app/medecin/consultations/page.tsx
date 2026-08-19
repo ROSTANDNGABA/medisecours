@@ -3,6 +3,7 @@
 import { useMemo, useState, useCallback } from 'react'
 import Link from 'next/link'
 import { AnimatePresence, motion } from 'framer-motion'
+import { useTranslation } from 'react-i18next'
 import {
   ClipboardList, Clock, CheckCircle, MessageSquare, FileText, AlertTriangle,
   Activity, Phone, Mail, User, Trash2,
@@ -24,7 +25,7 @@ import {
   daysSince,
 } from '../../../lib/consultations'
 import { CONSULTATIONS_KEY, CONSULTATIONS_PENDING_KEY } from '../../../lib/keys'
-import PrescriptionModal from '../../../components/admin/PrescriptionModal'
+import PrescriptionFormModal from '../../../components/admin/PrescriptionFormModal'
 import ConsultationDetailModal from '../../../components/consultations/ConsultationDetailModal'
 import ConfirmModal from '../../../components/ui/ConfirmModal'
 import type { StatutConsultation, PrioriteConsultation } from '../../../types/api'
@@ -36,16 +37,24 @@ const STATUT_PILLS = STATUT_CONSULTATION_PILL
 
 type TabKey = 'TOUTES' | 'OUVERTE' | 'EN_COURS' | 'TERMINEE'
 
-const TABS: { key: TabKey; label: string }[] = [
-  { key: 'TOUTES', label: 'Toutes' },
-  { key: 'OUVERTE', label: 'En attente' },
-  { key: 'EN_COURS', label: 'En cours' },
-  { key: 'TERMINEE', label: 'Terminées' },
+const TABS: { key: TabKey; labelKey: string }[] = [
+  { key: 'TOUTES', labelKey: 'consultations.tab_all' },
+  { key: 'OUVERTE', labelKey: 'consultations.tab_pending' },
+  { key: 'EN_COURS', labelKey: 'consultations.tab_inProgress' },
+  { key: 'TERMINEE', labelKey: 'consultations.tab_finished' },
 ]
+
+const STATUT_PILL_LABELS: Record<string, string> = {
+  OUVERTE: 'consultations.pending',
+  EN_COURS: 'consultations.inProgress',
+  TERMINEE: 'consultations.finished',
+  ANNULEE: 'consultations.cancelled',
+}
 
 export default function MedecinConsultationsPage() {
   const { user, token } = useAuth()
   const toast = useToast()
+  const { t, i18n } = useTranslation()
   const [tab, setTab] = useState<TabKey>('TOUTES')
   const [prescriptionFor, setPrescriptionFor] = useState<any>(null)
   const [detailFor, setDetailFor] = useState<number | null>(null)
@@ -64,10 +73,10 @@ export default function MedecinConsultationsPage() {
       mutate((current: any) => {
         const list = Array.isArray(current) ? current : []
         if (list.some((c: any) => c.id === payload.id)) return list
-        toast.info('Nouvelle demande de consultation reçue.')
+        toast.info(t('consultations.newRequest'))
         return [{ ...payload }, ...list]
       }, { revalidate: false })
-    }, [mutate, toast]),
+    }, [mutate, toast, t]),
     onConsultationAccepted: useCallback((payload: any) => {
       mutate((current: any) => {
         const list = Array.isArray(current) ? current : []
@@ -106,12 +115,12 @@ export default function MedecinConsultationsPage() {
         { statut },
         { headers: { 'Content-Type': 'application/merge-patch+json' } }
       )
-      const msg = statut === 'EN_COURS' ? 'Patient pris en charge avec succès.' : 'Consultation clôturée.'
+      const msg = statut === 'EN_COURS' ? t('consultations.updated') : t('consultations.closed')
       toast.success(msg)
       mutate()
       globalMutate(CONSULTATIONS_PENDING_KEY)
     } catch {
-      toast.error('Échec de la mise à jour.')
+      toast.error(t('consultations.updateError'))
     }
   }
 
@@ -122,67 +131,75 @@ export default function MedecinConsultationsPage() {
         const list = Array.isArray(current) ? current : []
         return list.filter((c: any) => c.id !== id)
       }, { revalidate: false })
-      toast.success('Consultation supprimée.')
+      toast.success(t('consultations.deleted'))
       setDeleteTarget(null)
       globalMutate(CONSULTATIONS_PENDING_KEY)
     } catch {
-      toast.error('Échec de la suppression.')
+      toast.error(t('consultations.deleteError'))
     }
   }
 
 
 
   return (
-    <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8">
+    <div className="medecin-consultations-page max-w-7xl mx-auto px-4 sm:px-6 py-6 lg:py-8">
       {/* En-tête */}
-      <div className="mb-8">
-        <h1 className="font-display text-2xl font-bold text-[#0F2C52]">Consultations</h1>
-        <p className="text-sm text-[#6B7280] mt-1">
+      <div className="medecin-consultations-header mb-8">
+        <p className="medecin-consultations-eyebrow">{t('consultations.eyebrow')}</p>
+        <h1 className="font-display text-2xl font-bold">{t('consultations.title')}</h1>
+        <p className="mt-1">
           {counts.OUVERTE > 0
-            ? `${counts.OUVERTE} demande${counts.OUVERTE > 1 ? 's' : ''} en attente`
-            : 'Aucune demande en attente'}
+            ? t('consultations.pendingCount', { count: counts.OUVERTE })
+            : t('consultations.noPendingCount')}
         </p>
+        <div className="medecin-consultations-live">
+          <span className="medecin-consultations-live-dot" />
+          {t('consultations.liveSync')}
+        </div>
       </div>
 
       {/* Cartes statistiques */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-8">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
         {[
-          { label: 'Total', value: counts.TOUTES, icon: ClipboardList, color: 'bg-blue-500' },
-          { label: 'En attente', value: counts.OUVERTE, icon: Clock, color: 'bg-amber-500' },
-          { label: 'En cours', value: counts.EN_COURS, icon: Activity, color: 'bg-blue-500' },
-          { label: 'Terminées', value: counts.TERMINEE, icon: CheckCircle, color: 'bg-green-500' },
+          { label: t('consultations.total'), value: counts.TOUTES, icon: ClipboardList },
+          { label: t('consultations.pending'), value: counts.OUVERTE, icon: Clock },
+          { label: t('consultations.inProgress'), value: counts.EN_COURS, icon: Activity },
+          { label: t('consultations.finished'), value: counts.TERMINEE, icon: CheckCircle },
         ].map((stat) => (
           <motion.div
             key={stat.label}
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
-            className="rounded-2xl bg-white border border-gray-100 p-4 flex items-center gap-3"
+            className="medecin-consultation-stat"
           >
-            <div className={`w-10 h-10 rounded-xl ${stat.color} flex items-center justify-center shrink-0`}>
-              <stat.icon className="w-5 h-5 text-white" />
+            <div className="medecin-consultation-stat-top">
+              <span className="medecin-consultation-stat-label">{stat.label}</span>
+              <div className="medecin-consultation-stat-icon-wrapper">
+                <stat.icon className="w-4 h-4" />
+              </div>
             </div>
-            <div>
-              <p className="text-2xl font-bold text-[#0F2C52]">{stat.value}</p>
-              <p className="text-xs text-[#6B7280]">{stat.label}</p>
+            <div className="medecin-consultation-stat-value">{stat.value}</div>
+            <div className="medecin-consultation-stat-trend neutral">
+              <span>{t('consultations.updatedNow')}</span>
             </div>
           </motion.div>
         ))}
       </div>
 
       {/* Filtres */}
-      <div className="flex gap-1.5 mb-6 overflow-x-auto pb-1">
-        {TABS.map((t) => (
+      <div className="medecin-consultation-tabs overflow-x-auto">
+        {TABS.map((tItem) => (
           <button
-            key={t.key}
-            onClick={() => setTab(t.key)}
-            className={`px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition ${
-              tab === t.key
-                ? 'bg-[#3B6EF8] text-white shadow-md shadow-blue-500/25'
-                : 'bg-white text-[#6B7280] border border-gray-200 hover:bg-gray-50'
+            key={tItem.key}
+            onClick={() => setTab(tItem.key)}
+            className={`whitespace-nowrap transition ${
+              tab === tItem.key
+                ? 'medecin-consultation-tab-active'
+                : 'medecin-consultation-tab'
             }`}
           >
-            {t.label}
-            <span className="ml-1.5 opacity-70">({counts[t.key]})</span>
+            {t(tItem.labelKey)}
+            <span className="medecin-consultation-tab-count">{counts[tItem.key]}</span>
           </button>
         ))}
       </div>
@@ -191,22 +208,29 @@ export default function MedecinConsultationsPage() {
       {filtered.length === 0 ? (
         <EmptyState
           icon={ClipboardList}
-          title={tab === 'OUVERTE' ? 'Aucune demande en attente' : 'Aucune consultation'}
-          description={tab === 'OUVERTE' ? 'Les nouvelles demandes apparaîtront ici en temps réel.' : 'Aucune consultation ne correspond à ce filtre.'}
+          title={tab === 'OUVERTE' ? t('consultations.noPendingTitle') : t('consultations.noConsultationTitle')}
+          description={tab === 'OUVERTE' ? t('consultations.noPendingDesc') : t('consultations.noConsultationDesc')}
           action={tab !== 'TOUTES' ? (
-            <button onClick={() => setTab('TOUTES')} className="px-4 py-2 rounded-xl text-sm font-semibold bg-[#3B6EF8] text-white">
-              Voir toutes les consultations
+            <button onClick={() => setTab('TOUTES')} className="medecin-consultation-btn-accent">
+              {t('consultations.seeAll')}
             </button>
           ) : undefined}
         />
       ) : (
-        <div className="space-y-3">
+        <div className="medecin-consultations-grid">
           <AnimatePresence mode="popLayout">
             {filtered.map((c: any) => {
               const statut = c.statut as StatutConsultation
               const badgeClass = STATUT_STYLES[statut] || STATUT_STYLES.OUVERTE
               const pill = STATUT_PILLS[statut] || statut
-              const prioriteClass = PRIORITE_BADGE[c.priorite as PrioriteConsultation]
+              const statutLabel = STATUT_PILL_LABELS[statut] || pill
+
+              let priorityCardClass = ''
+              if (c.priorite === 'CRITIQUE') priorityCardClass = 'medecin-consultation-card-urgent'
+              else if (c.priorite === 'URGENTE') priorityCardClass = 'medecin-consultation-card-priority'
+
+              const locale = i18n.language === 'en' ? 'en-GB' : 'fr-FR'
+
               return (
                 <motion.div
                   key={c.id}
@@ -214,121 +238,130 @@ export default function MedecinConsultationsPage() {
                   initial={{ opacity: 0, y: 8 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, x: -20 }}
-                  className="rounded-2xl bg-white border border-gray-100 p-5 hover:border-gray-200 transition-colors"
+                  className={`medecin-consultation-card ${priorityCardClass}`}
                 >
-                  <div className="flex flex-col lg:flex-row lg:items-center gap-4">
-                    {/* Infos patient */}
-                    <div className="flex items-center gap-4 lg:w-80 shrink-0">
-                      <Avatar
-                        name={`${c.patient?.prenom || ''} ${c.patient?.nom || ''}`}
-                        size="lg"
-                        src={imgUrl(c.patient?.photoProfil)}
-                      />
-                      <div className="min-w-0 flex-1">
-                        <p className="text-base font-bold text-[#0F2C52] truncate">
-                          {c.patient?.prenom} {c.patient?.nom}
-                        </p>
-                        {c.patient?.telephone && (
-                          <p className="text-sm text-[#6B7280] flex items-center gap-1.5 mt-0.5">
-                            <Phone className="w-3.5 h-3.5 shrink-0" />
-                            {c.patient.telephone}
-                          </p>
-                        )}
-                      </div>
-                    </div>
+                  {/* Card Header */}
+                  <div className="medecin-consultation-card-header">
+                    <span className="medecin-consultation-card-id">#{c.id.toString().padStart(5, '0')}</span>
+                    <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${badgeClass}`}>
+                      {statutLabel}
+                    </span>
+                  </div>
 
-                    {/* Motif + statut */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-start gap-2">
-                        <p className="text-sm font-medium text-[#374151] line-clamp-2">
-                          {c.motif || 'Motif non précisé'}
-                        </p>
-                        {prioriteClass && (
-                          <span className={`shrink-0 px-2 py-0.5 rounded-full text-xs font-semibold ${prioriteClass}`}>
-                            {c.priorite === 'URGENTE' ? 'Urgent' : 'Critique'}
-                          </span>
-                        )}
+                  {/* Infos patient */}
+                  <div className="medecin-consultation-patient">
+                    <Avatar
+                      name={`${c.patient?.prenom || ''} ${c.patient?.nom || ''}`}
+                      size="md"
+                      src={imgUrl(c.patient?.photoProfil)}
+                    />
+                    <div className="medecin-consultation-patient-info">
+                      <div className="medecin-consultation-patient-name">
+                        {c.patient?.prenom} {c.patient?.nom}
                       </div>
-                      <div className="flex items-center gap-2 mt-2 flex-wrap">
-                        <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${badgeClass}`}>
-                          {pill}
-                        </span>
-                        <span className="text-xs text-[#9CA3AF]">
-                          {new Date(c.createdAt).toLocaleDateString('fr-FR', {
-                            day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
-                          })}
-                        </span>
-                        <span className="text-xs text-[#9CA3AF]">
-                          · Ouverte depuis {daysSince(c.createdAt)}j
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Actions */}
-                    <div className="flex items-center gap-2 shrink-0">
-                      <button
-                        onClick={() => setDetailFor(c.id)}
-                        className="p-2.5 rounded-xl border border-gray-200 text-[#6B7280] hover:bg-gray-50 transition"
-                        title="Voir les détails"
-                      >
-                        <Activity className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => setDeleteTarget(c.id)}
-                        className="p-2.5 rounded-xl border border-red-200 text-red-400 hover:bg-red-50 transition"
-                        title="Supprimer"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                      {c.statut === 'OUVERTE' && (
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => updateStatut(c.id, 'EN_COURS')}
-                            className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-semibold bg-[#3B6EF8] hover:bg-[#2D5CD8] text-white transition active:scale-[0.97]"
-                          >
-                            <CheckCircle className="w-3.5 h-3.5" />
-                            Prendre en charge
-                          </button>
-                          <Link
-                            href={`/medecin/messages?patient=${c.patient?.id}`}
-                            className="p-2.5 rounded-xl border border-gray-200 text-[#6B7280] hover:bg-gray-50 transition"
-                            title="Contacter le patient"
-                          >
-                            <MessageSquare className="w-4 h-4" />
-                          </Link>
+                      {c.patient?.telephone && (
+                        <div className="medecin-consultation-patient-phone">
+                          <Phone className="w-3.5 h-3.5" />
+                          {c.patient.telephone}
                         </div>
                       )}
-                      {c.statut === 'EN_COURS' && (
-                        <div className="flex items-center gap-2">
-                          <Link
-                            href={`/medecin/messages?patient=${c.patient?.id}`}
-                            className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-semibold bg-[#3B6EF8] hover:bg-[#2D5CD8] text-white transition active:scale-[0.97]"
-                          >
-                            <MessageSquare className="w-3.5 h-3.5" />
-                            Discuter
-                          </Link>
-                          <button
-                            onClick={() => setPrescriptionFor(c)}
-                            className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-semibold bg-emerald-500 hover:bg-emerald-600 text-white transition active:scale-[0.97]"
-                          >
-                            <FileText className="w-3.5 h-3.5" />
-                            Prescrire
-                          </button>
-                          <button
-                            onClick={() => updateStatut(c.id, 'TERMINEE')}
-                            className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-semibold bg-red-500 hover:bg-red-600 text-white transition active:scale-[0.97]"
-                          >
-                            <CheckCircle className="w-3.5 h-3.5" />
-                            Terminer
-                          </button>
-                        </div>
-                      )}
-                      {c.statut === 'TERMINEE' && (
-                        <span className="px-4 py-2.5 rounded-xl text-xs font-semibold bg-gray-50 text-[#6B7280] border border-gray-200">
-                          Terminée le {new Date(c.closedAt || c.createdAt).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}
-                        </span>
-                      )}
                     </div>
+                  </div>
+
+                  {/* Details */}
+                  <div className="medecin-consultation-details">
+                    <div className="medecin-consultation-detail-item" style={{ gridColumn: 'span 2' }}>
+                      <span className="medecin-consultation-detail-label">{t('consultations.reason')}</span>
+                      <span className="medecin-consultation-detail-value truncate">
+                        {c.motif || t('common.none')}
+                      </span>
+                    </div>
+                    <div className="medecin-consultation-detail-item">
+                      <span className="medecin-consultation-detail-label">{t('consultations.date')}</span>
+                      <span className="medecin-consultation-detail-value">
+                        <Clock className="w-3.5 h-3.5 text-gray-400" />
+                        {new Date(c.createdAt).toLocaleDateString(locale, {
+                          day: 'numeric', month: 'short'
+                        })}
+                      </span>
+                    </div>
+                    <div className="medecin-consultation-detail-item">
+                      <span className="medecin-consultation-detail-label">{t('consultations.priority')}</span>
+                      <span className="medecin-consultation-detail-value">
+                        {c.priorite === 'CRITIQUE' ? (
+                          <span className="text-red-500 font-bold flex items-center gap-1"><AlertTriangle className="w-3 h-3" /> {t('consultations.priorityCritical')}</span>
+                        ) : c.priorite === 'URGENTE' ? (
+                          <span className="text-amber-500 font-bold flex items-center gap-1"><AlertTriangle className="w-3 h-3" /> {t('consultations.priorityUrgent')}</span>
+                        ) : (
+                          <span className="text-emerald-500 font-medium">{t('consultations.priorityNormal')}</span>
+                        )}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Actions */}
+                  <div className="medecin-consultation-actions">
+                    <button
+                      onClick={() => setDeleteTarget(c.id)}
+                      className="medecin-consultation-btn-danger"
+                      title={t('common.delete')}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+
+                    <button
+                      onClick={() => setDetailFor(c.id)}
+                      className="medecin-consultation-btn-outline"
+                    >
+                      {t('common.details')}
+                    </button>
+
+                    {c.statut === 'OUVERTE' && (
+                      <>
+                        <Link
+                          href={`/medecin/messages?patient=${c.patient?.id}`}
+                          className="medecin-consultation-btn-outline"
+                          title={t('consultations.message')}
+                        >
+                          <MessageSquare className="w-4 h-4" />
+                        </Link>
+                        <button
+                          onClick={() => updateStatut(c.id, 'EN_COURS')}
+                          className="medecin-consultation-btn-accent"
+                        >
+                          {t('consultations.takeCharge')}
+                        </button>
+                      </>
+                    )}
+                    {c.statut === 'EN_COURS' && (
+                      <>
+                        <Link
+                          href={`/medecin/messages?patient=${c.patient?.id}`}
+                          className="medecin-consultation-btn-outline"
+                          title={t('consultations.discuss')}
+                        >
+                          <MessageSquare className="w-4 h-4" />
+                        </Link>
+                        <button
+                          onClick={() => setPrescriptionFor(c)}
+                          className="medecin-consultation-btn-outline"
+                          title={t('consultations.prescribe')}
+                        >
+                          <FileText className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => updateStatut(c.id, 'TERMINEE')}
+                          className="medecin-consultation-btn-success"
+                        >
+                          <CheckCircle className="w-4 h-4" /> {t('consultations.finish')}
+                        </button>
+                      </>
+                    )}
+                    {c.statut === 'TERMINEE' && (
+                      <span className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-gray-50 text-gray-500 border border-gray-200 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400">
+                        {t('consultations.finishedOn', { date: new Date(c.closedAt || c.createdAt).toLocaleDateString(locale, { day: 'numeric', month: 'short' }) })}
+                      </span>
+                    )}
                   </div>
                 </motion.div>
               )
@@ -338,7 +371,7 @@ export default function MedecinConsultationsPage() {
       )}
 
       {prescriptionFor && (
-        <PrescriptionModal
+        <PrescriptionFormModal
           consultation={prescriptionFor}
           onClose={() => setPrescriptionFor(null)}
           onSaved={() => { setPrescriptionFor(null); mutate() }}
@@ -354,11 +387,11 @@ export default function MedecinConsultationsPage() {
         isOpen={deleteTarget !== null}
         onClose={() => setDeleteTarget(null)}
         onConfirm={() => handleDelete(deleteTarget!)}
-        title="Supprimer la consultation"
-        message="Vous êtes sur le point de supprimer définitivement cette consultation. Toutes les données associées (messages, prescriptions) seront également supprimées. Cette action est irréversible."
+        title={t('consultations.deleteTitle')}
+        message={t('consultations.deleteMessage')}
         type="danger"
-        confirmText="Oui, supprimer"
-        cancelText="Annuler"
+        confirmText={t('consultations.deleteConfirm')}
+        cancelText={t('common.cancel')}
       />
     </div>
   )

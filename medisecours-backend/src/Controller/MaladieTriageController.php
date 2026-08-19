@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Controller;
 
+use App\Service\ContentLocalizer;
 use App\Service\SymptomTriageService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -16,6 +17,7 @@ final class MaladieTriageController extends AbstractController
 {
     public function __construct(
         private readonly SymptomTriageService $triageService,
+        private readonly ContentLocalizer $localizer,
         #[Autowire(service: 'limiter.api_public')] private readonly RateLimiterFactory $publicApiLimiter,
     ) {
     }
@@ -26,19 +28,26 @@ final class MaladieTriageController extends AbstractController
     {
         $payload = json_decode($request->getContent(), true);
         if (!is_array($payload)) {
-            return $this->json(['message' => 'Payload JSON invalide.'], 400);
+            $msg = $this->localizer->isEnglish() ? 'Invalid JSON payload.' : 'Payload JSON invalide.';
+            return $this->json(['message' => $msg], 400);
         }
 
         $limiter = $this->publicApiLimiter->create((string) $request->getClientIp());
         if (!$limiter->consume()->isAccepted()) {
-            return $this->json(['message' => 'Trop de demandes. Réessayez dans quelques instants.'], 429);
+            $msg = $this->localizer->isEnglish()
+                ? 'Too many requests. Please try again in a few moments.'
+                : 'Trop de demandes. Réessayez dans quelques instants.';
+            return $this->json(['message' => $msg], 429);
         }
 
         $symptoms = $payload['symptomes'] ?? [];
         $freeText = (string) ($payload['texteLibre'] ?? $payload['query'] ?? '');
         $contexts = $payload['contextes'] ?? [];
         if (!is_array($symptoms) || count($symptoms) > 12 || !is_array($contexts) || count($contexts) > 6 || mb_strlen($freeText) > 500) {
-            return $this->json(['message' => 'Les informations saisies dépassent les limites autorisées.'], 422);
+            $msg = $this->localizer->isEnglish()
+                ? 'The entered information exceeds the allowed limits.'
+                : 'Les informations saisies dépassent les limites autorisées.';
+            return $this->json(['message' => $msg], 422);
         }
 
         return $this->json([

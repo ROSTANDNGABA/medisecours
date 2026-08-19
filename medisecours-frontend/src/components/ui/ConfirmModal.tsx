@@ -2,6 +2,7 @@
 
 import { type ReactNode } from 'react'
 import { AlertTriangle, CheckCircle2, Trash2, ShieldX, ShieldCheck } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import Modal from './Modal'
 import Button from './Button'
 
@@ -40,8 +41,8 @@ export default function ConfirmModal({
   title,
   message,
   type = 'warning',
-  confirmText = 'Confirmer',
-  cancelText = 'Annuler',
+  confirmText,
+  cancelText,
   isLoading = false,
 }: {
   isOpen: boolean
@@ -54,6 +55,7 @@ export default function ConfirmModal({
   cancelText?: string
   isLoading?: boolean
 }) {
+  const { t } = useTranslation()
   const config = TYPES[type] || TYPES.warning
   const Icon = config.icon
 
@@ -70,7 +72,7 @@ export default function ConfirmModal({
       footer={
         <div className="flex justify-end gap-3">
           <Button variant="secondary" size="sm" onClick={onClose} disabled={isLoading}>
-            {cancelText}
+            {cancelText || t('visitor.components.confirmModal.cancel')}
           </Button>
           <Button
             variant={type === 'danger' || type === 'invalidate' ? 'danger' : 'primary'}
@@ -78,7 +80,7 @@ export default function ConfirmModal({
             onClick={handleConfirm}
             isLoading={isLoading}
           >
-            {confirmText}
+            {confirmText || t('visitor.components.confirmModal.confirm')}
           </Button>
         </div>
       }

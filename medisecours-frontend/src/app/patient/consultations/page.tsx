@@ -1,11 +1,12 @@
 'use client'
 
 import { useMemo, useState, useCallback, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   ClipboardList, AlertTriangle, CheckCircle, Clock, MessageSquare, X, Plus,
-  Activity, Inbox, Search, Trash2,
+  Activity, Inbox, Search, Trash2, Pill,
 } from 'lucide-react'
 import useSWR from 'swr'
 import api from '../../../api/axios'
@@ -16,13 +17,16 @@ import LoadingSpinner from '../../../components/ui/LoadingSpinner'
 import EmptyState from '../../../components/ui/EmptyState'
 import { useToast } from '../../../components/ui/Toast'
 import ConsultationDetailModal from '../../../components/consultations/ConsultationDetailModal'
+import PrescriptionsModal from '../../../components/consultations/PrescriptionsModal'
+import PrescriptionDetailModal from '../../../components/admin/PrescriptionDetailModal'
 import ConfirmModal from '../../../components/ui/ConfirmModal'
+import type { Prescription } from '../../../types/api'
 
 const STATUT_STYLES = {
-  OUVERTE:  { badge: 'bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 ring-1 ring-amber-200 dark:ring-amber-500/30', icon: 'bg-amber-100 dark:bg-amber-900/50 text-amber-600 dark:text-amber-400', label: 'En attente' },
-  EN_COURS: { badge: 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 ring-1 ring-blue-200 dark:ring-blue-500/30', icon: 'bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-400', label: 'En cours' },
-  TERMINEE: { badge: 'bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-400 ring-1 ring-green-200 dark:ring-green-500/30', icon: 'bg-green-100 dark:bg-green-900/50 text-green-600 dark:text-green-400', label: 'Terminée' },
-  ANNULEE:  { badge: 'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 ring-1 ring-gray-200 dark:ring-gray-700', icon: 'bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-500', label: 'Annulée' },
+  OUVERTE:  { badge: 'bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 ring-1 ring-amber-200 dark:ring-amber-500/30', icon: 'bg-amber-100 dark:bg-amber-900/50 text-amber-600 dark:text-amber-400', labelKey: 'consultations.pending' },
+  EN_COURS: { badge: 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 ring-1 ring-blue-200 dark:ring-blue-500/30', icon: 'bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-400', labelKey: 'consultations.inProgress' },
+  TERMINEE: { badge: 'bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-400 ring-1 ring-green-200 dark:ring-green-500/30', icon: 'bg-green-100 dark:bg-green-900/50 text-green-600 dark:text-green-400', labelKey: 'consultations.finished' },
+  ANNULEE:  { badge: 'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 ring-1 ring-gray-200 dark:ring-gray-700', icon: 'bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-500', labelKey: 'consultations.cancelled' },
 }
 
 const STATUT_ICON = {
@@ -30,24 +34,26 @@ const STATUT_ICON = {
 }
 
 const PRIORITE_CONFIG = {
-  NORMALE:  { label: 'Normal',  class: 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 ring-gray-400 dark:ring-gray-500' },
-  URGENTE:  { label: 'Urgent',  class: 'bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-900/50 ring-amber-400 dark:ring-amber-500' },
-  CRITIQUE: { label: 'Critique', class: 'bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/50 ring-red-400 dark:ring-red-500' },
+  NORMALE:  { labelKey: 'consultations.priorityNormal',  class: 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 ring-gray-400 dark:ring-gray-500' },
+  URGENTE:  { labelKey: 'consultations.priorityUrgent',  class: 'bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-900/50 ring-amber-400 dark:ring-amber-500' },
+  CRITIQUE: { labelKey: 'consultations.priorityCritical', class: 'bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/50 ring-red-400 dark:ring-red-500' },
 }
 
 type FilterTab = 'TOUTES' | 'OUVERTE' | 'EN_COURS' | 'TERMINEE'
 
-const FILTER_TABS: { key: FilterTab; label: string }[] = [
-  { key: 'TOUTES', label: 'Toutes' },
-  { key: 'OUVERTE', label: 'En attente' },
-  { key: 'EN_COURS', label: 'En cours' },
-  { key: 'TERMINEE', label: 'Terminées' },
+const FILTER_TABS: { key: FilterTab; labelKey: string }[] = [
+  { key: 'TOUTES', labelKey: 'consultations.tab_all' },
+  { key: 'OUVERTE', labelKey: 'consultations.tab_pending' },
+  { key: 'EN_COURS', labelKey: 'consultations.tab_inProgress' },
+  { key: 'TERMINEE', labelKey: 'consultations.tab_finished' },
 ]
 
 export default function PatientConsultationsPage() {
   const { user, token } = useAuth()
   const router = useRouter()
   const toast = useToast()
+  const { t, i18n } = useTranslation()
+  const locale = i18n.language === 'en' ? 'en-GB' : 'fr-FR'
   const [showForm, setShowForm] = useState(false)
   const [detailFor, setDetailFor] = useState<number | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<number | null>(null)
@@ -55,6 +61,8 @@ export default function PatientConsultationsPage() {
   const [priorite, setPriorite] = useState('NORMALE')
   const [submitting, setSubmitting] = useState(false)
   const [filter, setFilter] = useState<FilterTab>('TOUTES')
+  const [showPrescriptions, setShowPrescriptions] = useState(false)
+  const [selectedPrescription, setSelectedPrescription] = useState<Prescription | null>(null)
 
   useEffect(() => {
     if (new URLSearchParams(window.location.search).get('new') !== '1') return
@@ -98,16 +106,16 @@ export default function PatientConsultationsPage() {
       }, { revalidate: false })
       const medecin = payload.medecin
       if (medecin) {
-        toast.success(`Dr ${medecin.prenom} ${medecin.nom} prend votre consultation en charge.`)
+        toast.success(t('patient.consultations.acceptedToast', { medecin: `${medecin.prenom} ${medecin.nom}` }))
       }
-    }, [mutate, toast]),
+    }, [mutate, toast, t]),
     onConsultationClosed: useCallback((payload) => {
       mutate((current) => {
         const list = Array.isArray(current) ? current : []
         return list.map((c) => c.id === payload.id ? { ...c, statut: 'TERMINEE' } : c)
       }, { revalidate: false })
-      toast.success('Votre consultation est terminée. Merci de votre confiance.')
-    }, [mutate, toast]),
+      toast.success(t('patient.consultations.closedToast'))
+    }, [mutate, toast, t]),
   })
 
   const createConsultation = async (e: React.FormEvent) => {
@@ -120,9 +128,9 @@ export default function PatientConsultationsPage() {
       setMotif('')
       setPriorite('NORMALE')
       mutate()
-      toast.success('Votre demande a été envoyée. Un médecin vous prendra en charge.')
+      toast.success(t('patient.consultations.sentToast'))
     } catch {
-      toast.error("Échec de l'envoi. Veuillez réessayer.")
+      toast.error(t('patient.consultations.sendError'))
     } finally {
       setSubmitting(false)
     }
@@ -135,9 +143,9 @@ export default function PatientConsultationsPage() {
         const list = Array.isArray(current) ? current : []
         return list.filter((c: any) => c.id !== id)
       }, { revalidate: false })
-      toast.success('Consultation supprimée.')
+      toast.success(t('consultations.deleted'))
     } catch {
-      toast.error('Échec de la suppression.')
+      toast.error(t('consultations.deleteError'))
     }
   }
 
@@ -146,7 +154,7 @@ export default function PatientConsultationsPage() {
     router.push(`/messages?consultation=${consultation.id}`)
   }
 
-  if (!user) return <LoadingSpinner label="Chargement..." />
+  if (!user) return <LoadingSpinner label={t('common.loading')} />
 
   return (
     <div className="min-h-screen bg-sable dark:bg-primary-900">
@@ -155,31 +163,40 @@ export default function PatientConsultationsPage() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
           <div>
             <h1 className="font-display text-2xl sm:text-3xl font-bold text-primary-900 dark:text-sable">
-              Mes consultations
+              {t('patient.consultations.title')}
             </h1>
             <p className="text-sm text-primary-300 mt-1">
-              Consultez l&apos;historique de vos demandes et suivez leur évolution
+              {t('patient.consultations.subtitle')}
             </p>
           </div>
-          <button
-            onClick={() => setShowForm(true)}
-            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold bg-mint-500 hover:bg-mint-700 text-white shadow-lg shadow-mint-500/25 transition-all active:scale-[0.97]"
-          >
-            <Plus className="w-4 h-4" />
-            Nouvelle consultation
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowPrescriptions(true)}
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold border border-primary-100 dark:border-white/10 text-primary-700 dark:text-sable hover:bg-white/60 dark:hover:bg-primary-700 transition-all active:scale-[0.97]"
+            >
+              <Pill className="w-4 h-4" />
+              {t('visitor.nav.prescriptions')}
+            </button>
+            <button
+              onClick={() => setShowForm(true)}
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold bg-mint-500 hover:bg-mint-700 text-white shadow-lg shadow-mint-500/25 transition-all active:scale-[0.97]"
+            >
+              <Plus className="w-4 h-4" />
+              {t('patient.consultations.new')}
+            </button>
+          </div>
         </div>
 
         {/* Cartes statistiques */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-8">
           {[
-            { label: 'Total', value: stats.total, icon: ClipboardList, color: 'bg-primary-500' },
-            { label: 'En attente', value: stats.enAttente, icon: Clock, color: 'bg-amber-500' },
-            { label: 'En cours', value: stats.enCours, icon: Activity, color: 'bg-blue-500' },
-            { label: 'Terminées', value: stats.terminees, icon: CheckCircle, color: 'bg-green-500' },
+            { labelKey: 'consultations.total', value: stats.total, icon: ClipboardList, color: 'bg-primary-500' },
+            { labelKey: 'consultations.pending', value: stats.enAttente, icon: Clock, color: 'bg-amber-500' },
+            { labelKey: 'consultations.inProgress', value: stats.enCours, icon: Activity, color: 'bg-blue-500' },
+            { labelKey: 'consultations.finished', value: stats.terminees, icon: CheckCircle, color: 'bg-green-500' },
           ].map((stat) => (
             <motion.div
-              key={stat.label}
+              key={stat.labelKey}
               initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
               className="rounded-2xl bg-white dark:bg-primary-800 border border-primary-100 dark:border-white/5 p-4 flex items-center gap-3"
@@ -189,7 +206,7 @@ export default function PatientConsultationsPage() {
               </div>
               <div>
                 <p className="text-2xl font-bold text-primary-900 dark:text-sable">{stat.value}</p>
-                <p className="text-xs text-primary-300">{stat.label}</p>
+                <p className="text-xs text-primary-300">{t(stat.labelKey)}</p>
               </div>
             </motion.div>
           ))}
@@ -207,7 +224,7 @@ export default function PatientConsultationsPage() {
                   : 'bg-white dark:bg-primary-800 text-primary-300 dark:text-sable/70 border border-primary-100 dark:border-white/10 hover:bg-primary-50 dark:hover:bg-primary-700'
               }`}
             >
-              {tab.label}
+              {t(tab.labelKey)}
               {tab.key !== 'TOUTES' && (
                 <span className="ml-1.5 opacity-70">
                   ({stats[tab.key === 'OUVERTE' ? 'enAttente' : tab.key === 'EN_COURS' ? 'enCours' : 'terminees']})
@@ -228,18 +245,18 @@ export default function PatientConsultationsPage() {
               className="rounded-2xl bg-white dark:bg-primary-800 border border-primary-100 dark:border-white/5 p-5 sm:p-6 mb-8 space-y-5"
             >
               <div>
-                <h3 className="font-semibold text-primary-900 dark:text-sable mb-1">Nouvelle demande de consultation</h3>
-                <p className="text-sm text-primary-300">Un médecin vous répondra dans les plus brefs délais</p>
+                <h3 className="font-semibold text-primary-900 dark:text-sable mb-1">{t('patient.consultations.formTitle')}</h3>
+                <p className="text-sm text-primary-300">{t('patient.consultations.formSubtitle')}</p>
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-primary-700 dark:text-sable/80 mb-1.5">
-                  Décrivez vos symptômes
+                  {t('patient.consultations.symptomsLabel')}
                 </label>
                 <textarea
                   value={motif}
                   onChange={(e) => setMotif(e.target.value)}
-                  placeholder="Ex : Forte fièvre depuis 3 jours, maux de tête intenses..."
+                  placeholder={t('patient.consultations.symptomsPlaceholder')}
                   rows={4}
                   className="w-full rounded-xl border border-primary-100 dark:border-white/10 bg-white dark:bg-primary-900 px-4 py-3 text-sm text-primary-900 dark:text-sable placeholder:text-primary-300 resize-none focus:outline-none focus:ring-2 focus:ring-mint-500/30"
                   required
@@ -248,7 +265,7 @@ export default function PatientConsultationsPage() {
 
               <div>
                 <label className="block text-sm font-medium text-primary-700 dark:text-sable/80 mb-2">
-                  Niveau de gravité
+                  {t('patient.consultations.severityLabel')}
                 </label>
                 <div className="flex gap-2">
                   {(Object.keys(PRIORITE_CONFIG) as Array<keyof typeof PRIORITE_CONFIG>).map((value) => {
@@ -264,7 +281,7 @@ export default function PatientConsultationsPage() {
                           : 'bg-gray-50 dark:bg-primary-900 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-primary-700'
                       }`}
                     >
-                      {config.label}
+                      {t(config.labelKey)}
                     </button>
                   )
                 })}
@@ -277,14 +294,14 @@ export default function PatientConsultationsPage() {
                   disabled={submitting || !motif.trim()}
                   className="px-6 py-2.5 rounded-xl text-sm font-semibold bg-mint-500 hover:bg-mint-700 text-white disabled:opacity-50 transition"
                 >
-                  {submitting ? 'Envoi en cours...' : 'Envoyer la demande'}
+                  {submitting ? t('patient.consultations.sending') : t('patient.consultations.send')}
                 </button>
                 <button
                   type="button"
                   onClick={() => setShowForm(false)}
                   className="px-6 py-2.5 rounded-xl text-sm font-semibold border border-primary-100 dark:border-white/10 text-primary-700 dark:text-sable hover:bg-primary-50 dark:hover:bg-primary-700 transition"
                 >
-                  Annuler
+                  {t('common.cancel')}
                 </button>
               </div>
             </motion.form>
@@ -295,20 +312,30 @@ export default function PatientConsultationsPage() {
         <section>
           <div className="flex items-center justify-between mb-4">
             <h2 className="font-display font-semibold text-lg text-primary-900 dark:text-sable">
-              Historique
+              {t('patient.consultations.history')}
             </h2>
             <span className="text-xs text-primary-300">
-              {filtered.length} consultation{filtered.length !== 1 ? 's' : ''}
+              {t('patient.consultations.count', { count: filtered.length })}
             </span>
           </div>
 
           {isLoading ? (
-            <LoadingSpinner label="Chargement des consultations..." />
+            <LoadingSpinner label={t('patient.consultations.loading')} />
           ) : filtered.length === 0 ? (
             <EmptyState
               icon={filter === 'TOUTES' ? ClipboardList : Inbox}
-              title={filter === 'TOUTES' ? 'Aucune consultation' : `Aucune consultation ${FILTER_TABS.find((t) => t.key === filter)?.label.toLowerCase() || ''}`}
-              description={filter === 'TOUTES' ? 'Cliquez sur "Nouvelle consultation" pour commencer.' : 'Essayez un autre filtre.'}
+              title={
+                filter === 'TOUTES'
+                  ? t('consultations.noConsultationTitle')
+                  : t('patient.consultations.emptyFilteredTitle', {
+                      filter: t(FILTER_TABS.find((tab) => tab.key === filter)?.labelKey || '').toLowerCase(),
+                    })
+              }
+              description={
+                filter === 'TOUTES'
+                  ? t('patient.consultations.emptyAllDesc')
+                  : t('patient.consultations.emptyFilteredDesc')
+              }
             />
           ) : (
             <div className="space-y-3">
@@ -333,21 +360,21 @@ export default function PatientConsultationsPage() {
                         <div className="flex-1 min-w-0">
                           <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-3">
                             <p className="text-sm font-semibold text-primary-900 dark:text-sable truncate">
-                              {c.motif || 'Consultation'}
+                              {c.motif || t('patient.consultations.fallbackTitle')}
                             </p>
                             {c.priorite !== 'NORMALE' && (
                               <span className="flex items-center gap-1 text-xs font-semibold text-red-500 shrink-0">
                                 <AlertTriangle className="w-3 h-3" />
-                                Urgence {c.priorite === 'CRITIQUE' ? 'critique' : c.priorite.toLowerCase()}
+                                {c.priorite === 'CRITIQUE' ? t('patient.consultations.urgencyCritical') : t('patient.consultations.urgencyUrgent')}
                               </span>
                             )}
                           </div>
                           <div className="flex items-center gap-2 mt-1.5 flex-wrap">
                             <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${style.badge}`}>
-                              {style.label}
+                              {t(style.labelKey)}
                             </span>
                             <span className="text-xs text-primary-300">
-                              {new Date(c.createdAt).toLocaleDateString('fr-FR', {
+                              {new Date(c.createdAt).toLocaleDateString(locale, {
                                 day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
                               })}
                             </span>
@@ -367,20 +394,20 @@ export default function PatientConsultationsPage() {
                         <button
                           onClick={() => setDetailFor(c.id)}
                           className="p-2 rounded-xl border border-primary-100 dark:border-white/10 text-primary-300 hover:bg-primary-50 dark:hover:bg-primary-700 transition"
-                          title="Voir les détails"
+                          title={t('patient.consultations.viewDetails')}
                         >
                           <Activity className="w-4 h-4" />
                         </button>
                         <button
                           onClick={() => setDeleteTarget(c.id)}
                           className="p-2 rounded-xl border border-red-200 text-red-400 hover:bg-red-50 transition"
-                          title="Supprimer"
+                          title={t('common.delete')}
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
                         {c.statut === 'OUVERTE' && (
                           <span className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 animate-pulse">
-                            En attente
+                            {t('consultations.pending')}
                           </span>
                         )}
                         {c.statut === 'EN_COURS' && (
@@ -389,12 +416,12 @@ export default function PatientConsultationsPage() {
                             className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold bg-mint-500 hover:bg-mint-700 text-white transition active:scale-[0.97]"
                           >
                             <MessageSquare className="w-3.5 h-3.5" />
-                            Discuter
+                            {t('consultations.discuss')}
                           </button>
                         )}
                         {c.statut === 'TERMINEE' && (
                           <span className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-green-50 dark:bg-green-900/30 text-green-600 dark:text-green-400">
-                            Terminée
+                            {t('consultations.finished')}
                           </span>
                         )}
                       </div>
@@ -413,15 +440,27 @@ export default function PatientConsultationsPage() {
           onClose={() => setDetailFor(null)}
         />
       )}
+      {showPrescriptions && (
+        <PrescriptionsModal
+          onClose={() => setShowPrescriptions(false)}
+          onSelect={(p) => { setShowPrescriptions(false); setSelectedPrescription(p) }}
+        />
+      )}
+      {selectedPrescription && (
+        <PrescriptionDetailModal
+          prescription={selectedPrescription}
+          onClose={() => setSelectedPrescription(null)}
+        />
+      )}
       <ConfirmModal
         isOpen={deleteTarget !== null}
         onClose={() => setDeleteTarget(null)}
         onConfirm={() => handleDelete(deleteTarget!)}
-        title="Supprimer la consultation"
-        message="Vous êtes sur le point de supprimer définitivement cette consultation. Toutes les données associées (messages, prescriptions) seront également supprimées. Cette action est irréversible."
+        title={t('consultations.deleteTitle')}
+        message={t('consultations.deleteMessage')}
         type="danger"
-        confirmText="Oui, supprimer"
-        cancelText="Annuler"
+        confirmText={t('consultations.deleteConfirm')}
+        cancelText={t('common.cancel')}
       />
     </div>
   )

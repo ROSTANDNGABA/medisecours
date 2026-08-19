@@ -1,6 +1,7 @@
 // @ts-nocheck
 'use client'
 import { useState, useRef, useEffect, useCallback } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Save, X, Upload } from 'lucide-react'
 import { createPortal } from 'react-dom'
 import api from '../../api/axios'
@@ -9,6 +10,7 @@ import { CategoryIcon } from '../ui/CategoryIcon'
 import { useToast } from '../ui/Toast'
 
 function CategorySelect({ value, onChange }) {
+  const { t } = useTranslation()
   const [categories, setCategories] = useState([])
   useEffect(() => {
     api.get('/api/categories?itemsPerPage=100').then((res) => {
@@ -22,7 +24,7 @@ function CategorySelect({ value, onChange }) {
       onChange={(e) => onChange(e.target.value || null)}
       className="w-full rounded-2xl border border-[#dfe5db] bg-[#f8faf6] px-4 py-3 text-sm text-[#223023] outline-none transition focus:border-[#bfd0bd] focus:bg-white"
     >
-      <option value="">- Sélectionnez une catégorie -</option>
+      <option value="">{t('admin.maladieModal.selectCategorie')}</option>
       {categories.map((cat) => (
         <option key={cat['@id'] || cat.id} value={cat['@id'] || `/api/categories/${cat.id}`}>
           {cat.nom}
@@ -51,6 +53,7 @@ export default function DiseaseEditModal({
   const [uploadedUrls, setUploadedUrls] = useState([])
   const fileInputRef = useRef(null)
   const toast = useToast()
+  const { t } = useTranslation()
   const isNew = !editing.id
 
   const existingImages = Array.isArray(editing.images) ? editing.images : []
@@ -84,10 +87,10 @@ export default function DiseaseEditModal({
       const uploaded = res.data.images || []
       const urls = uploaded.map((img) => img.url)
       setUploadedUrls((prev) => [...prev, ...urls])
-      toast.success(res.data.message || 'Image(s) uploadée(s).')
+      toast.success(res.data.message || t('admin.maladieModal.toastUploadSuccess'))
     } catch (err) {
       console.error('Upload failed', err)
-      toast.error("Échec de l'upload.")
+      toast.error(t('admin.maladieModal.toastUploadError'))
     } finally {
       setUploading(false)
     }
@@ -112,8 +115,8 @@ export default function DiseaseEditModal({
           <div className="flex items-center gap-4">
             <CategoryIcon iconName={editing.categorie?.icone} categoryName={editing.categorie?.nom} size="lg" />
             <div>
-              <h2 className="text-lg font-bold text-white">{isNew ? 'Nouvelle maladie' : 'Modifier la maladie'}</h2>
-              <p className="mt-0.5 text-sm text-white/60">{isNew ? 'Ajoutez une nouvelle maladie au catalogue' : 'Modifiez les informations de la maladie'}</p>
+              <h2 className="text-lg font-bold text-white">{isNew ? t('admin.maladieModal.titleNew') : t('admin.maladieModal.titleEdit')}</h2>
+              <p className="mt-0.5 text-sm text-white/60">{isNew ? t('admin.maladieModal.subtitleNew') : t('admin.maladieModal.subtitleEdit')}</p>
             </div>
           </div>
         </div>
@@ -123,17 +126,17 @@ export default function DiseaseEditModal({
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.18em] text-[#7a8578]">Nom</label>
+                  <label className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.18em] text-[#7a8578]">{t('admin.maladieModal.nom')}</label>
                   <input
                     type="text"
                     value={editing.nom || ''}
                     onChange={(e) => onFieldChange('nom', e.target.value)}
-                    placeholder="Nom de la maladie"
+                    placeholder={t('admin.maladieModal.placeholderNom')}
                     className="w-full rounded-2xl border border-[#dfe5db] bg-[#f8faf6] px-4 py-3 text-sm text-[#223023] outline-none transition focus:border-[#bfd0bd] focus:bg-white"
                   />
                 </div>
                 <div>
-                  <label className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.18em] text-[#7a8578]">Gravité</label>
+                  <label className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.18em] text-[#7a8578]">{t('admin.maladieModal.gravite')}</label>
                   <select
                     value={editing.niveauGravite || ''}
                     onChange={(e) => onFieldChange('niveauGravite', e.target.value)}
@@ -148,7 +151,7 @@ export default function DiseaseEditModal({
               </div>
 
               <div>
-                <label className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.18em] text-[#7a8578]">Catégorie</label>
+                <label className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.18em] text-[#7a8578]">{t('admin.maladieModal.categorie')}</label>
                 <CategorySelect value={editing.categorie} onChange={(iri) => onFieldChange('categorie', iri)} />
               </div>
 
@@ -160,7 +163,7 @@ export default function DiseaseEditModal({
                     onChange={(e) => onFieldChange('urgence', e.target.checked)}
                     className="h-4 w-4 accent-[#2f6b45]"
                   />
-                  <span className="text-sm font-medium text-[#223023]">Urgence</span>
+                  <span className="text-sm font-medium text-[#223023]">{t('admin.maladieModal.urgence')}</span>
                 </label>
                 <label className="inline-flex items-center gap-2 cursor-pointer">
                   <input
@@ -169,7 +172,7 @@ export default function DiseaseEditModal({
                     onChange={(e) => onFieldChange('contagieux', e.target.checked)}
                     className="h-4 w-4 accent-[#2f6b45]"
                   />
-                  <span className="text-sm font-medium text-[#223023]">Contagieux</span>
+                  <span className="text-sm font-medium text-[#223023]">{t('admin.maladieModal.contagieux')}</span>
                 </label>
                 <label className="inline-flex items-center gap-2 cursor-pointer">
                   <input
@@ -178,80 +181,80 @@ export default function DiseaseEditModal({
                     onChange={(e) => onFieldChange('isAccident', e.target.checked)}
                     className="h-4 w-4 accent-[#2f6b45]"
                   />
-                  <span className="text-sm font-medium text-[#223023]">Accident</span>
+                  <span className="text-sm font-medium text-[#223023]">{t('admin.maladieModal.accident')}</span>
                 </label>
               </div>
 
               {editing.isAccident && (
                 <div>
-                  <label className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.18em] text-[#7a8578]">Type d&apos;accident</label>
+                  <label className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.18em] text-[#7a8578]">{t('admin.maladieModal.typeAccident')}</label>
                   <input
                     type="text"
                     value={editing.typeAccident || ''}
                     onChange={(e) => onFieldChange('typeAccident', e.target.value)}
-                    placeholder="ex: Accident de la route"
+                    placeholder={t('admin.maladieModal.placeholderTypeAccident')}
                     className="w-full rounded-2xl border border-[#dfe5db] bg-[#f8faf6] px-4 py-3 text-sm text-[#223023] outline-none transition focus:border-[#bfd0bd] focus:bg-white"
                   />
                 </div>
               )}
 
               <div>
-                <label className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.18em] text-[#7a8578]">Description</label>
+                <label className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.18em] text-[#7a8578]">{t('admin.maladieModal.description')}</label>
                 <textarea
                   value={editing.description || ''}
                   onChange={(e) => onFieldChange('description', e.target.value)}
                   rows={2}
-                  placeholder="Description de la maladie..."
+                  placeholder={t('admin.maladieModal.placeholderDescription')}
                   className="w-full rounded-2xl border border-[#dfe5db] bg-[#f8faf6] px-4 py-3 text-sm text-[#223023] outline-none transition focus:border-[#bfd0bd] focus:bg-white"
                 />
               </div>
 
               <div>
-                <label className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.18em] text-[#7a8578]">Symptômes</label>
+                <label className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.18em] text-[#7a8578]">{t('admin.maladieModal.symptomes')}</label>
                 <textarea
                   value={editing.symptomes || ''}
                   onChange={(e) => onFieldChange('symptomes', e.target.value)}
                   rows={2}
-                  placeholder="Symptômes de la maladie..."
+                  placeholder={t('admin.maladieModal.placeholderSymptomes')}
                   className="w-full rounded-2xl border border-[#dfe5db] bg-[#f8faf6] px-4 py-3 text-sm text-[#223023] outline-none transition focus:border-[#bfd0bd] focus:bg-white"
                 />
               </div>
 
               <div>
-                <label className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.18em] text-[#7a8578]">Causes</label>
+                <label className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.18em] text-[#7a8578]">{t('admin.maladieModal.causes')}</label>
                 <textarea
                   value={editing.causes || ''}
                   onChange={(e) => onFieldChange('causes', e.target.value)}
                   rows={2}
-                  placeholder="Causes de la maladie..."
+                  placeholder={t('admin.maladieModal.placeholderCauses')}
                   className="w-full rounded-2xl border border-[#dfe5db] bg-[#f8faf6] px-4 py-3 text-sm text-[#223023] outline-none transition focus:border-[#bfd0bd] focus:bg-white"
                 />
               </div>
 
               <div>
-                <label className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.18em] text-[#7a8578]">Traitement</label>
+                <label className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.18em] text-[#7a8578]">{t('admin.maladieModal.traitement')}</label>
                 <textarea
                   value={editing.traitement || ''}
                   onChange={(e) => onFieldChange('traitement', e.target.value)}
                   rows={2}
-                  placeholder="Traitement recommandé..."
+                  placeholder={t('admin.maladieModal.placeholderTraitement')}
                   className="w-full rounded-2xl border border-[#dfe5db] bg-[#f8faf6] px-4 py-3 text-sm text-[#223023] outline-none transition focus:border-[#bfd0bd] focus:bg-white"
                 />
               </div>
 
               <div>
-                <label className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.18em] text-[#7a8578]">Précautions</label>
+                <label className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.18em] text-[#7a8578]">{t('admin.maladieModal.precautions')}</label>
                 <textarea
                   value={editing.precautions || ''}
                   onChange={(e) => onFieldChange('precautions', e.target.value)}
                   rows={2}
-                  placeholder="Précautions à prendre..."
+                  placeholder={t('admin.maladieModal.placeholderPrecautions')}
                   className="w-full rounded-2xl border border-[#dfe5db] bg-[#f8faf6] px-4 py-3 text-sm text-[#223023] outline-none transition focus:border-[#bfd0bd] focus:bg-white"
                 />
               </div>
 
               <div>
-                <label className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.18em] text-[#7a8578]">Image URL (externe)</label>
+                <label className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.18em] text-[#7a8578]">{t('admin.maladieModal.imageUrlExternal')}</label>
                 <div className="flex items-center gap-3">
                   {editing.imageUrl && (
                     <img
@@ -265,14 +268,14 @@ export default function DiseaseEditModal({
                     type="url"
                     value={editing.imageUrl || ''}
                     onChange={(e) => onFieldChange('imageUrl', e.target.value)}
-                    placeholder="https://exemple.com/image.jpg"
+                    placeholder={t('admin.maladieModal.placeholderImageUrl')}
                     className="flex-1 rounded-2xl border border-[#dfe5db] bg-[#f8faf6] px-4 py-3 text-sm text-[#223023] outline-none transition focus:border-[#bfd0bd] focus:bg-white"
                   />
                 </div>
               </div>
 
               <div className="border-t border-[#dfe5db] pt-4">
-                <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-[#7a8578]">Photos</label>
+                <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-[#7a8578]">{t('admin.maladieModal.photos')}</label>
                 <div className="flex flex-wrap gap-3" id="disease-images">
                   {existingImages.map((img, idx) => (
                     <div key={`existing-${idx}`} className="group relative h-20 w-20 overflow-hidden rounded-xl border border-[#dfe5db] bg-[#f8faf6]">
@@ -298,7 +301,7 @@ export default function DiseaseEditModal({
                     className="flex h-20 w-20 items-center justify-center rounded-xl border-2 border-dashed border-[#dfe5db] text-[#aab3a8] transition hover:border-[#bfd0bd] hover:text-[#566355] disabled:opacity-40"
                   >
                     {uploading ? (
-                      <span className="text-xs">Upload...</span>
+                      <span className="text-xs">{t('admin.maladieModal.upload')}</span>
                     ) : (
                       <Upload className="h-5 w-5" />
                     )}
@@ -313,7 +316,7 @@ export default function DiseaseEditModal({
                   />
                 </div>
                 {!editing.id && (
-                  <p className="mt-1.5 text-xs text-[#aab3a8]">Enregistrez d&apos;abord la maladie avant d&apos;ajouter des photos.</p>
+                  <p className="mt-1.5 text-xs text-[#aab3a8]">{t('admin.maladieModal.saveFirst')}</p>
                 )}
               </div>
             </div>
@@ -326,7 +329,7 @@ export default function DiseaseEditModal({
                 onClick={onClose}
                 className="rounded-2xl border border-[#dfe5db] bg-white px-5 py-2.5 text-sm font-semibold text-[#566355] transition hover:bg-[#edf2ea]"
               >
-                Annuler
+                {t('admin.maladieModal.cancel')}
               </button>
               <button
                 type="submit"
@@ -334,7 +337,7 @@ export default function DiseaseEditModal({
                 className="inline-flex items-center gap-2 rounded-2xl bg-[#2f6b45] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-[#1f4a2e] disabled:opacity-50"
               >
                 <Save className="h-4 w-4" />
-                {saving ? 'Enregistrement...' : 'Enregistrer'}
+                {saving ? t('admin.maladieModal.saving') : t('admin.maladieModal.save')}
               </button>
             </div>
           </div>

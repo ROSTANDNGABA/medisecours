@@ -3,6 +3,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
+import { useTranslation } from 'react-i18next'
 import {
   Ban, Check, Eye, EyeOff, Mail, Pencil, Phone, Plus, Search,
   ShieldCheck, Stethoscope, UserCheck, Users, X,
@@ -30,16 +31,11 @@ const EMPTY_CREATE_FORM = {
   numeroOrdre: '',
 }
 
-const ROLE_LABEL = {
-  ROLE_MEDECIN: 'Medecin',
-  ROLE_PATIENT: 'Patient',
-}
-
 const ACTION_COPY = {
-  activer: { verb: 'activer', label: 'Activer', type: 'success' },
-  desactiver: { verb: 'desactiver', label: 'Desactiver', type: 'danger' },
-  bannir: { verb: 'bannir', label: 'Bannir', type: 'danger' },
-  debannir: { verb: 'debannir', label: 'Debannir', type: 'success' },
+  activer: { verbKey: 'verbActiver', labelKey: 'actionActiver', type: 'success' },
+  desactiver: { verbKey: 'verbDesactiver', labelKey: 'actionDesactiver', type: 'danger' },
+  bannir: { verbKey: 'verbBannir', labelKey: 'actionBannir', type: 'danger' },
+  debannir: { verbKey: 'verbDebannir', labelKey: 'actionDebannir', type: 'success' },
 }
 
 function primaryRole(roles = []) {
@@ -125,6 +121,7 @@ function formFromUser(user) {
 }
 
 export default function UtilisateursPage() {
+  const { t, i18n } = useTranslation()
   const [users, setUsers] = useState([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState('')
@@ -146,11 +143,11 @@ export default function UtilisateursPage() {
       setUsers(Array.isArray(res.data?.users) ? res.data.users : [])
     } catch (err) {
       console.error('Error loading users:', err)
-      toast.error('Impossible de charger les utilisateurs.')
+      toast.error(t('admin.utilisateurs.toastLoadError'))
     } finally {
       setLoading(false)
     }
-  }, [toast])
+  }, [toast, t])
 
   useEffect(() => {
     let ignore = false
@@ -165,7 +162,7 @@ export default function UtilisateursPage() {
       } catch (err) {
         console.error('Error loading users:', err)
         if (!ignore) {
-          toast.error('Impossible de charger les utilisateurs.')
+          toast.error(t('admin.utilisateurs.toastLoadError'))
         }
       } finally {
         if (!ignore) {
@@ -178,7 +175,7 @@ export default function UtilisateursPage() {
     return () => {
       ignore = true
     }
-  }, [toast])
+  }, [toast, t])
 
   const passwordChecks = useMemo(() => ({
     minLen: createForm.password.length >= 8,
@@ -216,6 +213,8 @@ export default function UtilisateursPage() {
   }), [users])
 
   const confirmActionMeta = ACTION_COPY[confirmModal.action] || ACTION_COPY.desactiver
+  const confirmLabel = t(`admin.utilisateurs.${confirmActionMeta.labelKey}`)
+  const confirmVerb = t(`admin.utilisateurs.${confirmActionMeta.verbKey}`)
 
   const openEditModal = (user) => {
     setEditModal(user)
@@ -241,10 +240,10 @@ export default function UtilisateursPage() {
       })
       const updatedUser = data?.user
       setUsers((prev) => prev.map((user) => (user.id === confirmModal.user.id ? (updatedUser || user) : user)))
-      toast.success(data?.message || `Utilisateur ${confirmActionMeta.verb} avec succes.`)
+      toast.success(data?.message || t('admin.utilisateurs.toastActionSuccess', { verb: confirmVerb }))
     } catch (err) {
       console.error('Error performing action:', err)
-      toast.error(err.response?.data?.error || 'Echec de l operation.')
+      toast.error(err.response?.data?.error || t('admin.utilisateurs.toastActionError'))
     } finally {
       setActionLoading(false)
       setConfirmModal({ isOpen: false, user: null, action: null })
@@ -261,12 +260,12 @@ export default function UtilisateursPage() {
       } else {
         await fetchUsers()
       }
-      toast.success(data?.message || 'Utilisateur cree avec succes.')
+      toast.success(data?.message || t('admin.utilisateurs.toastCreateSuccess'))
       setCreateModal(false)
       setCreateForm(EMPTY_CREATE_FORM)
     } catch (err) {
       console.error('Error creating user:', err)
-      toast.error(err.response?.data?.error || 'Echec de la creation.')
+      toast.error(err.response?.data?.error || t('admin.utilisateurs.toastCreateError'))
     } finally {
       setActionLoading(false)
     }
@@ -283,7 +282,7 @@ export default function UtilisateursPage() {
       const updatedUser = data?.user
       setUsers((prev) => prev.map((user) => (user.id === editModal.id ? (updatedUser || user) : user)))
       setViewModal((prev) => (prev?.id === editModal.id ? (updatedUser || prev) : prev))
-      toast.success(data?.message || 'Utilisateur modifié avec succès.')
+      toast.success(data?.message || t('admin.utilisateurs.toastEditSuccess'))
       closeEditModal()
     } catch (err) {
       const serverErrors = err.response?.data?.errors
@@ -294,14 +293,14 @@ export default function UtilisateursPage() {
           toast.error(`${field} : ${msg}`)
         })
       } else {
-        toast.error(serverMsg || 'Échec de la modification.')
+        toast.error(serverMsg || t('admin.utilisateurs.toastEditError'))
       }
     } finally {
       setActionLoading(false)
     }
   }
 
-  if (loading) return <LoadingSpinner label="Chargement des utilisateurs..." />
+  if (loading) return <LoadingSpinner label={t('admin.utilisateurs.loading')} />
 
   return (
     <div className="space-y-6">
@@ -311,9 +310,9 @@ export default function UtilisateursPage() {
         onConfirm={handleConfirmAction}
         isLoading={actionLoading}
         type={confirmActionMeta.type}
-        title={`${confirmActionMeta.label} cet utilisateur ?`}
-        message={confirmModal.user ? `Voulez-vous ${confirmActionMeta.verb} ${fullName(confirmModal.user)} ?` : ''}
-        confirmText={confirmActionMeta.label}
+        title={t('admin.utilisateurs.confirmTitle', { label: confirmLabel })}
+        message={confirmModal.user ? t('admin.utilisateurs.confirmMessage', { verb: confirmVerb, name: fullName(confirmModal.user) }) : ''}
+        confirmText={confirmLabel}
       />
 
       {/* Slide-over détails utilisateur — même style que page médecins */}
@@ -334,7 +333,7 @@ export default function UtilisateursPage() {
                 {/* Header */}
                 <div className="flex items-center justify-between mb-6">
                   <h3 className="font-display font-bold text-xl text-primary-900 dark:text-sable">
-                    Détails utilisateur
+                    {t('admin.utilisateurs.detailTitle')}
                   </h3>
                   <button onClick={() => setViewModal(null)} className="text-primary-300 hover:text-primary-700">
                     <X className="w-6 h-6" />
@@ -356,24 +355,24 @@ export default function UtilisateursPage() {
                         ? 'bg-blue-100 text-blue-700'
                         : 'bg-mint-100 text-mint-700'
                     }`}>
-                      {primaryRole(viewModal.roles) === 'ROLE_MEDECIN' ? '🩺 Médecin' : '👤 Patient'}
+                      {primaryRole(viewModal.roles) === 'ROLE_MEDECIN' ? `🩺 ${t('admin.utilisateurs.roleMedecin')}` : `👤 ${t('admin.utilisateurs.rolePatient')}`}
                     </span>
                     {viewModal.banni ? (
                       <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-urgence-100 text-urgence-700">
-                        <Ban className="w-3 h-3" /> Banni
+                        <Ban className="w-3 h-3" /> {t('admin.utilisateurs.statusBanni')}
                       </span>
                     ) : viewModal.actif ? (
                       <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-mint-100 text-mint-700">
-                        <UserCheck className="w-3 h-3" /> Actif
+                        <UserCheck className="w-3 h-3" /> {t('admin.utilisateurs.statusActif')}
                       </span>
                     ) : (
                       <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-700">
-                        <X className="w-3 h-3" /> Désactivé
+                        <X className="w-3 h-3" /> {t('admin.utilisateurs.statusDesactive')}
                       </span>
                     )}
                     {!viewModal.emailVerified && (
                       <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-600">
-                        ⚠️ Email non vérifié
+                        ⚠️ {t('admin.utilisateurs.emailNonVerifie')}
                       </span>
                     )}
                   </div>
@@ -382,11 +381,11 @@ export default function UtilisateursPage() {
                 {/* Infos principales */}
                 <div className="space-y-3">
                   {[
-                    { icon: Mail,  label: 'Email',     value: viewModal.email },
-                    { icon: Phone, label: 'Téléphone', value: viewModal.telephone },
-                    { icon: null,  label: 'Quartier',  value: viewModal.quartier },
-                    { icon: null,  label: 'Inscription', value: viewModal.createdAt
-                        ? new Date(viewModal.createdAt).toLocaleDateString('fr-FR', { year: 'numeric', month: 'long', day: 'numeric' })
+                    { icon: Mail,  label: t('admin.utilisateurs.detailEmail'),     value: viewModal.email },
+                    { icon: Phone, label: t('admin.utilisateurs.detailTelephone'), value: viewModal.telephone },
+                    { icon: null,  label: t('admin.utilisateurs.detailQuartier'),  value: viewModal.quartier },
+                    { icon: null,  label: t('admin.utilisateurs.detailInscription'), value: viewModal.createdAt
+                        ? new Date(viewModal.createdAt).toLocaleDateString(i18n.language?.startsWith('en') ? 'en-US' : 'fr-FR', { year: 'numeric', month: 'long', day: 'numeric' })
                         : null },
                   ].filter((f) => f.value).map(({ icon: Icon, label, value }) => (
                     <div key={label} className="flex items-start gap-3 p-3 rounded-xl bg-primary-50 dark:bg-primary-900/40">
@@ -406,7 +405,7 @@ export default function UtilisateursPage() {
                         <div className="flex items-start gap-3 p-3 rounded-xl bg-blue-50 dark:bg-blue-900/10">
                           <Stethoscope className="w-4 h-4 text-blue-500 shrink-0 mt-0.5" />
                           <div>
-                            <p className="text-[10px] font-semibold text-blue-500 uppercase tracking-wide">Spécialité</p>
+                            <p className="text-[10px] font-semibold text-blue-500 uppercase tracking-wide">{t('admin.utilisateurs.detailSpecialite')}</p>
                             <p className="text-sm text-primary-900 dark:text-sable">{viewModal.specialite}</p>
                           </div>
                         </div>
@@ -415,7 +414,7 @@ export default function UtilisateursPage() {
                         <div className="flex items-start gap-3 p-3 rounded-xl bg-blue-50 dark:bg-blue-900/10">
                           <ShieldCheck className="w-4 h-4 text-blue-500 shrink-0 mt-0.5" />
                           <div>
-                            <p className="text-[10px] font-semibold text-blue-500 uppercase tracking-wide">N° d&apos;Ordre</p>
+                            <p className="text-[10px] font-semibold text-blue-500 uppercase tracking-wide">{t('admin.utilisateurs.detailNumeroOrdre')}</p>
                             <p className="text-sm text-primary-900 dark:text-sable font-mono">{viewModal.numeroOrdre}</p>
                           </div>
                         </div>
@@ -423,9 +422,9 @@ export default function UtilisateursPage() {
                       <div className="flex items-start gap-3 p-3 rounded-xl bg-blue-50 dark:bg-blue-900/10">
                         <ShieldCheck className="w-4 h-4 text-blue-500 shrink-0 mt-0.5" />
                         <div>
-                          <p className="text-[10px] font-semibold text-blue-500 uppercase tracking-wide">Validation admin</p>
+                          <p className="text-[10px] font-semibold text-blue-500 uppercase tracking-wide">{t('admin.utilisateurs.detailValidationAdmin')}</p>
                           <p className="text-sm text-primary-900 dark:text-sable">
-                            {viewModal.estValide ? '✅ Compte validé' : '⏳ En attente de validation'}
+                            {viewModal.estValide ? `✅ ${t('admin.utilisateurs.detailCompteValide')}` : `⏳ ${t('admin.utilisateurs.detailEnAttenteValidation')}`}
                           </p>
                         </div>
                       </div>
@@ -439,7 +438,7 @@ export default function UtilisateursPage() {
                         <div className="flex items-start gap-3 p-3 rounded-xl bg-urgence-50 dark:bg-urgence-900/10">
                           <span className="text-urgence-500 shrink-0 mt-0.5 text-base">🩸</span>
                           <div>
-                            <p className="text-[10px] font-semibold text-urgence-500 uppercase tracking-wide">Groupe sanguin</p>
+                            <p className="text-[10px] font-semibold text-urgence-500 uppercase tracking-wide">{t('admin.utilisateurs.detailGroupeSanguin')}</p>
                             <p className="text-sm text-primary-900 dark:text-sable font-semibold">{viewModal.groupeSanguin}</p>
                           </div>
                         </div>
@@ -448,7 +447,7 @@ export default function UtilisateursPage() {
                         <div className="flex items-start gap-3 p-3 rounded-xl bg-urgence-50 dark:bg-urgence-900/10">
                           <span className="text-urgence-500 shrink-0 mt-0.5 text-base">⚠️</span>
                           <div>
-                            <p className="text-[10px] font-semibold text-urgence-500 uppercase tracking-wide">Allergies</p>
+                            <p className="text-[10px] font-semibold text-urgence-500 uppercase tracking-wide">{t('admin.utilisateurs.detailAllergies')}</p>
                             <p className="text-sm text-primary-900 dark:text-sable">{viewModal.allergies.join(', ')}</p>
                           </div>
                         </div>
@@ -463,7 +462,7 @@ export default function UtilisateursPage() {
                     onClick={() => { openEditModal(viewModal); setViewModal(null) }}
                     className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-primary-200 dark:border-white/10 text-primary-700 dark:text-sable font-semibold hover:bg-primary-50 transition text-sm"
                   >
-                    <Pencil className="w-4 h-4" /> Modifier
+                    <Pencil className="w-4 h-4" /> {t('admin.utilisateurs.modifier')}
                   </button>
                   <button
                     onClick={() => { openStatusModal(viewModal, viewModal.actif ? 'desactiver' : 'activer'); setViewModal(null) }}
@@ -473,7 +472,7 @@ export default function UtilisateursPage() {
                         : 'bg-mint-500/10 text-mint-500 hover:bg-mint-500/20'
                     }`}
                   >
-                    {viewModal.actif ? <><X className="w-4 h-4" /> Désactiver</> : <><Check className="w-4 h-4" /> Activer</>}
+                    {viewModal.actif ? <><X className="w-4 h-4" /> {t('admin.utilisateurs.desactiver')}</> : <><Check className="w-4 h-4" /> {t('admin.utilisateurs.activer')}</>}
                   </button>
                 </div>
               </div>
@@ -483,24 +482,24 @@ export default function UtilisateursPage() {
       </AnimatePresence>
 
       {createModal && (
-        <Modal isOpen onClose={() => setCreateModal(false)} title="Creer un utilisateur" size="lg">
+        <Modal isOpen onClose={() => setCreateModal(false)} title={t('admin.utilisateurs.createTitle')} size="lg">
           <form onSubmit={handleCreateUser} className="space-y-4">
             <FormSelect
-              label="Type d utilisateur"
+              label={t('admin.utilisateurs.typeUtilisateur')}
               value={createForm.type}
               onChange={(e) => setCreateForm((prev) => ({ ...prev, type: e.target.value }))}
               options={[
-                { value: 'patient', label: 'Patient' },
-                { value: 'medecin', label: 'Medecin' },
+                { value: 'patient', label: t('admin.utilisateurs.rolePatient') },
+                { value: 'medecin', label: t('admin.utilisateurs.roleMedecin') },
               ]}
             />
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              <FormField label="Nom" value={createForm.nom} onChange={(e) => setCreateForm((prev) => ({ ...prev, nom: e.target.value }))} required />
-              <FormField label="Prenom" value={createForm.prenom} onChange={(e) => setCreateForm((prev) => ({ ...prev, prenom: e.target.value }))} required />
+              <FormField label={t('admin.utilisateurs.nom')} value={createForm.nom} onChange={(e) => setCreateForm((prev) => ({ ...prev, nom: e.target.value }))} required />
+              <FormField label={t('admin.utilisateurs.prenom')} value={createForm.prenom} onChange={(e) => setCreateForm((prev) => ({ ...prev, prenom: e.target.value }))} required />
             </div>
-            <FormField label="Email" type="email" value={createForm.email} onChange={(e) => setCreateForm((prev) => ({ ...prev, email: e.target.value }))} required />
+            <FormField label={t('admin.utilisateurs.email')} type="email" value={createForm.email} onChange={(e) => setCreateForm((prev) => ({ ...prev, email: e.target.value }))} required />
             <div>
-              <label className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.18em] text-[#7a8578]">Mot de passe</label>
+              <label className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.18em] text-[#7a8578]">{t('admin.utilisateurs.password')}</label>
               <div className="relative">
                 <input
                   type={showPassword ? 'text' : 'password'}
@@ -516,11 +515,11 @@ export default function UtilisateursPage() {
               {createForm.password.length > 0 && (
                 <div className="mt-2 space-y-1">
                   {[
-                    { key: 'minLen', label: '8 caractères minimum', ok: passwordChecks.minLen },
-                    { key: 'hasUpper', label: 'Une majuscule', ok: passwordChecks.hasUpper },
-                    { key: 'hasLower', label: 'Une minuscule', ok: passwordChecks.hasLower },
-                    { key: 'hasDigit', label: 'Un chiffre', ok: passwordChecks.hasDigit },
-                    { key: 'hasSpecial', label: 'Un caractère spécial', ok: passwordChecks.hasSpecial },
+                    { key: 'minLen', label: t('admin.utilisateurs.passwordMinLen'), ok: passwordChecks.minLen },
+                    { key: 'hasUpper', label: t('admin.utilisateurs.passwordUpper'), ok: passwordChecks.hasUpper },
+                    { key: 'hasLower', label: t('admin.utilisateurs.passwordLower'), ok: passwordChecks.hasLower },
+                    { key: 'hasDigit', label: t('admin.utilisateurs.passwordDigit'), ok: passwordChecks.hasDigit },
+                    { key: 'hasSpecial', label: t('admin.utilisateurs.passwordSpecial'), ok: passwordChecks.hasSpecial },
                   ].map(({ key, label, ok }) => (
                     <p key={key} className={`flex items-center gap-1.5 text-xs ${ok ? 'text-green-600' : 'text-[#7a8578]'}`}>
                       {ok ? <Check className="w-3.5 h-3.5" /> : <span className="inline-block w-3.5 h-3.5 rounded-full border border-current" />}
@@ -532,76 +531,76 @@ export default function UtilisateursPage() {
             </div>
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <div>
-                <label className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.18em] text-[#7a8578]">Telephone</label>
+                <label className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.18em] text-[#7a8578]">{t('admin.utilisateurs.telephone')}</label>
                 <input
                   type="tel"
                   value={createForm.telephone}
                   onChange={(e) => setCreateForm((prev) => ({ ...prev, telephone: e.target.value }))}
-                  placeholder="+237 6 89 47 85 12"
+                  placeholder={t('admin.utilisateurs.phonePlaceholder')}
                   className="w-full rounded-2xl border border-[#dfe5db] bg-[#f8faf6] px-4 py-3 text-sm text-[#223023] outline-none transition focus:border-[#bfd0bd] focus:bg-white"
                 />
                 {phoneValid === false && (
                   <p className="mt-1.5 flex items-center gap-1 text-xs text-red-500">
                     <X className="w-3.5 h-3.5" />
-                    Format invalide (ex: +237 6 89 47 85 12 ou 0689478512)
+                    {t('admin.utilisateurs.phoneInvalid')}
                   </p>
                 )}
                 {phoneValid === true && (
                   <p className="mt-1.5 flex items-center gap-1 text-xs text-green-600">
                     <Check className="w-3.5 h-3.5" />
-                    Numéro valide
+                    {t('admin.utilisateurs.phoneValid')}
                   </p>
                 )}
               </div>
-              <FormField label="Quartier" value={createForm.quartier} onChange={(e) => setCreateForm((prev) => ({ ...prev, quartier: e.target.value }))} />
+              <FormField label={t('admin.utilisateurs.quartier')} value={createForm.quartier} onChange={(e) => setCreateForm((prev) => ({ ...prev, quartier: e.target.value }))} />
             </div>
             {createForm.type === 'patient' && (
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                <FormField label="Groupe sanguin" value={createForm.groupeSanguin} onChange={(e) => setCreateForm((prev) => ({ ...prev, groupeSanguin: e.target.value }))} placeholder="A+, O-, etc." />
-                <FormField label="Allergies" value={createForm.allergies} onChange={(e) => setCreateForm((prev) => ({ ...prev, allergies: e.target.value }))} placeholder="Penicilline, Aspirine" />
+                <FormField label={t('admin.utilisateurs.groupeSanguin')} value={createForm.groupeSanguin} onChange={(e) => setCreateForm((prev) => ({ ...prev, groupeSanguin: e.target.value }))} placeholder="A+, O-, etc." />
+                <FormField label={t('admin.utilisateurs.allergies')} value={createForm.allergies} onChange={(e) => setCreateForm((prev) => ({ ...prev, allergies: e.target.value }))} placeholder="Penicilline, Aspirine" />
               </div>
             )}
             {createForm.type === 'medecin' && (
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                <FormField label="Specialite" value={createForm.specialite} onChange={(e) => setCreateForm((prev) => ({ ...prev, specialite: e.target.value }))} />
-                <FormField label="Numero d ordre" value={createForm.numeroOrdre} onChange={(e) => setCreateForm((prev) => ({ ...prev, numeroOrdre: e.target.value }))} />
+                <FormField label={t('admin.utilisateurs.specialite')} value={createForm.specialite} onChange={(e) => setCreateForm((prev) => ({ ...prev, specialite: e.target.value }))} />
+                <FormField label={t('admin.utilisateurs.numeroOrdre')} value={createForm.numeroOrdre} onChange={(e) => setCreateForm((prev) => ({ ...prev, numeroOrdre: e.target.value }))} />
               </div>
             )}
             <div className="flex justify-end gap-2 pt-4">
-              <Button type="button" variant="secondary" onClick={() => setCreateModal(false)} disabled={actionLoading}>Annuler</Button>
-              <Button variant="primary" type="submit" isLoading={actionLoading}>Creer</Button>
+              <Button type="button" variant="secondary" onClick={() => setCreateModal(false)} disabled={actionLoading}>{t('admin.utilisateurs.cancel')}</Button>
+              <Button variant="primary" type="submit" isLoading={actionLoading}>{t('admin.utilisateurs.createBtn')}</Button>
             </div>
           </form>
         </Modal>
       )}
 
       {editModal && (
-        <Modal isOpen onClose={closeEditModal} title="Modifier un utilisateur" size="lg">
+        <Modal isOpen onClose={closeEditModal} title={t('admin.utilisateurs.editTitle')} size="lg">
           <form onSubmit={handleEditUser} className="space-y-4">
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              <FormField label="Nom" value={editForm.nom} onChange={(e) => setEditForm((prev) => ({ ...prev, nom: e.target.value }))} required />
-              <FormField label="Prenom" value={editForm.prenom} onChange={(e) => setEditForm((prev) => ({ ...prev, prenom: e.target.value }))} required />
+              <FormField label={t('admin.utilisateurs.nom')} value={editForm.nom} onChange={(e) => setEditForm((prev) => ({ ...prev, nom: e.target.value }))} required />
+              <FormField label={t('admin.utilisateurs.prenom')} value={editForm.prenom} onChange={(e) => setEditForm((prev) => ({ ...prev, prenom: e.target.value }))} required />
             </div>
-            <FormField label="Email" type="email" value={editForm.email} onChange={(e) => setEditForm((prev) => ({ ...prev, email: e.target.value }))} required />
+            <FormField label={t('admin.utilisateurs.email')} type="email" value={editForm.email} onChange={(e) => setEditForm((prev) => ({ ...prev, email: e.target.value }))} required />
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              <FormField label="Telephone" value={editForm.telephone} onChange={(e) => setEditForm((prev) => ({ ...prev, telephone: e.target.value }))} />
-              <FormField label="Quartier" value={editForm.quartier} onChange={(e) => setEditForm((prev) => ({ ...prev, quartier: e.target.value }))} />
+              <FormField label={t('admin.utilisateurs.telephone')} value={editForm.telephone} onChange={(e) => setEditForm((prev) => ({ ...prev, telephone: e.target.value }))} />
+              <FormField label={t('admin.utilisateurs.quartier')} value={editForm.quartier} onChange={(e) => setEditForm((prev) => ({ ...prev, quartier: e.target.value }))} />
             </div>
             {primaryRole(editModal.roles) === 'ROLE_PATIENT' && (
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                <FormField label="Groupe sanguin" value={editForm.groupeSanguin} onChange={(e) => setEditForm((prev) => ({ ...prev, groupeSanguin: e.target.value }))} />
-                <FormField label="Allergies" value={editForm.allergies} onChange={(e) => setEditForm((prev) => ({ ...prev, allergies: e.target.value }))} />
+                <FormField label={t('admin.utilisateurs.groupeSanguin')} value={editForm.groupeSanguin} onChange={(e) => setEditForm((prev) => ({ ...prev, groupeSanguin: e.target.value }))} />
+                <FormField label={t('admin.utilisateurs.allergies')} value={editForm.allergies} onChange={(e) => setEditForm((prev) => ({ ...prev, allergies: e.target.value }))} />
               </div>
             )}
             {primaryRole(editModal.roles) === 'ROLE_MEDECIN' && (
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                <FormField label="Specialite" value={editForm.specialite} onChange={(e) => setEditForm((prev) => ({ ...prev, specialite: e.target.value }))} />
-                <FormField label="Numero d ordre" value={editForm.numeroOrdre} onChange={(e) => setEditForm((prev) => ({ ...prev, numeroOrdre: e.target.value }))} />
+                <FormField label={t('admin.utilisateurs.specialite')} value={editForm.specialite} onChange={(e) => setEditForm((prev) => ({ ...prev, specialite: e.target.value }))} />
+                <FormField label={t('admin.utilisateurs.numeroOrdre')} value={editForm.numeroOrdre} onChange={(e) => setEditForm((prev) => ({ ...prev, numeroOrdre: e.target.value }))} />
               </div>
             )}
             <div className="flex justify-end gap-2 pt-4">
-              <Button type="button" variant="secondary" onClick={closeEditModal} disabled={actionLoading}>Annuler</Button>
-              <Button variant="primary" type="submit" isLoading={actionLoading}>Modifier</Button>
+              <Button type="button" variant="secondary" onClick={closeEditModal} disabled={actionLoading}>{t('admin.utilisateurs.cancel')}</Button>
+              <Button variant="primary" type="submit" isLoading={actionLoading}>{t('admin.utilisateurs.editBtn')}</Button>
             </div>
           </form>
         </Modal>
@@ -609,11 +608,10 @@ export default function UtilisateursPage() {
 
       <section className="grid grid-cols-1 gap-4 xl:grid-cols-[1.4fr_1fr]">
         <div className="rounded-[28px] bg-[linear-gradient(135deg,#09170f_0%,#0f2418_60%,#183626_100%)] p-6 text-white shadow-[0_18px_45px_rgba(15,36,24,0.16)]">
-          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-white/60">Gestion des comptes</p>
-          <h1 className="mt-3 font-display text-3xl font-extrabold tracking-tight">Utilisateurs</h1>
+          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-white/60">{t('admin.utilisateurs.eyebrow')}</p>
+          <h1 className="mt-3 font-display text-3xl font-extrabold tracking-tight">{t('admin.utilisateurs.title')}</h1>
           <p className="mt-3 max-w-2xl text-sm leading-6 text-white/72">
-            Pilote les patients et les medecins depuis une vue unique, avec filtres, verification des statuts
-            et actions rapides alignees sur la nouvelle direction artistique.
+            {t('admin.utilisateurs.description')}
           </p>
           <div className="mt-6 flex flex-wrap gap-3">
             <button
@@ -622,28 +620,28 @@ export default function UtilisateursPage() {
               className="inline-flex items-center gap-2 rounded-full bg-[#57c66b] px-4 py-3 text-sm font-semibold text-[#0f2418] transition hover:bg-[#6cda80]"
             >
               <Plus className="h-4 w-4" />
-              Nouvel utilisateur
+              {t('admin.utilisateurs.newUser')}
             </button>
             <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/6 px-4 py-3 text-sm font-semibold text-white/80">
               <Users className="h-4 w-4" />
-              {counts.total} comptes suivis
+              {t('admin.utilisateurs.comptesSuivis', { count: counts.total })}
             </div>
           </div>
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-2">
-          <StatCard label="Total" value={counts.total} icon={Users} />
-          <StatCard label="Patients" value={counts.patients} icon={UserCheck} tone="green" />
-          <StatCard label="Medecins" value={counts.medecins} icon={ShieldCheck} tone="blue" />
-          <StatCard label="Actifs" value={counts.actifs} icon={Check} tone="lime" />
+          <StatCard label={t('admin.utilisateurs.statTotal')} value={counts.total} icon={Users} />
+          <StatCard label={t('admin.utilisateurs.statPatients')} value={counts.patients} icon={UserCheck} tone="green" />
+          <StatCard label={t('admin.utilisateurs.statMedecins')} value={counts.medecins} icon={ShieldCheck} tone="blue" />
+          <StatCard label={t('admin.utilisateurs.statActifs')} value={counts.actifs} icon={Check} tone="lime" />
         </div>
       </section>
 
       <section className="rounded-[28px] border border-[#e3e7df] bg-white p-5 shadow-[0_18px_45px_rgba(15,36,24,0.05)] sm:p-6">
         <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
           <div>
-            <p className="text-lg font-bold text-[#152116]">Recherche et segmentation</p>
-            <p className="mt-1 text-sm text-[#6f796c]">Filtre rapidement les comptes par role et par identite.</p>
+            <p className="text-lg font-bold text-[#152116]">{t('admin.utilisateurs.searchTitle')}</p>
+            <p className="mt-1 text-sm text-[#6f796c]">{t('admin.utilisateurs.searchSubtitle')}</p>
           </div>
           <div className="flex flex-1 flex-col gap-3 xl:max-w-3xl xl:flex-row xl:items-center xl:justify-end">
             <div className="relative xl:min-w-[320px] xl:flex-1">
@@ -651,7 +649,7 @@ export default function UtilisateursPage() {
               <input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Rechercher un patient ou un medecin..."
+                placeholder={t('admin.utilisateurs.searchPlaceholder')}
                 className="w-full rounded-full border border-[#dfe5db] bg-[#f8faf6] py-3 pl-11 pr-4 text-sm text-[#233024] outline-none transition focus:border-[#bfd0bd] focus:bg-white"
               />
             </div>
@@ -667,7 +665,7 @@ export default function UtilisateursPage() {
                       : 'border border-[#dfe5db] bg-white text-[#5f6c5d] hover:bg-[#edf2ea]'
                   }`}
                 >
-                  {role ? ROLE_LABEL[role] : 'Tous'}
+                  {role ? (role === 'ROLE_MEDECIN' ? t('admin.utilisateurs.roleMedecin') : t('admin.utilisateurs.rolePatient')) : t('admin.utilisateurs.filterTous')}
                 </button>
               ))}
             </div>
@@ -679,8 +677,8 @@ export default function UtilisateursPage() {
         {filtered.length === 0 ? (
           <div className="p-6">
             <EmptyState
-              title="Aucun utilisateur"
-              description="Aucun patient ou medecin ne correspond a ces criteres."
+              title={t('admin.utilisateurs.emptyTitle')}
+              description={t('admin.utilisateurs.emptyDesc')}
             />
           </div>
         ) : (
@@ -688,11 +686,11 @@ export default function UtilisateursPage() {
             <table className="w-full min-w-[860px] text-sm">
               <thead>
                 <tr className="text-left text-xs uppercase tracking-[0.18em] text-[#7a8578]">
-                  <th className="px-5 py-4 font-semibold">Utilisateur</th>
-                  <th className="px-5 py-4 font-semibold">Contact</th>
-                  <th className="px-5 py-4 font-semibold">Role</th>
-                  <th className="px-5 py-4 font-semibold">Statut</th>
-                  <th className="px-5 py-4 text-right font-semibold">Actions</th>
+                  <th className="px-5 py-4 font-semibold">{t('admin.utilisateurs.thUtilisateur')}</th>
+                  <th className="px-5 py-4 font-semibold">{t('admin.utilisateurs.thContact')}</th>
+                  <th className="px-5 py-4 font-semibold">{t('admin.utilisateurs.thRole')}</th>
+                  <th className="px-5 py-4 font-semibold">{t('admin.utilisateurs.thStatut')}</th>
+                  <th className="px-5 py-4 text-right font-semibold">{t('admin.utilisateurs.thActions')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -703,14 +701,14 @@ export default function UtilisateursPage() {
                         <Avatar name={fullName(user)} size="sm" />
                         <div>
                           <p className="font-semibold text-[#172216]">{fullName(user)}</p>
-                          <p className="mt-1 text-xs text-[#778275]">{user.quartier || 'Quartier non renseigne'}</p>
+                          <p className="mt-1 text-xs text-[#778275]">{user.quartier || t('admin.utilisateurs.emptyQuartier')}</p>
                         </div>
                       </div>
                     </td>
                     <td className="px-5 py-4">
                       <div className="space-y-1 text-sm">
                         <p className="text-[#223023]">{user.email}</p>
-                        <p className="text-[#7b8678]">{user.telephone || 'Telephone non renseigne'}</p>
+                        <p className="text-[#7b8678]">{user.telephone || t('admin.utilisateurs.emptyTelephone')}</p>
                       </div>
                     </td>
                     <td className="px-5 py-4">
@@ -721,29 +719,29 @@ export default function UtilisateursPage() {
                         <StatusPill user={user} />
                         {!user.emailVerified && (
                           <span className="inline-flex rounded-full bg-[#fff4dc] px-3 py-1 text-xs font-semibold text-[#9b6b17]">
-                            Email non verifie
+                            {t('admin.utilisateurs.emailNonVerifie')}
                           </span>
                         )}
                       </div>
                     </td>
                     <td className="px-5 py-4">
                       <div className="flex justify-end gap-2">
-                        <ActionButton onClick={() => setViewModal(user)} title="Voir">
+                        <ActionButton onClick={() => setViewModal(user)} title={t('admin.utilisateurs.actionVoir')}>
                           <Eye className="h-4 w-4" />
                         </ActionButton>
-                        <ActionButton onClick={() => openEditModal(user)} title="Modifier">
+                        <ActionButton onClick={() => openEditModal(user)} title={t('admin.utilisateurs.actionModifier')}>
                           <Pencil className="h-4 w-4" />
                         </ActionButton>
                         <ActionButton
                           onClick={() => openStatusModal(user, user.actif ? 'desactiver' : 'activer')}
-                          title={user.actif ? 'Desactiver' : 'Activer'}
+                          title={user.actif ? t('admin.utilisateurs.actionDesactiver') : t('admin.utilisateurs.actionActiver')}
                           tone={user.actif ? 'amber' : 'green'}
                         >
                           {user.actif ? <X className="h-4 w-4" /> : <Check className="h-4 w-4" />}
                         </ActionButton>
                         <ActionButton
                           onClick={() => openStatusModal(user, user.banni ? 'debannir' : 'bannir')}
-                          title={user.banni ? 'Debannir' : 'Bannir'}
+                          title={user.banni ? t('admin.utilisateurs.actionDebannir') : t('admin.utilisateurs.actionBannir')}
                           tone={user.banni ? 'green' : 'red'}
                         >
                           <Ban className="h-4 w-4" />
@@ -785,23 +783,25 @@ function StatCard({ label, value, icon: Icon, tone = 'neutral' }) {
 }
 
 function RolePill({ role }) {
+  const { t } = useTranslation()
   const ui = role === 'ROLE_MEDECIN'
     ? 'bg-[#edf4fb] text-[#285074]'
     : 'bg-[#e8f3e8] text-[#2f6b45]'
 
   return (
     <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${ui}`}>
-      {ROLE_LABEL[role]}
+      {role === 'ROLE_MEDECIN' ? t('admin.utilisateurs.roleMedecin') : t('admin.utilisateurs.rolePatient')}
     </span>
   )
 }
 
 function StatusPill({ user }) {
+  const { t } = useTranslation()
   if (user.banni) {
     return (
       <span className="inline-flex items-center gap-1 rounded-full bg-[#fde8e8] px-3 py-1 text-xs font-semibold text-[#b44949]">
         <Ban className="h-3 w-3" />
-        Banni
+        {t('admin.utilisateurs.statusBanni')}
       </span>
     )
   }
@@ -810,7 +810,7 @@ function StatusPill({ user }) {
     return (
       <span className="inline-flex items-center gap-1 rounded-full bg-[#e8f3e8] px-3 py-1 text-xs font-semibold text-[#2f6b45]">
         <UserCheck className="h-3 w-3" />
-        Actif
+        {t('admin.utilisateurs.statusActif')}
       </span>
     )
   }
@@ -818,7 +818,7 @@ function StatusPill({ user }) {
   return (
     <span className="inline-flex items-center gap-1 rounded-full bg-[#fff4dc] px-3 py-1 text-xs font-semibold text-[#9b6b17]">
       <X className="h-3 w-3" />
-      Desactive
+      {t('admin.utilisateurs.statusDesactive')}
     </span>
   )
 }

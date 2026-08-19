@@ -1,4 +1,7 @@
+'use client'
+
 import React from 'react'
+import { useTranslation } from 'react-i18next'
 import { Phone, Globe, MapPin, HeartPulse } from 'lucide-react'
 
 const T = '#0A4A5C'
@@ -11,6 +14,7 @@ export default function PrescriptionPDFTemplate({
   consultation,
   medecin
 }) {
+  const { t } = useTranslation()
   const patient = consultation?.patient || {}
 
   return (
@@ -24,10 +28,10 @@ export default function PrescriptionPDFTemplate({
       {/* Header */}
       <div style={{ background: '#F8F9FA', padding: '32px 40px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '3px solid ' + T }}>
         <div>
-          <h1 style={{ color: '#2B838A', fontSize: '28px', fontWeight: 700, marginBottom: '8px' }}>MediSecours Clinic</h1>
+          <h1 style={{ color: '#2B838A', fontSize: '28px', fontWeight: 700, marginBottom: '8px' }}>{t('admin.pdfTemplate.clinicName')}</h1>
           <h2 style={{ color: T, fontSize: '28px', fontWeight: 800, marginBottom: '4px' }}>Dr. {medecin?.prenom} {medecin?.nom}</h2>
-          <p style={{ color: '#888', fontSize: '12px', fontWeight: 600, letterSpacing: '1px', textTransform: 'uppercase', marginBottom: '2px' }}>{medecin?.specialite || 'Spécialiste en Médecine'}</p>
-          <p style={{ color: '#555', fontSize: '12px' }}>Registration No: {medecin?.id ? `MS-${medecin.id.toString().padStart(6, '0')}` : 'MS-000000'}</p>
+          <p style={{ color: '#888', fontSize: '12px', fontWeight: 600, letterSpacing: '1px', textTransform: 'uppercase', marginBottom: '2px' }}>{medecin?.specialite || t('admin.pdfTemplate.specialiteFallback')}</p>
+          <p style={{ color: '#555', fontSize: '12px' }}>{t('admin.pdfTemplate.registrationNo', { id: medecin?.id ? `MS-${medecin.id.toString().padStart(6, '0')}` : 'MS-000000' })}</p>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <div style={{ width: '56px', height: '56px', borderRadius: '16px', background: '#206277', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -51,21 +55,21 @@ export default function PrescriptionPDFTemplate({
           <div style={{ padding: '24px 32px', borderBottom: '1px solid #e5e7eb' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '12px' }}>
               <div style={{ display: 'flex', flex: '1', alignItems: 'flex-end' }}>
-                <span style={{ color: '#555', fontSize: '11px', fontWeight: 700, marginRight: '8px', whiteSpace: 'nowrap' }}>Patient Name:</span>
+                <span style={{ color: '#555', fontSize: '11px', fontWeight: 700, marginRight: '8px', whiteSpace: 'nowrap' }}>{t('admin.pdfTemplate.patientName')}</span>
                 <div style={{ flex: '1', borderBottom: '1px solid #999', fontSize: '13px', fontWeight: 500, paddingBottom: '3px', color: '#111' }}>{patient.prenom} {patient.nom}</div>
               </div>
               <div style={{ width: '128px', display: 'flex', alignItems: 'flex-end', marginLeft: '16px' }}>
-                <span style={{ color: '#555', fontSize: '11px', fontWeight: 700, marginRight: '8px', whiteSpace: 'nowrap' }}>Age:</span>
-                <div style={{ flex: '1', borderBottom: '1px solid #999', fontSize: '13px', fontWeight: 500, paddingBottom: '3px', textAlign: 'center', color: '#111' }}>{patient.age ? `${patient.age} ans` : '-'}</div>
+                <span style={{ color: '#555', fontSize: '11px', fontWeight: 700, marginRight: '8px', whiteSpace: 'nowrap' }}>{t('admin.pdfTemplate.age')}:</span>
+                <div style={{ flex: '1', borderBottom: '1px solid #999', fontSize: '13px', fontWeight: 500, paddingBottom: '3px', textAlign: 'center', color: '#111' }}>{patient.age ? t('admin.pdfTemplate.years', { count: patient.age }) : '-'}</div>
               </div>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
               <div style={{ display: 'flex', flex: '1', alignItems: 'flex-end' }}>
-                <span style={{ color: '#555', fontSize: '11px', fontWeight: 700, marginRight: '8px', whiteSpace: 'nowrap' }}>Address:</span>
+                <span style={{ color: '#555', fontSize: '11px', fontWeight: 700, marginRight: '8px', whiteSpace: 'nowrap' }}>{t('admin.pdfTemplate.address')}:</span>
                 <div style={{ flex: '1', borderBottom: '1px solid #999', fontSize: '13px', fontWeight: 500, paddingBottom: '3px', color: '#111' }}>{patient.quartier || patient.adresse || '\u2014'}</div>
               </div>
               <div style={{ width: '192px', display: 'flex', alignItems: 'flex-end', marginLeft: '16px' }}>
-                <span style={{ color: '#555', fontSize: '11px', fontWeight: 700, marginRight: '8px', whiteSpace: 'nowrap' }}>Date:</span>
+                <span style={{ color: '#555', fontSize: '11px', fontWeight: 700, marginRight: '8px', whiteSpace: 'nowrap' }}>{t('admin.pdfTemplate.date')}:</span>
                 <div style={{ flex: '1', borderBottom: '1px solid #999', fontSize: '13px', fontWeight: 500, paddingBottom: '3px', textAlign: 'center', color: '#111' }}>{new Date().toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' })}</div>
               </div>
             </div>
@@ -82,13 +86,13 @@ export default function PrescriptionPDFTemplate({
           <div style={{ position: 'relative', zIndex: 10, padding: '24px 32px', height: '100%' }}>
             {/* Diagnostic */}
             <div style={{ marginBottom: '24px' }}>
-              <h3 style={{ color: T, borderBottom: '2px solid ' + T, fontSize: '18px', fontWeight: 700, display: 'inline-block', paddingBottom: '3px', marginBottom: '12px' }}>Diagnostic</h3>
+              <h3 style={{ color: T, borderBottom: '2px solid ' + T, fontSize: '18px', fontWeight: 700, display: 'inline-block', paddingBottom: '3px', marginBottom: '12px' }}>{t('admin.pdfTemplate.diagnostic')}</h3>
               <p style={{ color: '#333', fontSize: '13px', lineHeight: '1.6', fontWeight: 500 }}>{diagnostic}</p>
             </div>
 
             {/* Medications */}
             <div style={{ marginBottom: '24px' }}>
-              <h3 style={{ color: T, borderBottom: '2px solid ' + T, fontSize: '18px', fontWeight: 700, display: 'inline-block', paddingBottom: '3px', marginBottom: '16px' }}>Médicaments Prescrits</h3>
+              <h3 style={{ color: T, borderBottom: '2px solid ' + T, fontSize: '18px', fontWeight: 700, display: 'inline-block', paddingBottom: '3px', marginBottom: '16px' }}>{t('admin.pdfTemplate.medicationsPrescribed')}</h3>
               <ul style={{ margin: 0, padding: 0, listStyle: 'none' }}>
                 {medicaments.map((med, idx) => (
                   <li key={idx} style={{ display: 'flex', flexDirection: 'column', marginBottom: '16px' }}>
@@ -97,8 +101,8 @@ export default function PrescriptionPDFTemplate({
                       <strong style={{ color: '#111', fontSize: '14px' }}>{med.nom}</strong>
                     </div>
                     <div style={{ marginLeft: '32px', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '24px', fontSize: '12px', color: '#555' }}>
-                      <span><span style={{ fontWeight: 600, color: '#666' }}>Posologie:</span> {med.posologie}</span>
-                      <span><span style={{ fontWeight: 600, color: '#666' }}>Durée:</span> {med.duree}</span>
+                      <span><span style={{ fontWeight: 600, color: '#666' }}>{t('admin.pdfTemplate.posologie')}</span> {med.posologie}</span>
+                      <span><span style={{ fontWeight: 600, color: '#666' }}>{t('admin.pdfTemplate.duree')}</span> {med.duree}</span>
                     </div>
                   </li>
                 ))}
@@ -108,7 +112,7 @@ export default function PrescriptionPDFTemplate({
             {/* Recommendations */}
             {recommandations && (
               <div>
-                <h3 style={{ color: T, borderBottom: '2px solid ' + T, fontSize: '18px', fontWeight: 700, display: 'inline-block', paddingBottom: '3px', marginBottom: '12px' }}>Recommandations</h3>
+                <h3 style={{ color: T, borderBottom: '2px solid ' + T, fontSize: '18px', fontWeight: 700, display: 'inline-block', paddingBottom: '3px', marginBottom: '12px' }}>{t('admin.pdfTemplate.recommandations')}</h3>
                 <p style={{ color: '#333', fontSize: '13px', lineHeight: '1.6', fontWeight: 500 }}>{recommandations}</p>
               </div>
             )}
@@ -116,7 +120,7 @@ export default function PrescriptionPDFTemplate({
             {/* Signature */}
             <div style={{ position: 'absolute', bottom: '24px', right: '32px', textAlign: 'center' }}>
               <div style={{ width: '160px', borderTop: '1px solid #333', marginBottom: '4px' }}></div>
-              <span style={{ color: '#555', fontSize: '11px', fontWeight: 700 }}>Signature du Médecin</span>
+              <span style={{ color: '#555', fontSize: '11px', fontWeight: 700 }}>{t('admin.pdfTemplate.signatureMedecin')}</span>
             </div>
           </div>
         </div>
@@ -129,8 +133,8 @@ export default function PrescriptionPDFTemplate({
             <Phone style={{ width: '16px', height: '16px', color: '#fff' }} />
           </div>
           <div style={{ display: 'flex', flexDirection: 'column' }}>
-            <span>{medecin?.telephone || '123 456 789'}</span>
-            <span>{medecin?.telephoneUrgences || '123 456 789'}</span>
+            <span>{medecin?.telephone || t('admin.pdfTemplate.phoneFallback')}</span>
+            <span>{medecin?.telephoneUrgences || t('admin.pdfTemplate.phoneFallback')}</span>
           </div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#fff', fontSize: '11px' }}>
@@ -138,8 +142,8 @@ export default function PrescriptionPDFTemplate({
             <Globe style={{ width: '16px', height: '16px', color: '#fff' }} />
           </div>
           <div style={{ display: 'flex', flexDirection: 'column' }}>
-            <span>{medecin?.email || 'doctor@medisecours.com'}</span>
-            <span>www.medisecours.com</span>
+            <span>{medecin?.email || t('admin.pdfTemplate.emailFallback')}</span>
+            <span>{t('admin.pdfTemplate.website')}</span>
           </div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#fff', fontSize: '11px' }}>
@@ -147,8 +151,8 @@ export default function PrescriptionPDFTemplate({
             <MapPin style={{ width: '16px', height: '16px', color: '#fff' }} />
           </div>
           <div style={{ display: 'flex', flexDirection: 'column' }}>
-            <span>{medecin?.hopital || 'Health Care Clinic'}</span>
-            <span>{medecin?.quartier || 'By boose, Austria'}</span>
+            <span>{medecin?.hopital || t('admin.pdfTemplate.hopitalFallback')}</span>
+            <span>{medecin?.quartier || t('admin.pdfTemplate.quartierFallback')}</span>
           </div>
         </div>
       </div>

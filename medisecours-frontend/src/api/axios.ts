@@ -1,4 +1,5 @@
 import axios from 'axios'
+import i18n from '../i18n'
 
 let accessToken: string | null = null
 type RefreshedSession = { token: string; user: any }
@@ -24,6 +25,10 @@ api.interceptors.request.use((config) => {
     } else {
       delete (config.headers as Record<string, unknown>)['Content-Type']
     }
+  }
+
+  if (i18n.language) {
+    config.headers['Accept-Language'] = i18n.language
   }
 
   if (accessToken) {

@@ -2,6 +2,8 @@
 
 import { useCallback, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { useTranslation } from 'react-i18next'
+import type { TFunction } from 'i18next'
 import useSWR, { mutate as globalMutate } from 'swr'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
@@ -61,21 +63,21 @@ const iconByType = {
   },
 }
 
-function timeAgo(dateString: string): string {
+function timeAgo(dateString: string, t: TFunction): string {
   const timestamp = new Date(dateString).getTime()
   if (!Number.isFinite(timestamp)) return ''
 
   const minutes = Math.max(0, Math.floor((Date.now() - timestamp) / 60000))
-  if (minutes < 1) return "À l'instant"
-  if (minutes < 60) return `Il y a ${minutes} min`
+  if (minutes < 1) return t('medecin.notifications.justNow')
+  if (minutes < 60) return t('medecin.notifications.minutesAgo', { count: minutes })
 
   const hours = Math.floor(minutes / 60)
-  if (hours < 24) return `Il y a ${hours} h`
+  if (hours < 24) return t('medecin.notifications.hoursAgo', { count: hours })
 
   const days = Math.floor(hours / 24)
-  if (days < 30) return `Il y a ${days} j`
+  if (days < 30) return t('medecin.notifications.daysAgo', { count: days })
 
-  return `Il y a ${Math.floor(days / 30)} mois`
+  return t('medecin.notifications.monthsAgo', { count: Math.floor(days / 30) })
 }
 
 function normalizeLink(link?: string | null): string {
@@ -90,6 +92,7 @@ export default function MedecinNotificationsPage() {
   const { user, mounted } = useAuth()
   const router = useRouter()
   const toast = useToast()
+  const { t } = useTranslation()
   const [markingAll, setMarkingAll] = useState(false)
   const [deletingAll, setDeletingAll] = useState(false)
   const [markingId, setMarkingId] = useState<number | null>(null)
@@ -136,12 +139,12 @@ export default function MedecinNotificationsPage() {
       )
       return true
     } catch {
-      toast.error('Impossible de marquer cette notification comme lue.')
+      toast.error(t('medecin.notifications.markReadError'))
       return false
     } finally {
       setMarkingId(null)
     }
-  }, [mutate, toast, unreadCount])
+  }, [mutate, toast, unreadCount, t])
 
   const openNotification = useCallback(async (notification: NotificationRecord) => {
     await markAsRead(notification)
@@ -162,21 +165,19 @@ export default function MedecinNotificationsPage() {
         { revalidate: false },
       )
       globalMutate(UNREAD_NOTIFICATIONS_KEY, { unreadCount: 0 }, false)
-      toast.success('Toutes les notifications ont été marquées comme lues.')
+      toast.success(t('medecin.notifications.markAllReadSuccess'))
     } catch {
-      toast.error('Impossible de marquer toutes les notifications comme lues.')
+      toast.error(t('medecin.notifications.markAllReadError'))
       await mutate()
       globalMutate(UNREAD_NOTIFICATIONS_KEY)
     } finally {
       setMarkingAll(false)
     }
-  }, [mutate, toast, unreadCount])
+  }, [mutate, toast, unreadCount, t])
 
   const deleteAllNotifications = useCallback(async () => {
     if (notifications.length === 0) return
-    if (!window.confirm(
-      "Effacer définitivement tout l'historique des notifications ? Cette action ne supprime ni les messages ni les consultations.",
-    )) {
+    if (!window.confirm(t('medecin.notifications.deleteConfirm'))) {
       return
     }
 
@@ -186,20 +187,20 @@ export default function MedecinNotificationsPage() {
       await mutate([], { revalidate: false })
       globalMutate(NOTIFICATIONS_KEY, [], false)
       globalMutate(UNREAD_NOTIFICATIONS_KEY, { unreadCount: 0 }, false)
-      toast.success("L'historique des notifications a été effacé.")
+      toast.success(t('medecin.notifications.deleteSuccess'))
     } catch {
-      toast.error("Impossible d'effacer l'historique des notifications.")
+      toast.error(t('medecin.notifications.deleteError'))
       await mutate()
       globalMutate(UNREAD_NOTIFICATIONS_KEY)
     } finally {
       setDeletingAll(false)
     }
-  }, [mutate, notifications.length, toast])
+  }, [mutate, notifications.length, toast, t])
 
   if (!mounted || isLoading) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
-        <LoadingSpinner label="Chargement des notifications..." />
+        <LoadingSpinner label={t('medecin.notifications.loading')} />
       </div>
     )
   }
@@ -218,12 +219,12 @@ export default function MedecinNotificationsPage() {
           </div>
           <div className="min-w-0 flex-1">
             <h1 className="text-2xl font-bold tracking-tight text-[#0F2C52]">
-              Notifications
+              {t('medecin.notifications.title')}
             </h1>
             <p className="mt-0.5 text-sm text-[#6B7280]">
               {unreadCount > 0
-                ? `${unreadCount} non lue${unreadCount > 1 ? 's' : ''}`
-                : 'Tout est à jour'}
+                ? t('medecin.notifications.unreadCount', { count: unreadCount })
+                : t('medecin.notifications.upToDate')}
             </p>
           </div>
           {notifications.length > 0 && (
@@ -240,7 +241,7 @@ export default function MedecinNotificationsPage() {
                   ) : (
                     <CheckCheck className="h-4 w-4" />
                   )}
-                  Tout marquer comme lu
+                  {t('medecin.notifications.markAllRead')}
                 </button>
               )}
               <button
@@ -254,7 +255,7 @@ export default function MedecinNotificationsPage() {
                 ) : (
                   <Trash2 className="h-4 w-4" />
                 )}
-                Tout effacer
+                {t('medecin.notifications.deleteAll')}
               </button>
             </div>
           )}
@@ -264,14 +265,14 @@ export default function MedecinNotificationsPage() {
       {error ? (
         <div className="rounded-xl border border-red-200 bg-red-50 px-5 py-6 text-center">
           <p className="text-sm font-medium text-red-700">
-            Impossible de charger les notifications.
+            {t('medecin.notifications.loadError')}
           </p>
           <button
             type="button"
             onClick={() => mutate()}
             className="mt-3 rounded-lg bg-white px-4 py-2 text-sm font-semibold text-red-700 shadow-sm"
           >
-            Réessayer
+            {t('medecin.notifications.retry')}
           </button>
         </div>
       ) : notifications.length === 0 ? (
@@ -282,8 +283,8 @@ export default function MedecinNotificationsPage() {
         >
           <EmptyState
             icon={Bell}
-            title="Aucune notification"
-            description="Les nouveaux messages et événements liés à vos consultations apparaîtront ici."
+            title={t('medecin.notifications.emptyTitle')}
+            description={t('medecin.notifications.emptyDesc')}
           />
         </motion.div>
       ) : (
@@ -343,16 +344,16 @@ export default function MedecinNotificationsPage() {
                         </p>
                         <span className="flex shrink-0 items-center gap-1 text-[11px] text-[#9CA3AF]">
                           <Clock className="h-3 w-3" />
-                          {timeAgo(notification.createdAt)}
+                          {timeAgo(notification.createdAt, t)}
                         </span>
                       </div>
                       <p className="mt-1 line-clamp-3 text-xs leading-relaxed text-[#6B7280] dark:text-slate-300">
-                        {notification.body || 'Une nouvelle information est disponible.'}
+                        {notification.body || t('medecin.notifications.newInfo')}
                       </p>
                       <span className="mt-2 inline-flex text-xs font-semibold text-[#315FD6] dark:text-blue-300">
                         {notification.type === 'message_received'
-                          ? 'Voir la conversation'
-                          : 'Voir les détails'}
+                          ? t('medecin.notifications.viewConversation')
+                          : t('medecin.notifications.viewDetails')}
                       </span>
                     </div>
                     {markingId === notification.id ? (

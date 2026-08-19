@@ -7,6 +7,7 @@ import Link from 'next/link'
 import { motion } from 'framer-motion'
 import { HeartPulse, Lock, Eye, EyeOff, CheckCircle, XCircle } from 'lucide-react'
 import api from '../../api/axios'
+import { useTranslation } from 'react-i18next'
 
 /**
  * Page de réinitialisation de mot de passe.
@@ -27,6 +28,7 @@ const PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{8,}$/
 function ResetPasswordForm() {
   const searchParams = useSearchParams()
   const router = useRouter()
+  const { t } = useTranslation()
   const token = searchParams.get('token')
 
   const [password, setPassword] = useState('')
@@ -39,10 +41,10 @@ function ResetPasswordForm() {
   const validate = () => {
     const e = {}
     if (!PASSWORD_REGEX.test(password)) {
-      e.password = 'Minimum 8 caractères avec majuscule, minuscule, chiffre et symbole.'
+      e.password = t('visitor.resetPassword.pwCriteriaError')
     }
     if (password !== confirm) {
-      e.confirm = 'Les mots de passe ne correspondent pas.'
+      e.confirm = t('visitor.resetPassword.pwMismatch')
     }
     setErrors(e)
     return Object.keys(e).length === 0
@@ -53,7 +55,7 @@ function ResetPasswordForm() {
     if (!validate()) return
 
     if (!token) {
-      setErrors({ general: 'Token manquant. Utilisez le lien reçu par email.' })
+      setErrors({ general: t('visitor.resetPassword.missingToken') })
       return
     }
 
@@ -65,13 +67,13 @@ function ResetPasswordForm() {
     } catch (err) {
       const status = err.response?.status
       if (status === 404) {
-        setErrors({ general: 'Token invalide. Faites une nouvelle demande de réinitialisation.' })
+        setErrors({ general: t('visitor.resetPassword.invalidToken') })
       } else if (status === 410) {
         setStatus('expired')
       } else if (status === 422) {
-        setErrors({ password: 'Le mot de passe ne respecte pas les critères de sécurité.' })
+        setErrors({ password: t('visitor.resetPassword.pwSecurityError') })
       } else {
-        setErrors({ general: 'Une erreur est survenue. Veuillez réessayer.' })
+        setErrors({ general: t('visitor.resetPassword.genericError') })
       }
     } finally {
       setLoading(false)
@@ -81,18 +83,18 @@ function ResetPasswordForm() {
   if (status === 'success') {
     return <StatusScreen
       icon={<CheckCircle className="w-14 h-14 text-mint-500 mx-auto mb-4" />}
-      title="Mot de passe mis à jour !"
-      message="Votre mot de passe a été réinitialisé avec succès. Redirection vers la connexion…"
-      action={<Link href="/login" className="inline-block mt-4 px-6 py-2.5 rounded-xl bg-mint-500 hover:bg-mint-700 text-white font-semibold text-sm">Se connecter</Link>}
+      title={t('visitor.resetPassword.successTitle')}
+      message={t('visitor.resetPassword.successMessage')}
+      action={<Link href="/login" className="inline-block mt-4 px-6 py-2.5 rounded-xl bg-mint-500 hover:bg-mint-700 text-white font-semibold text-sm">{t('visitor.resetPassword.login')}</Link>}
     />
   }
 
   if (status === 'expired') {
     return <StatusScreen
       icon={<XCircle className="w-14 h-14 text-urgence-500 mx-auto mb-4" />}
-      title="Lien expiré"
-      message="Ce lien de réinitialisation a expiré (valide 1h). Faites une nouvelle demande."
-      action={<Link href="/forgot-password" className="inline-block mt-4 px-6 py-2.5 rounded-xl bg-primary-500 hover:bg-primary-700 text-white font-semibold text-sm">Nouvelle demande</Link>}
+      title={t('visitor.resetPassword.expiredTitle')}
+      message={t('visitor.resetPassword.expiredMessage')}
+      action={<Link href="/forgot-password" className="inline-block mt-4 px-6 py-2.5 rounded-xl bg-primary-500 hover:bg-primary-700 text-white font-semibold text-sm">{t('visitor.resetPassword.newRequest')}</Link>}
     />
   }
 
@@ -109,10 +111,10 @@ function ResetPasswordForm() {
             <HeartPulse className="w-6 h-6 text-white" />
           </div>
           <h1 className="font-display font-bold text-2xl text-primary-900 dark:text-sable">
-            Nouveau mot de passe
+            {t('visitor.resetPassword.title')}
           </h1>
           <p className="text-sm text-primary-300 text-center mt-1">
-            Choisissez un mot de passe fort pour sécuriser votre compte.
+            {t('visitor.resetPassword.subtitle')}
           </p>
         </div>
 
@@ -120,7 +122,7 @@ function ResetPasswordForm() {
           {/* Nouveau mot de passe */}
           <div>
             <label className="text-sm font-medium text-primary-700 dark:text-sable">
-              Nouveau mot de passe
+              {t('visitor.resetPassword.newPasswordLabel')}
             </label>
             <div className="relative mt-1">
               <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-primary-300" />
@@ -141,14 +143,14 @@ function ResetPasswordForm() {
             </div>
             {errors.password && <p className="text-xs text-urgence-500 mt-1">{errors.password}</p>}
             <p className="text-xs text-primary-300 mt-1">
-              8 caractères min. avec majuscule, minuscule, chiffre et symbole.
+              {t('visitor.resetPassword.pwStrengthHint')}
             </p>
           </div>
 
           {/* Confirmation */}
           <div>
             <label className="text-sm font-medium text-primary-700 dark:text-sable">
-              Confirmer le mot de passe
+              {t('visitor.resetPassword.confirmLabel')}
             </label>
             <div className="relative mt-1">
               <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-primary-300" />
@@ -174,13 +176,13 @@ function ResetPasswordForm() {
             disabled={loading}
             className="w-full py-3 rounded-xl bg-mint-500 hover:bg-mint-700 text-white font-semibold shadow-lg transition disabled:opacity-60"
           >
-            {loading ? 'Mise à jour…' : 'Réinitialiser le mot de passe'}
+            {loading ? t('visitor.resetPassword.updating') : t('visitor.resetPassword.submit')}
           </button>
         </form>
 
         <p className="text-center text-sm text-primary-300 mt-5">
           <Link href="/login" className="text-primary-400 hover:text-primary-700 underline underline-offset-2">
-            Retour à la connexion
+            {t('visitor.resetPassword.backToLogin')}
           </Link>
         </p>
       </motion.div>

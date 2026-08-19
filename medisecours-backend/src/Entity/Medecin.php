@@ -32,7 +32,7 @@ class Medecin extends User
 {
     #[ORM\Column(length: 255, nullable: true)]
     #[Assert\Length(max: 255, maxMessage: 'La spécialité ne peut pas dépasser {{ limit }} caractères')]
-    #[Groups(['user:read', 'user:write'])]
+    #[Groups(['user:read', 'user:write', 'prescription:read'])]
     private ?string $specialite = null;
 
     #[ORM\Column(length: 100, nullable: true)]

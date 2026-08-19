@@ -3,6 +3,7 @@
 import Image from 'next/image'
 import Link from 'next/link'
 import { ArrowLeft, BadgeCheck, HeartHandshake, ShieldCheck } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 
 type AuthLayoutProps = {
   eyebrow: string
@@ -11,13 +12,13 @@ type AuthLayoutProps = {
   children: React.ReactNode
 }
 
-const assurances = [
-  { icon: ShieldCheck, label: 'Données de santé protégées' },
-  { icon: BadgeCheck, label: 'Médecins soumis à validation' },
-  { icon: HeartHandshake, label: 'Assistance médicale responsable' },
-]
-
 export default function AuthLayout({ eyebrow, title, description, children }: AuthLayoutProps) {
+  const { t } = useTranslation()
+  const assurances = [
+    { icon: ShieldCheck, label: t('visitor.authLayout.assuranceData') },
+    { icon: BadgeCheck, label: t('visitor.authLayout.assuranceDoctors') },
+    { icon: HeartHandshake, label: t('visitor.authLayout.assuranceAssistance') },
+  ]
   return (
     <div className="flex min-h-dvh items-center justify-center bg-[#edf6fb] px-3 py-3 text-slate-900 sm:px-6 sm:py-6 dark:bg-[#081525]">
       <section className="grid w-full max-w-[1180px] overflow-hidden rounded-lg border border-white/80 bg-white shadow-[0_28px_90px_rgba(30,58,95,0.18)] lg:min-h-[720px] lg:grid-cols-[0.86fr_1.14fr] dark:border-white/10 dark:bg-slate-950 dark:shadow-[0_28px_90px_rgba(0,0,0,0.48)]">
@@ -38,7 +39,7 @@ export default function AuthLayout({ eyebrow, title, description, children }: Au
               className="inline-flex items-center gap-2 text-xs font-semibold text-white/85 transition-colors hover:text-white"
             >
               <ArrowLeft className="h-4 w-4" />
-              Retour au site
+              {t('visitor.authLayout.backToSite')}
             </Link>
             <span className="rounded-full border border-white/25 bg-white/10 px-3 py-1 text-[11px] font-semibold backdrop-blur-md">
               MediSecours+
@@ -58,10 +59,10 @@ export default function AuthLayout({ eyebrow, title, description, children }: Au
             </div>
             <p className="text-sm font-semibold text-cyan-50">{eyebrow}</p>
             <h2 className="mt-2 font-display text-2xl font-extrabold leading-tight sm:text-3xl lg:text-4xl">
-              Votre santé, accompagnée avec rigueur.
+              {t('visitor.authLayout.headline')}
             </h2>
             <p className="mt-4 hidden text-sm leading-6 text-blue-50/85 sm:block">
-              Accédez aux gestes de premiers secours, aux centres de santé et à une messagerie médicale sécurisée.
+              {t('visitor.authLayout.subtitle')}
             </p>
           </div>
 

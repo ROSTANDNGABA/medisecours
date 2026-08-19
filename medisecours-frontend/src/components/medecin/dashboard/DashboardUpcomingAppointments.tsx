@@ -2,19 +2,22 @@
 
 import { useRouter } from 'next/navigation'
 import { Calendar, Clock, ChevronRight } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import Avatar from '../../ui/Avatar'
 import type { Consultation } from '../../../types/api'
 
 export default function DashboardUpcomingAppointments({ upcomingAppointments }: { upcomingAppointments: Consultation[] }) {
   const router = useRouter()
+  const { t, i18n } = useTranslation()
+  const locale = i18n.language === 'en' ? 'en-GB' : 'fr-FR'
 
   const upcoming = upcomingAppointments || []
 
   if (upcoming.length === 0) {
     return (
       <div className="rounded-2xl bg-white p-5 shadow-[0_2px_12px_rgba(0,0,0,0.06)]">
-        <h3 className="text-sm font-bold text-[#0F2C52] mb-1">Prochains rendez-vous</h3>
-        <div className="flex h-[200px] items-center justify-center"><p className="text-sm text-[#9CA3AF]">Aucun rendez-vous planifié</p></div>
+        <h3 className="text-sm font-bold text-[#0F2C52] mb-1">{t('medecin.dashboard.upcoming.title')}</h3>
+        <div className="flex h-[200px] items-center justify-center"><p className="text-sm text-[#9CA3AF]">{t('medecin.dashboard.upcoming.none')}</p></div>
       </div>
     )
   }
@@ -23,8 +26,8 @@ export default function DashboardUpcomingAppointments({ upcomingAppointments }: 
     <div className="rounded-2xl bg-white p-5 shadow-[0_2px_12px_rgba(0,0,0,0.06)]">
       <div className="flex items-center justify-between mb-3">
         <div>
-          <h3 className="text-sm font-bold text-[#0F2C52]">Prochains rendez-vous</h3>
-          <p className="text-xs text-[#6B7280]">{upcoming.length} à venir</p>
+          <h3 className="text-sm font-bold text-[#0F2C52]">{t('medecin.dashboard.upcoming.title')}</h3>
+          <p className="text-xs text-[#6B7280]">{t('medecin.dashboard.upcoming.count', { count: upcoming.length })}</p>
         </div>
         <Calendar className="h-5 w-5 text-[#3B6EF8]" />
       </div>
@@ -32,8 +35,8 @@ export default function DashboardUpcomingAppointments({ upcomingAppointments }: 
       <div className="space-y-2">
         {upcoming.map((c) => {
           const d = new Date(c.dateConsultation)
-          const day = d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })
-          const time = d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+          const day = d.toLocaleDateString(locale, { day: 'numeric', month: 'short' })
+          const time = d.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' })
           const isToday = d.toDateString() === new Date().toDateString()
 
           return (
@@ -48,13 +51,13 @@ export default function DashboardUpcomingAppointments({ upcomingAppointments }: 
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-semibold text-[#0F2C52] truncate">
-                  {typeof c.patient === 'object' ? `${c.patient?.prenom ?? ''} ${c.patient?.nom ?? ''}` : 'Patient'}
+                  {typeof c.patient === 'object' ? `${c.patient?.prenom ?? ''} ${c.patient?.nom ?? ''}` : t('medecin.dashboard.upcoming.patientFallback')}
                 </p>
-                <p className="text-xs text-[#9CA3AF] truncate">{c.motif || 'Consultation'}</p>
+                <p className="text-xs text-[#9CA3AF] truncate">{c.motif || t('medecin.dashboard.upcoming.motifFallback')}</p>
               </div>
               {isToday && (
                 <span className="px-2 py-0.5 rounded-full bg-[#3B6EF8]/10 text-[10px] font-semibold text-[#3B6EF8]">
-                  Aujourd&apos;hui
+                  {t('medecin.dashboard.upcoming.today')}
                 </span>
               )}
               <ChevronRight className="h-4 w-4 text-[#D1D5DB]" />

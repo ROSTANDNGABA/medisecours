@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect, useCallback } from 'react'
+import { useTranslation } from 'react-i18next'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -81,6 +82,7 @@ function TrafficLights() {
 }
 
 function TopNav() {
+  const { t } = useTranslation()
   return (
     <div className="flex items-center justify-between px-6 py-3 bg-white border-b border-gray-200">
       <div className="flex items-center gap-4">
@@ -89,10 +91,10 @@ function TopNav() {
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
         </svg>
       </div>
-      <span className="absolute left-1/2 -translate-x-1/2 text-[11px] font-bold tracking-[0.2em] text-gray-700">MESSAGES</span>
+      <span className="absolute left-1/2 -translate-x-1/2 text-[11px] font-bold tracking-[0.2em] text-gray-700">{t('visitor.chatPreview.messages')}</span>
       <div className="flex items-center gap-6">
-        <button className="text-[11px] font-semibold tracking-wider text-gray-400 uppercase hover:text-gray-600 transition-colors">Download App</button>
-        <button className="text-[11px] font-semibold tracking-wider text-gray-400 uppercase hover:text-gray-600 transition-colors">Logout</button>
+        <button className="text-[11px] font-semibold tracking-wider text-gray-400 uppercase hover:text-gray-600 transition-colors">{t('visitor.chatPreview.downloadApp')}</button>
+        <button className="text-[11px] font-semibold tracking-wider text-gray-400 uppercase hover:text-gray-600 transition-colors">{t('visitor.chatPreview.logout')}</button>
       </div>
     </div>
   )
@@ -161,6 +163,7 @@ function ConversationItem({
 }
 
 function MessageBubble({ message, isMine, showAvatar }: { message: Message; isMine: boolean; showAvatar: boolean }) {
+  const { t } = useTranslation()
   if (message.type === 'image' && message.images) {
     return (
       <div className={`flex ${isMine ? 'justify-end' : 'justify-start'} mb-3`}>
@@ -195,7 +198,7 @@ function MessageBubble({ message, isMine, showAvatar }: { message: Message; isMi
         </div>
         {isMine && showAvatar && (
           <div className="ml-2 self-end">
-            <Avatar name="You" size={36} />
+            <Avatar name={t('visitor.chatPreview.you')} size={36} />
           </div>
         )}
         {isMine && !showAvatar && <div className="w-[36px] ml-2 shrink-0" />}
@@ -227,7 +230,7 @@ function MessageBubble({ message, isMine, showAvatar }: { message: Message; isMi
       </div>
       {isMine && showAvatar && (
         <div className="ml-2 self-end">
-          <Avatar name="You" size={36} />
+          <Avatar name={t('visitor.chatPreview.you')} size={36} />
         </div>
       )}
       {isMine && !showAvatar && <div className="w-[36px] ml-2 shrink-0" />}
@@ -251,16 +254,18 @@ function TypingIndicator() {
 }
 
 function DateDivider({ label }: { label: string }) {
+  const { t } = useTranslation()
   return (
     <div className="flex items-center gap-4 my-6">
       <div className="flex-1 h-px bg-gray-200" />
-      <span className="text-[11px] font-semibold tracking-wider text-gray-400 uppercase">{label}</span>
+      <span className="text-[11px] font-semibold tracking-wider text-gray-400 uppercase">{t(label)}</span>
       <div className="flex-1 h-px bg-gray-200" />
     </div>
   )
 }
 
 function MessageInput({ onSend }: { onSend: (text: string) => void }) {
+  const { t } = useTranslation()
   const [value, setValue] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
 
@@ -284,7 +289,7 @@ function MessageInput({ onSend }: { onSend: (text: string) => void }) {
         value={value}
         onChange={(e) => setValue(e.target.value)}
         onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-        placeholder="Hi there"
+        placeholder={t('visitor.chatPreview.inputPlaceholder')}
         className="flex-1 text-sm text-[#212121] placeholder-gray-400 bg-transparent outline-none"
       />
       <button
@@ -294,7 +299,7 @@ function MessageInput({ onSend }: { onSend: (text: string) => void }) {
           value.trim() ? 'text-[#2196F3] hover:text-blue-700' : 'text-gray-300'
         }`}
       >
-        Send
+        {t('visitor.chatPreview.send')}
       </button>
     </div>
   )
@@ -370,7 +375,7 @@ export default function ModernChat() {
           {/* Chat Panel */}
           <div className="flex-1 flex flex-col bg-[#FAFAFA]">
             <div className="flex-1 overflow-y-auto px-6 py-5">
-              <DateDivider label="TUESDAY" />
+              <DateDivider label="visitor.chatPreview.dateDivider" />
               {messages.map((msg, idx) => (
                 <MessageBubble
                   key={msg.id}

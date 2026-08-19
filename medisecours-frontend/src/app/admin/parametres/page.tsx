@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Activity, Info, Key, Save, ShieldCheck } from 'lucide-react'
 import api from '../../../api/axios'
 import { useAuth } from '../../../hooks/useAuth'
@@ -11,6 +12,7 @@ import { useToast } from '../../../components/ui/Toast'
 
 export default function AdminParametresPage() {
   const { user, updateUser, logout } = useAuth()
+  const { t, i18n } = useTranslation()
   const toast = useToast()
   const [savingProfile, setSavingProfile] = useState(false)
   const [changingPassword, setChangingPassword] = useState(false)
@@ -31,7 +33,7 @@ export default function AdminParametresPage() {
       const { data } = await api.get('/api/admin/audit-log')
       setAuditLog(data.entries || [])
     } catch {
-      toast.error('Impossible de charger le journal d audit.')
+      toast.error(t('admin.parametres.toastAuditError'))
     } finally {
       setLoadingAudit(false)
     }
@@ -49,9 +51,9 @@ export default function AdminParametresPage() {
         headers: { 'Content-Type': 'application/merge-patch+json' },
       })
       updateUser({ ...user, ...data })
-      toast.success('Profil administrateur mis a jour.')
+      toast.success(t('admin.parametres.toastProfileUpdated'))
     } catch {
-      toast.error('Echec de la mise a jour.')
+      toast.error(t('admin.parametres.toastProfileError'))
     } finally {
       setSavingProfile(false)
     }
@@ -59,7 +61,7 @@ export default function AdminParametresPage() {
 
   const handleChangePassword = async () => {
     if (passwordForm.new !== passwordForm.confirm) {
-      toast.error('Les mots de passe ne correspondent pas.')
+      toast.error(t('admin.parametres.toastPasswordMismatch'))
       return
     }
 
@@ -69,13 +71,13 @@ export default function AdminParametresPage() {
         currentPassword: passwordForm.current,
         newPassword: passwordForm.new,
       })
-      toast.success('Mot de passe modifie avec succes.')
+      toast.success(t('admin.parametres.toastPasswordUpdated'))
       setShowPasswordModal(false)
       setPasswordForm({ current: '', new: '', confirm: '' })
       await logout()
       window.location.assign('/login')
     } catch {
-      toast.error('Echec de la modification du mot de passe.')
+      toast.error(t('admin.parametres.toastPasswordError'))
     } finally {
       setChangingPassword(false)
     }
@@ -85,16 +87,16 @@ export default function AdminParametresPage() {
     <div className="space-y-6">
       <section className="grid grid-cols-1 gap-4 xl:grid-cols-[1.4fr_1fr]">
         <div className="rounded-[28px] bg-[linear-gradient(135deg,#09170f_0%,#0f2418_60%,#183626_100%)] p-6 text-white shadow-[0_18px_45px_rgba(15,36,24,0.16)]">
-          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-white/60">Configuration</p>
-          <h1 className="mt-3 font-display text-3xl font-extrabold tracking-tight">Parametres admin</h1>
+          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-white/60">{t('admin.parametres.eyebrow')}</p>
+          <h1 className="mt-3 font-display text-3xl font-extrabold tracking-tight">{t('admin.parametres.title')}</h1>
           <p className="mt-3 max-w-2xl text-sm leading-6 text-white/72">
-            Gere ton profil administrateur, la securite d acces et les informations techniques du back-office.
+            {t('admin.parametres.description')}
           </p>
         </div>
         <div className="grid gap-4 sm:grid-cols-3 xl:grid-cols-1">
-          <MetricCard label="Role" value="Admin" tone="green" />
-          <MetricCard label="Audit" value={auditLog.length || '0'} tone="blue" />
-          <MetricCard label="Version" value="1.0.0" tone="neutral" />
+          <MetricCard label={t('admin.parametres.metricRole')} value={t('admin.parametres.roleAdmin')} tone="green" />
+          <MetricCard label={t('admin.parametres.metricAudit')} value={auditLog.length || '0'} tone="blue" />
+          <MetricCard label={t('admin.parametres.metricVersion')} value="1.0.0" tone="neutral" />
         </div>
       </section>
 
@@ -102,58 +104,58 @@ export default function AdminParametresPage() {
         <div className="space-y-6">
           <Panel
             icon={ShieldCheck}
-            title="Profil administrateur"
-            description="Mets a jour tes informations de contact et ton identite."
+            title={t('admin.parametres.profileTitle')}
+            description={t('admin.parametres.profileDesc')}
             iconTone="green"
           >
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              <Field label="Prenom" value={form.prenom} onChange={setFormField('prenom')} />
-              <Field label="Nom" value={form.nom} onChange={setFormField('nom')} />
-              <Field label="Email" value={form.email} onChange={setFormField('email')} readOnly />
-              <Field label="Telephone" value={form.telephone} onChange={setFormField('telephone')} />
+              <Field label={t('admin.parametres.fieldPrenom')} value={form.prenom} onChange={setFormField('prenom')} />
+              <Field label={t('admin.parametres.fieldNom')} value={form.nom} onChange={setFormField('nom')} />
+              <Field label={t('admin.parametres.fieldEmail')} value={form.email} onChange={setFormField('email')} readOnly />
+              <Field label={t('admin.parametres.fieldTelephone')} value={form.telephone} onChange={setFormField('telephone')} />
             </div>
 
             <div className="mt-5 flex flex-wrap gap-3">
               <Button onClick={handleSaveProfile} variant="primary" isLoading={savingProfile}>
-                <Save className="h-4 w-4" /> Enregistrer le profil
+                <Save className="h-4 w-4" /> {t('admin.parametres.profileSave')}
               </Button>
               <Button onClick={() => setShowPasswordModal(true)} variant="secondary">
-                <Key className="h-4 w-4" /> Changer le mot de passe
+                <Key className="h-4 w-4" /> {t('admin.parametres.changePassword')}
               </Button>
             </div>
           </Panel>
 
           <Panel
             icon={Activity}
-            title="Journal d audit"
-            description="Historique recent des actions d administration."
+            title={t('admin.parametres.auditTitle')}
+            description={t('admin.parametres.auditDesc')}
             iconTone="blue"
             action={(
               <Button onClick={loadAuditLog} variant="secondary" size="sm">
-                Actualiser
+                {t('admin.parametres.auditRefresh')}
               </Button>
             )}
           >
             {loadingAudit ? (
-              <LoadingSpinner label="Chargement du journal..." />
+              <LoadingSpinner label={t('admin.parametres.auditLoading')} />
             ) : auditLog.length === 0 ? (
               <div className="rounded-[22px] border border-dashed border-[#dbe1d8] bg-[#f8faf6] px-4 py-10 text-center text-sm text-[#7a8578]">
-                Aucune entree dans le journal d audit.
+                {t('admin.parametres.auditEmpty')}
               </div>
             ) : (
               <div className="overflow-x-auto rounded-[24px] border border-[#edf1eb]">
                 <table className="w-full min-w-[640px] text-sm">
                   <thead>
                     <tr className="text-left text-xs uppercase tracking-[0.18em] text-[#7a8578]">
-                      <th className="px-5 py-4 font-semibold">Date</th>
-                      <th className="px-5 py-4 font-semibold">Action</th>
-                      <th className="px-5 py-4 font-semibold">Entite</th>
+                      <th className="px-5 py-4 font-semibold">{t('admin.parametres.thDate')}</th>
+                      <th className="px-5 py-4 font-semibold">{t('admin.parametres.thAction')}</th>
+                      <th className="px-5 py-4 font-semibold">{t('admin.parametres.thEntite')}</th>
                     </tr>
                   </thead>
                   <tbody>
                     {auditLog.slice(0, 10).map((entry: any, index: number) => (
                       <tr key={index} className="border-t border-[#edf1eb]">
-                        <td className="px-5 py-4 text-[#4c584c]">{new Date(entry.loggedAt).toLocaleString('fr-FR')}</td>
+                        <td className="px-5 py-4 text-[#4c584c]">{new Date(entry.loggedAt).toLocaleString(i18n.language?.startsWith('en') ? 'en-US' : 'fr-FR')}</td>
                         <td className="px-5 py-4 font-medium text-[#172216]">{entry.action}</td>
                         <td className="px-5 py-4 text-[#4c584c]">{entry.objectClass?.split('\\').pop()}</td>
                       </tr>
@@ -167,38 +169,38 @@ export default function AdminParametresPage() {
 
         <Panel
           icon={Info}
-          title="Informations plateforme"
-          description="Vue rapide des caracteristiques du produit."
+          title={t('admin.parametres.infoTitle')}
+          description={t('admin.parametres.infoDesc')}
           iconTone="amber"
         >
           <dl className="space-y-3">
-            <InfoRow label="Nom" value="MediSecours+" />
-            <InfoRow label="Marche" value="Cameroun" />
-            <InfoRow label="Frontend" value="Next.js 16" />
-            <InfoRow label="Backend" value="Symfony 7.4 + API Platform 4" />
-            <InfoRow label="Base de donnees" value="PostgreSQL 15" />
-            <InfoRow label="Version" value="1.0.0" />
+            <InfoRow label={t('admin.parametres.infoNom')} value="MediSecours+" />
+            <InfoRow label={t('admin.parametres.infoMarche')} value="Cameroun" />
+            <InfoRow label={t('admin.parametres.infoFrontend')} value="Next.js 16" />
+            <InfoRow label={t('admin.parametres.infoBackend')} value="Symfony 7.4 + API Platform 4" />
+            <InfoRow label={t('admin.parametres.infoBase')} value="PostgreSQL 15" />
+            <InfoRow label={t('admin.parametres.infoVersion')} value="1.0.0" />
           </dl>
         </Panel>
       </section>
 
       {showPasswordModal && (
-        <Modal isOpen onClose={() => setShowPasswordModal(false)} title="Changer le mot de passe">
+        <Modal isOpen onClose={() => setShowPasswordModal(false)} title={t('admin.parametres.passwordModalTitle')}>
           <div className="space-y-4">
             <Field
-              label="Mot de passe actuel"
+              label={t('admin.parametres.fieldCurrent')}
               type="password"
               value={passwordForm.current}
               onChange={setPasswordField('current')}
             />
             <Field
-              label="Nouveau mot de passe"
+              label={t('admin.parametres.fieldNew')}
               type="password"
               value={passwordForm.new}
               onChange={setPasswordField('new')}
             />
             <Field
-              label="Confirmer le nouveau mot de passe"
+              label={t('admin.parametres.fieldConfirm')}
               type="password"
               value={passwordForm.confirm}
               onChange={setPasswordField('confirm')}
@@ -206,10 +208,10 @@ export default function AdminParametresPage() {
           </div>
           <div className="mt-6 flex justify-end gap-3">
             <Button variant="secondary" onClick={() => setShowPasswordModal(false)} disabled={changingPassword}>
-              Annuler
+              {t('admin.parametres.cancel')}
             </Button>
             <Button variant="primary" onClick={handleChangePassword} isLoading={changingPassword}>
-              <Key className="h-4 w-4" /> Changer le mot de passe
+              <Key className="h-4 w-4" /> {t('admin.parametres.changePasswordBtn')}
             </Button>
           </div>
         </Modal>

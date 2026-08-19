@@ -31,14 +31,15 @@ import {
   type PublicMedecinDetail,
 } from '@/types/api'
 import { useToast } from '@/components/ui/Toast'
+import { useTranslation } from 'react-i18next'
 
 const REPORT_REASONS = [
-  { value: 'COMPORTEMENT_INAPPROPRIE', label: 'Comportement inapproprié' },
-  { value: 'FAUSSE_INFORMATION', label: 'Informations fausses ou trompeuses' },
-  { value: 'HARCELEMENT', label: 'Harcèlement ou propos déplacés' },
-  { value: 'NEGLIGENCE', label: 'Négligence pendant la prise en charge' },
-  { value: 'FRAUDE', label: 'Fraude ou demande de paiement suspecte' },
-  { value: 'AUTRE', label: 'Autre motif' },
+  'COMPORTEMENT_INAPPROPRIE',
+  'FAUSSE_INFORMATION',
+  'HARCELEMENT',
+  'NEGLIGENCE',
+  'FRAUDE',
+  'AUTRE',
 ]
 
 function fullName(medecin: PublicMedecinDetail): string {
@@ -46,8 +47,9 @@ function fullName(medecin: PublicMedecinDetail): string {
 }
 
 function Stars({ note, size = 'h-4 w-4' }: { note: number; size?: string }) {
+  const { t } = useTranslation()
   return (
-    <span className="flex gap-0.5" aria-label={`Note ${note} sur 5`}>
+    <span className="flex gap-0.5" aria-label={t('visitor.medecinDetail.ratingAria', { note })}>
       {[1, 2, 3, 4, 5].map((value) => (
         <Star
           key={value}
@@ -64,8 +66,9 @@ function Stars({ note, size = 'h-4 w-4' }: { note: number; size?: string }) {
 }
 
 function Review({ review }: { review: PublicMedecinAvis }) {
-  const patient = `${review.patient.prenom ?? ''} ${review.patient.nom ?? ''}`.trim() || 'Patient'
-  const date = new Intl.DateTimeFormat('fr-CM', {
+  const { t, i18n } = useTranslation()
+  const patient = `${review.patient.prenom ?? ''} ${review.patient.nom ?? ''}`.trim() || t('visitor.medecinDetail.anonymousPatient')
+  const date = new Intl.DateTimeFormat(i18n.language.startsWith('en') ? 'en-GB' : 'fr-CM', {
     day: 'numeric',
     month: 'long',
     year: 'numeric',
@@ -97,6 +100,7 @@ function Review({ review }: { review: PublicMedecinAvis }) {
 export default function MedecinDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
   const { mounted, isAuthenticated, isMedecin, user } = useAuth()
+  const { t } = useTranslation()
   const toast = useToast()
   const [note, setNote] = useState(0)
   const [commentaire, setCommentaire] = useState('')
@@ -133,11 +137,11 @@ export default function MedecinDetailPage({ params }: { params: Promise<{ id: st
     event.preventDefault()
     const text = commentaire.trim()
     if (!note) {
-      toast.error('Choisissez une note.')
+      toast.error(t('visitor.medecinDetail.toastNoNote'))
       return
     }
     if (text && text.length < 10) {
-      toast.error('Le commentaire doit contenir au moins 10 caractères.')
+      toast.error(t('visitor.medecinDetail.toastCommentTooShort'))
       return
     }
 
@@ -151,15 +155,15 @@ export default function MedecinDetailPage({ params }: { params: Promise<{ id: st
       setNote(0)
       setCommentaire('')
       await mutate()
-      toast.success('Votre avis a été publié.')
+      toast.success(t('visitor.medecinDetail.toastReviewSuccess'))
     } catch (requestError: unknown) {
       const status = (requestError as { response?: { status?: number } }).response?.status
       if (status === 403) {
-        toast.error('Un avis peut être publié après une consultation terminée avec ce médecin.')
+        toast.error(t('visitor.medecinDetail.toastReview403'))
       } else if (status === 422) {
-        toast.error('Vérifiez la note et le contenu de votre avis.')
+        toast.error(t('visitor.medecinDetail.toastReview422'))
       } else {
-        toast.error('Impossible de publier cet avis.')
+        toast.error(t('visitor.medecinDetail.toastReviewError'))
       }
     } finally {
       setSending(false)
@@ -170,11 +174,11 @@ export default function MedecinDetailPage({ params }: { params: Promise<{ id: st
     event.preventDefault()
     const description = reportDescription.trim()
     if (!reportReason) {
-      toast.error('Sélectionnez le motif du signalement.')
+      toast.error(t('visitor.medecinDetail.reportReasonEmpty'))
       return
     }
     if (description.length < 20) {
-      toast.error('Décrivez les faits avec au moins 20 caractères.')
+      toast.error(t('visitor.medecinDetail.reportDescriptionTooShort'))
       return
     }
 
@@ -188,12 +192,12 @@ export default function MedecinDetailPage({ params }: { params: Promise<{ id: st
       setReportOpen(false)
       setReportReason('')
       setReportDescription('')
-      toast.success('Votre signalement a été transmis à l’administration.')
+      toast.success(t('visitor.medecinDetail.reportSuccess'))
     } catch (requestError: unknown) {
       const response = (requestError as {
         response?: { status?: number; data?: { error?: string } }
       }).response
-      toast.error(response?.data?.error || 'Impossible de transmettre ce signalement.')
+      toast.error(response?.data?.error || t('visitor.medecinDetail.reportError'))
     } finally {
       setReportSending(false)
     }
@@ -203,7 +207,7 @@ export default function MedecinDetailPage({ params }: { params: Promise<{ id: st
     return (
       <main className="flex min-h-[440px] items-center justify-center text-sm text-slate-500" role="status">
         <LoaderCircle className="mr-3 h-5 w-5 animate-spin" aria-hidden="true" />
-        Chargement du profil
+        {t('visitor.medecinDetail.loadingProfile')}
       </main>
     )
   }
@@ -213,15 +217,15 @@ export default function MedecinDetailPage({ params }: { params: Promise<{ id: st
       <main className="mx-auto max-w-2xl px-4 py-16 text-center sm:px-6">
         <Stethoscope className="mx-auto h-12 w-12 text-slate-400" aria-hidden="true" />
         <h1 className="mt-4 font-display text-2xl font-bold text-slate-950 dark:text-white">
-          Médecin introuvable
+          {t('visitor.medecinDetail.notFoundTitle')}
         </h1>
-        <p className="mt-2 text-sm text-slate-500">Ce profil n&apos;est plus accessible.</p>
+        <p className="mt-2 text-sm text-slate-500">{t('visitor.medecinDetail.notFoundDesc')}</p>
         <Link
           href="/medecins"
           className="mt-6 inline-flex min-h-11 items-center gap-2 bg-slate-950 px-4 text-sm font-bold text-white"
         >
           <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-          Retour aux médecins
+          {t('visitor.medecinDetail.backToDoctors')}
         </Link>
       </main>
     )
@@ -234,10 +238,10 @@ export default function MedecinDetailPage({ params }: { params: Promise<{ id: st
       ? '/medecin'
       : messagesPath
   const contactLabel = !mounted || !isAuthenticated
-    ? 'Se connecter pour contacter'
+    ? t('visitor.medecinDetail.loginContact')
     : isMedecin
-      ? 'Retour à mon espace'
-      : 'Contacter ce médecin'
+      ? t('visitor.medecinDetail.mySpace')
+      : t('visitor.medecinDetail.contactDoctor')
   const photo = medecin.photoProfil ? resolveImgPath(medecin.photoProfil) : null
   const initials = `${medecin.prenom?.[0] ?? ''}${medecin.nom?.[0] ?? ''}`.toUpperCase() || 'DR'
 
@@ -248,16 +252,16 @@ export default function MedecinDetailPage({ params }: { params: Promise<{ id: st
         onClose={() => {
           if (!reportSending) setReportOpen(false)
         }}
-        title={`Signaler ${fullName(medecin)}`}
+        title={t('visitor.medecinDetail.reportModalTitle', { name: fullName(medecin) })}
         size="md"
       >
         <form onSubmit={submitReport} className="space-y-4">
           <div className="border border-red-200 bg-red-50 p-3 text-xs leading-5 text-red-900 dark:border-red-500/25 dark:bg-red-500/10 dark:text-red-100">
-            Ce formulaire est privé. Il sera uniquement transmis aux administrateurs chargés d’examiner le dossier.
+            {t('visitor.medecinDetail.reportPrivateNote')}
           </div>
           <div>
             <label htmlFor="report-reason" className="text-sm font-bold text-slate-900 dark:text-white">
-              Motif
+              {t('visitor.medecinDetail.reportReasonLabel')}
             </label>
             <select
               id="report-reason"
@@ -266,15 +270,15 @@ export default function MedecinDetailPage({ params }: { params: Promise<{ id: st
               className="mt-2 min-h-11 w-full border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none focus:border-red-500 dark:border-white/10 dark:bg-slate-950 dark:text-white"
               required
             >
-              <option value="">Sélectionner un motif</option>
+              <option value="">{t('visitor.medecinDetail.reportReasonPlaceholder')}</option>
               {REPORT_REASONS.map((reason) => (
-                <option key={reason.value} value={reason.value}>{reason.label}</option>
+                <option key={reason} value={reason}>{t(`visitor.medecinDetail.reportReasons.${reason}`)}</option>
               ))}
             </select>
           </div>
           <div>
             <label htmlFor="report-description" className="text-sm font-bold text-slate-900 dark:text-white">
-              Description des faits
+              {t('visitor.medecinDetail.reportDescriptionLabel')}
             </label>
             <textarea
               id="report-description"
@@ -283,7 +287,7 @@ export default function MedecinDetailPage({ params }: { params: Promise<{ id: st
               rows={6}
               minLength={20}
               maxLength={2000}
-              placeholder="Décrivez les faits, le contexte et les éléments utiles à la vérification."
+              placeholder={t('visitor.medecinDetail.reportDescriptionPlaceholder')}
               className="mt-2 w-full resize-y border border-slate-300 bg-white px-3 py-3 text-sm text-slate-900 outline-none focus:border-red-500 dark:border-white/10 dark:bg-slate-950 dark:text-white"
               required
             />
@@ -298,14 +302,14 @@ export default function MedecinDetailPage({ params }: { params: Promise<{ id: st
               disabled={reportSending}
               className="min-h-11 border border-slate-300 bg-white px-4 text-sm font-bold text-slate-700 disabled:opacity-50 dark:border-white/15 dark:bg-slate-900 dark:text-white"
             >
-              Annuler
+              {t('visitor.medecinDetail.reportCancel')}
             </button>
             <button
               type="submit"
               disabled={reportSending || !reportReason || reportDescription.trim().length < 20}
               className="min-h-11 bg-red-700 px-4 text-sm font-bold text-white hover:bg-red-600 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {reportSending ? 'Transmission...' : 'Envoyer le signalement'}
+              {reportSending ? t('visitor.medecinDetail.reportSending') : t('visitor.medecinDetail.reportSubmit')}
             </button>
           </div>
         </form>
@@ -316,7 +320,7 @@ export default function MedecinDetailPage({ params }: { params: Promise<{ id: st
         className="inline-flex min-h-10 items-center gap-2 text-sm font-bold text-slate-600 hover:text-slate-950 dark:text-slate-300"
       >
         <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-        Tous les médecins
+        {t('visitor.medecinDetail.allDoctors')}
       </Link>
 
       <section className="mt-4 border border-slate-200 bg-white dark:border-white/10 dark:bg-slate-900">
@@ -326,7 +330,7 @@ export default function MedecinDetailPage({ params }: { params: Promise<{ id: st
               {photo ? (
                 <Image
                   src={photo}
-                  alt={`Photo de ${fullName(medecin)}`}
+                  alt={t('visitor.medecinDetail.photoAlt', { name: fullName(medecin) })}
                   width={96}
                   height={96}
                   unoptimized
@@ -343,23 +347,23 @@ export default function MedecinDetailPage({ params }: { params: Promise<{ id: st
                 {medecin.estValide && <CertifiedBadge className="h-6 w-6" />}
                 <span className="inline-flex items-center gap-1.5 bg-blue-100 px-2 py-1 text-[11px] font-bold text-blue-800 dark:bg-[#1DA1F2]/15 dark:text-[#60A5FA]">
                   <ShieldCheck className="h-3.5 w-3.5" aria-hidden="true" />
-                  Compte certifié
+                  {t('visitor.medecinDetail.certifiedAccount')}
                 </span>
               </div>
               <p className="mt-2 font-semibold text-emerald-700 dark:text-emerald-300">
-                {medecin.specialite || 'Médecine générale'}
+                {medecin.specialite || t('visitor.medecinDetail.generalMedicine')}
               </p>
               <div className="mt-4 flex flex-wrap items-center gap-2">
                 <Stars note={medecin.noteMoyenne || 0} />
                 <span className="text-sm font-semibold text-slate-600 dark:text-slate-300">
                   {medecin.totalAvis > 0
-                    ? `${medecin.noteMoyenne.toFixed(1)} · ${medecin.totalAvis} avis`
-                    : 'Aucun avis publié'}
+                    ? `${medecin.noteMoyenne.toFixed(1)} · ${t('visitor.medecinDetail.reviewsCount', { count: medecin.totalAvis })}`
+                    : t('visitor.medecinDetail.noReviewPublished')}
                 </span>
               </div>
               <div className="mt-4 flex items-start gap-2 text-sm leading-6 text-slate-600 dark:text-slate-300">
                 <Clock3 className="mt-1 h-4 w-4 shrink-0" aria-hidden="true" />
-                <span>{medecin.disponibilitesLabel || 'Horaires non renseignés'}</span>
+                <span>{medecin.disponibilitesLabel || t('visitor.medecinDetail.hoursUnknown')}</span>
               </div>
             </div>
           </div>
@@ -373,10 +377,10 @@ export default function MedecinDetailPage({ params }: { params: Promise<{ id: st
               <span className={`h-2.5 w-2.5 rounded-full ${
                 medecin.isDisponibleMaintenant ? 'bg-emerald-500' : 'bg-slate-400'
               }`} aria-hidden="true" />
-              {medecin.isDisponibleMaintenant ? 'Disponible selon ses horaires' : 'Indisponible actuellement'}
+              {medecin.isDisponibleMaintenant ? t('visitor.medecinDetail.availableNow') : t('visitor.medecinDetail.unavailableNow')}
             </p>
             <p className="mt-3 text-xs leading-5 text-slate-500 dark:text-slate-400">
-              Le médecin confirme lui-même la prise en charge, le rappel ou le rendez-vous.
+              {t('visitor.medecinDetail.availabilityHint')}
             </p>
             <Link
               href={contactHref}
@@ -392,7 +396,7 @@ export default function MedecinDetailPage({ params }: { params: Promise<{ id: st
                   className="mt-2 inline-flex min-h-11 w-full items-center justify-center gap-2 border border-slate-300 bg-white px-4 text-sm font-bold text-slate-700 dark:border-white/15 dark:bg-slate-900 dark:text-white"
                 >
                   <CalendarDays className="h-4 w-4" aria-hidden="true" />
-                  Nouvelle consultation
+                  {t('visitor.medecinDetail.newConsultation')}
                 </Link>
                 {canReview && (
                   <button
@@ -401,7 +405,7 @@ export default function MedecinDetailPage({ params }: { params: Promise<{ id: st
                     className="mt-2 inline-flex min-h-11 w-full items-center justify-center gap-2 border border-red-200 bg-red-50 px-4 text-sm font-bold text-red-700 hover:bg-red-100 dark:border-red-500/25 dark:bg-red-500/10 dark:text-red-200"
                   >
                     <Flag className="h-4 w-4" aria-hidden="true" />
-                    Signaler ce médecin
+                    {t('visitor.medecinDetail.reportDoctor')}
                   </button>
                 )}
               </>
@@ -413,13 +417,13 @@ export default function MedecinDetailPage({ params }: { params: Promise<{ id: st
           <div className="flex gap-3">
             <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-700" aria-hidden="true" />
             <p className="text-xs leading-5 text-slate-600 dark:text-slate-300">
-              Indiquez le motif, les symptômes observés, leur durée et les informations utiles.
+              {t('visitor.medecinDetail.messageHint')}
             </p>
           </div>
           <div className="flex gap-3">
             <PhoneCall className="h-5 w-5 shrink-0 text-red-700" aria-hidden="true" />
             <p className="text-xs leading-5 text-slate-600 dark:text-slate-300">
-              En cas de danger immédiat, la messagerie ne remplace pas les secours : appelez le{' '}
+              {t('visitor.medecinDetail.emergencyHint')}{' '}
               <a href={emergencyCallHref()} className="font-bold text-red-700 underline">{EMERGENCY_NUMBER}</a>.
             </p>
           </div>
@@ -430,14 +434,14 @@ export default function MedecinDetailPage({ params }: { params: Promise<{ id: st
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
             <h2 id="reviews-title" className="font-display text-xl font-bold text-slate-950 dark:text-white">
-              Avis des patients
+              {t('visitor.medecinDetail.reviewsTitle')}
             </h2>
             <p className="mt-1 text-xs text-slate-500">
-              Les avis sont réservés aux patients ayant terminé une consultation avec ce médecin.
+              {t('visitor.medecinDetail.reviewsNote')}
             </p>
           </div>
           <span className="text-sm font-semibold text-slate-600 dark:text-slate-300">
-            {medecin.avis.length} avis
+            {t('visitor.medecinDetail.reviewsCount', { count: medecin.avis.length })}
           </span>
         </div>
 
@@ -446,14 +450,14 @@ export default function MedecinDetailPage({ params }: { params: Promise<{ id: st
             onSubmit={submitReview}
             className="mt-5 border border-slate-200 bg-slate-50 p-5 dark:border-white/10 dark:bg-slate-900"
           >
-            <h3 className="text-sm font-bold text-slate-950 dark:text-white">Partager mon expérience</h3>
-            <div className="mt-3 flex gap-1" role="group" aria-label="Choisir une note">
+            <h3 className="text-sm font-bold text-slate-950 dark:text-white">{t('visitor.medecinDetail.shareExperience')}</h3>
+            <div className="mt-3 flex gap-1" role="group" aria-label={t('visitor.medecinDetail.chooseRatingAria')}>
               {[1, 2, 3, 4, 5].map((value) => (
                 <button
                   key={value}
                   type="button"
                   onClick={() => setNote(value)}
-                  aria-label={`${value} étoile${value > 1 ? 's' : ''}`}
+                  aria-label={t('visitor.medecinDetail.starAria', { value })}
                   aria-pressed={note === value}
                   className="p-1 focus-visible:outline-2 focus-visible:outline-emerald-600"
                 >
@@ -471,7 +475,7 @@ export default function MedecinDetailPage({ params }: { params: Promise<{ id: st
               onChange={(event) => setCommentaire(event.target.value)}
               rows={4}
               maxLength={2000}
-              placeholder="Commentaire facultatif, 10 caractères minimum s’il est renseigné."
+              placeholder={t('visitor.medecinDetail.commentPlaceholder')}
               className="mt-4 w-full resize-y border border-slate-300 bg-white px-3 py-3 text-sm outline-none focus:border-emerald-500 dark:border-white/10 dark:bg-slate-950 dark:text-white"
             />
             <button
@@ -479,20 +483,20 @@ export default function MedecinDetailPage({ params }: { params: Promise<{ id: st
               disabled={sending || note === 0}
               className="mt-3 min-h-11 bg-emerald-700 px-5 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {sending ? 'Publication...' : 'Publier mon avis'}
+              {sending ? t('visitor.medecinDetail.publishing') : t('visitor.medecinDetail.publishReview')}
             </button>
           </form>
         )}
 
         {isPatient && !canReview && (
           <div className="mt-5 border border-blue-200 bg-blue-50 p-4 text-sm leading-6 text-blue-900 dark:border-blue-500/25 dark:bg-blue-500/10 dark:text-blue-100">
-            Le formulaire d&apos;avis sera disponible après une consultation terminée avec ce médecin.
+            {t('visitor.medecinDetail.reviewUnavailable')}
           </div>
         )}
 
         {medecin.avis.length === 0 ? (
           <div className="mt-5 border border-slate-200 bg-white p-7 text-center text-sm text-slate-500 dark:border-white/10 dark:bg-slate-900">
-            Aucun avis publié pour le moment.
+            {t('visitor.medecinDetail.noReviewsYet')}
           </div>
         ) : (
           <div className="mt-5 grid gap-3">

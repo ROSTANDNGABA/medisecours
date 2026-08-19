@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Search, BookOpen, ChevronRight, Loader2 } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import api from '../../../api/axios'
 import { useDebounce } from '../../../hooks/useDebounce'
 import useSWR from 'swr'
@@ -18,6 +19,7 @@ interface MaladieResult {
 
 export default function DashboardCatalogueSearch() {
   const router = useRouter()
+  const { t } = useTranslation()
   const [query, setQuery] = useState('')
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
@@ -45,7 +47,7 @@ export default function DashboardCatalogueSearch() {
     <div className="rounded-2xl bg-white p-5 shadow-[0_2px_12px_rgba(0,0,0,0.06)]">
       <div className="flex items-center gap-2 mb-3">
         <BookOpen className="h-4 w-4 text-[#8B5CF6]" />
-        <h3 className="text-sm font-bold text-[#0F2C52]">Catalogue maladies</h3>
+        <h3 className="text-sm font-bold text-[#0F2C52]">{t('medecin.dashboard.catalogue.title')}</h3>
       </div>
 
       <div ref={ref} className="relative">
@@ -56,7 +58,7 @@ export default function DashboardCatalogueSearch() {
             value={query}
             onChange={(e) => { setQuery(e.target.value); setOpen(true) }}
             onFocus={() => setOpen(true)}
-            placeholder="Rechercher une maladie…"
+            placeholder={t('medecin.dashboard.catalogue.searchPlaceholder')}
             className="w-full rounded-xl bg-[#F3F4F6] py-2.5 pl-9 pr-3 text-sm text-[#374151] placeholder-[#9CA3AF] outline-none transition focus:bg-white focus:ring-2 focus:ring-[#3B6EF8]/20"
           />
           {isLoading && (
@@ -91,14 +93,14 @@ export default function DashboardCatalogueSearch() {
 
         {open && !isLoading && debouncedQuery.trim().length >= 2 && results.length === 0 && (
           <div className="absolute left-0 right-0 top-full mt-1 z-20 rounded-xl border border-[#E5E7EB] bg-white shadow-lg">
-            <div className="px-4 py-6 text-center text-sm text-[#9CA3AF]">Aucune maladie trouvée</div>
+            <div className="px-4 py-6 text-center text-sm text-[#9CA3AF]">{t('medecin.dashboard.catalogue.noResult')}</div>
           </div>
         )}
       </div>
 
       {!query && (
         <p className="mt-3 text-[11px] text-[#9CA3AF]">
-          Tapez au moins 2 caractères pour rechercher dans le catalogue
+          {t('medecin.dashboard.catalogue.hint')}
         </p>
       )}
     </div>

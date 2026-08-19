@@ -12,6 +12,7 @@ import EmptyState from '../../components/ui/EmptyState'
 import api from '../../api/axios'
 import { fetcher } from '../../lib/fetcher'
 import { NOTIFICATIONS_KEY, UNREAD_NOTIFICATIONS_KEY } from '../../lib/keys'
+import { useTranslation } from 'react-i18next'
 
 interface NotificationRecord {
   id: number
@@ -23,17 +24,17 @@ interface NotificationRecord {
   readAt?: string | null
 }
 
-function timeAgo(dateString) {
+function timeAgo(dateString, t) {
   if (!dateString) return ''
   const diff = Date.now() - new Date(dateString).getTime()
   const minutes = Math.floor(diff / 60000)
-  if (minutes < 1) return "À l'instant"
-  if (minutes < 60) return `Il y a ${minutes} min`
+  if (minutes < 1) return t('visitor.notifications.justNow')
+  if (minutes < 60) return t('visitor.notifications.minutesAgo', { count: minutes })
   const hours = Math.floor(minutes / 60)
-  if (hours < 24) return `Il y a ${hours}h`
+  if (hours < 24) return t('visitor.notifications.hoursAgo', { count: hours })
   const days = Math.floor(hours / 24)
-  if (days < 30) return `Il y a ${days}j`
-  return `Il y a ${Math.floor(days / 30)}mois`
+  if (days < 30) return t('visitor.notifications.daysAgo', { count: days })
+  return t('visitor.notifications.monthsAgo', { count: Math.floor(days / 30) })
 }
 
 const stagger = { animate: { transition: { staggerChildren: 0.05 } } }
@@ -43,6 +44,7 @@ const itemFade = {
 }
 
 export default function NotificationsPage() {
+  const { t } = useTranslation()
   const { user, mounted } = useAuth()
   const router = useRouter()
   const toast = useToast()
@@ -79,7 +81,7 @@ export default function NotificationsPage() {
 
   if (!mounted || isLoading) return (
     <div className="flex min-h-[60vh] items-center justify-center">
-      <LoadingSpinner label="Chargement des notifications…" />
+      <LoadingSpinner label={t('visitor.notifications.loading')} />
     </div>
   )
 
@@ -91,11 +93,11 @@ export default function NotificationsPage() {
             <Bell className="h-6 w-6 text-[#3B6EF8]" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold tracking-tight text-[#0F2C52]">Notifications</h1>
+            <h1 className="text-2xl font-bold tracking-tight text-[#0F2C52]">{t('visitor.notifications.title')}</h1>
             <p className="mt-0.5 text-sm text-[#6B7280]">
               {unreadCount > 0
-                ? `${unreadCount} non lue${unreadCount > 1 ? 's' : ''}`
-                : 'Tout est à jour'}
+                ? t('visitor.notifications.unreadCount', { count: unreadCount })
+                : t('visitor.notifications.allCaughtUp')}
             </p>
           </div>
         </div>
@@ -104,19 +106,19 @@ export default function NotificationsPage() {
       {error ? (
         <div className="rounded-xl border border-red-200 bg-red-50 px-5 py-6 text-center dark:border-red-900/50 dark:bg-red-950/30">
           <p className="text-sm font-medium text-red-700 dark:text-red-300">
-            Impossible de charger les notifications.
+            {t('visitor.notifications.errorLoad')}
           </p>
           <button
             type="button"
             onClick={() => mutate()}
             className="mt-3 rounded-lg bg-white px-4 py-2 text-sm font-semibold text-red-700 shadow-sm dark:bg-slate-900 dark:text-red-300"
           >
-            Réessayer
+            {t('visitor.notifications.retry')}
           </button>
         </div>
       ) : notificationItems.length === 0 ? (
         <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15, type: 'spring', damping: 20, stiffness: 300 }}>
-          <EmptyState icon={Bell} title="Aucune notification" description="Vous serez notifié des nouveaux messages de vos médecins ici." />
+          <EmptyState icon={Bell} title={t('visitor.notifications.emptyTitle')} description={t('visitor.notifications.emptyDesc')} />
         </motion.div>
       ) : (
         <motion.div variants={stagger} initial="initial" animate="animate" className="space-y-1.5">
@@ -145,7 +147,7 @@ export default function NotificationsPage() {
                           { revalidate: false },
                         )
                       } catch {
-                        toast.error('Impossible de marquer la notification comme lue.')
+                        toast.error(t('visitor.notifications.errorMarkRead'))
                       }
                     }
                     router.push(n.link)
@@ -164,14 +166,14 @@ export default function NotificationsPage() {
                       <p className={`text-sm ${n.unread ? 'font-bold text-[#0F2C52]' : 'font-semibold text-[#374151]'}`}>{n.title}</p>
                       <span className="flex shrink-0 items-center gap-1 text-[11px] text-[#9CA3AF]">
                         <Clock className="h-3 w-3" />
-                        {timeAgo(n.time)}
+                        {timeAgo(n.time, t)}
                       </span>
                     </div>
                     <p className="mt-1 line-clamp-3 text-xs leading-relaxed text-[#6B7280] dark:text-slate-300">
-                      {n.description || 'Une nouvelle information est disponible.'}
+                      {n.description || t('visitor.notifications.fallbackDesc')}
                     </p>
                     <span className="mt-2 inline-flex text-xs font-semibold text-[#315FD6] dark:text-blue-300">
-                      {n.type === 'message_received' ? 'Voir la conversation' : 'Voir les détails'}
+                      {n.type === 'message_received' ? t('visitor.notifications.viewConversation') : t('visitor.notifications.viewDetails')}
                     </span>
                   </div>
                   <ArrowRight className="mt-2 h-4 w-4 shrink-0 text-[#D1D5DB] transition group-hover:text-[#3B6EF8] group-hover:translate-x-0.5" style={{ transition: 'color 0.2s, transform 0.2s' }} />

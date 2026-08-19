@@ -1,6 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Star, Flag } from 'lucide-react'
 import useSWR, { mutate as globalMutate } from 'swr'
 import api from '../../../api/axios'
@@ -12,14 +13,16 @@ import { useToast } from '../../../components/ui/Toast'
 import { fetcher } from '../../../lib/fetcher'
 import type { Avis } from '../../../types/api'
 
-function patientName(patient: Avis['patient'] | undefined): string {
-  if (!patient || typeof patient === 'string') return 'Patient'
-  return [patient.prenom, patient.nom].filter(Boolean).join(' ').trim() || 'Patient'
+function patientName(patient: Avis['patient'] | undefined, t: (key: string) => string): string {
+  if (!patient || typeof patient === 'string') return t('medecin.avis.patientFallback')
+  return [patient.prenom, patient.nom].filter(Boolean).join(' ').trim() || t('medecin.avis.patientFallback')
 }
 
 export default function MedecinAvisPage() {
   const { user } = useAuth()
   const toast = useToast()
+  const { t, i18n } = useTranslation()
+  const locale = i18n.language === 'en' ? 'en-GB' : 'fr-FR'
   const { data: avis = [], isLoading } = useSWR<Avis[]>(
     user?.id ? `/api/avis?medecin=${user.id}` : null,
     fetcher,
@@ -54,11 +57,11 @@ export default function MedecinAvisPage() {
         const arr = prev ?? []
         return arr.map((x) => (x.id === reportTarget.id ? { ...x, signale: true, raisonSignalement: reportReason } : x))
       }, { revalidate: false })
-      toast.success('Avis signalé pour modération.')
+      toast.success(t('medecin.avis.reported'))
       setReportTarget(null)
       setReportReason('')
     } catch {
-      toast.error('Échec du signalement.')
+      toast.error(t('medecin.avis.reportFailed'))
     } finally {
       setSubmittingReport(false)
     }
@@ -79,9 +82,9 @@ export default function MedecinAvisPage() {
               ))}
             </div>
             <div className="flex gap-4 mt-3 text-xs text-primary-300 justify-center">
-              <span>{avis.length} avis au total</span>
-              <span>{cinqEtoiles} avis 5★</span>
-              <span>{signales} signalés</span>
+              <span>{t('medecin.avis.totalReviews', { count: avis.length })}</span>
+              <span>{t('medecin.avis.fiveStars', { count: cinqEtoiles })}</span>
+              <span>{t('medecin.avis.reportedCount', { count: signales })}</span>
             </div>
           </div>
 
@@ -106,25 +109,25 @@ export default function MedecinAvisPage() {
 
       {/* Reviews list */}
       {isLoading ? (
-        <LoadingSpinner label="Chargement des avis…" />
+        <LoadingSpinner label={t('medecin.avis.loading')} />
       ) : sorted.length === 0 ? (
-        <EmptyState icon={Star} title="Aucun avis pour le moment" description="Les avis de vos patients apparaîtront ici." />
+        <EmptyState icon={Star} title={t('medecin.avis.emptyTitle')} description={t('medecin.avis.emptyDesc')} />
       ) : (
         <div className="space-y-3">
           {sorted.map((a) => (
             <div key={a.id} className="rounded-2xl bg-white dark:bg-primary-800 border border-primary-100 dark:border-white/5 p-5">
               {a.signale && (
                 <div className="mb-3 px-3 py-2 rounded-xl bg-amber-100 text-amber-700 text-xs font-semibold">
-                  Cet avis a été signalé{a.raisonSignalement ? ` : ${a.raisonSignalement}` : ''}
+                  {t('medecin.avis.reportedBanner')}{a.raisonSignalement ? ` : ${a.raisonSignalement}` : ''}
                 </div>
               )}
               <div className="flex items-start gap-3">
-                <Avatar name={patientName(a.patient)} />
+                <Avatar name={patientName(a.patient, t)} />
                 <div className="flex-1 min-w-0">
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <p className="text-sm font-semibold text-primary-900 dark:text-sable">{patientName(a.patient)}</p>
+                    <p className="text-sm font-semibold text-primary-900 dark:text-sable">{patientName(a.patient, t)}</p>
                     <p className="text-xs text-primary-300">
-                      {new Date(a.createdAt).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}
+                      {new Date(a.createdAt).toLocaleDateString(locale, { day: 'numeric', month: 'long', year: 'numeric' })}
                     </p>
                   </div>
                   <div className="flex items-center gap-0.5 my-1.5">
@@ -139,7 +142,7 @@ export default function MedecinAvisPage() {
                       onClick={() => setReportTarget(a)}
                       className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-urgence-500 hover:text-urgence-700"
                     >
-                      <Flag className="w-3.5 h-3.5" /> Signaler cet avis comme inapproprié
+                      <Flag className="w-3.5 h-3.5" /> {t('medecin.avis.reportInappropriate')}
                     </button>
                   )}
                 </div>
@@ -153,22 +156,22 @@ export default function MedecinAvisPage() {
       {reportTarget && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-6" onClick={() => setReportTarget(null)}>
           <div onClick={(e) => e.stopPropagation()} className="bg-white dark:bg-primary-800 rounded-2xl shadow-glass w-full max-w-sm p-5">
-            <h3 className="font-display font-bold text-primary-900 dark:text-sable mb-3">Signaler cet avis</h3>
+            <h3 className="font-display font-bold text-primary-900 dark:text-sable mb-3">{t('medecin.avis.reportTitle')}</h3>
             <textarea
               value={reportReason}
               onChange={(e) => setReportReason(e.target.value)}
-              placeholder="Expliquez pourquoi cet avis est inapproprié…"
+              placeholder={t('medecin.avis.reportPlaceholder')}
               rows={3}
               className="w-full px-3 py-2 rounded-xl border border-primary-100 dark:border-white/10 bg-white dark:bg-primary-900/40 focus:outline-none focus:ring-2 focus:ring-mint-500 text-sm"
             />
             <div className="flex items-center justify-end gap-2 mt-4">
-              <button onClick={() => setReportTarget(null)} className="px-4 py-2 rounded-xl text-sm font-semibold text-primary-500 dark:text-sable hover:bg-primary-100 dark:hover:bg-primary-700">Annuler</button>
+              <button onClick={() => setReportTarget(null)} className="px-4 py-2 rounded-xl text-sm font-semibold text-primary-500 dark:text-sable hover:bg-primary-100 dark:hover:bg-primary-700">{t('common.cancel')}</button>
               <button
                 onClick={submitReport}
                 disabled={submittingReport || !reportReason.trim()}
                 className="px-4 py-2 rounded-xl text-sm font-semibold bg-urgence-500 hover:bg-urgence-700 text-white disabled:opacity-60"
               >
-                {submittingReport ? 'Envoi…' : 'Signaler'}
+                {submittingReport ? t('medecin.avis.sending') : t('medecin.avis.report')}
               </button>
             </div>
           </div>

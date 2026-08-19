@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
 import { 
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer,
   PieChart, Pie, Cell,
@@ -16,53 +17,57 @@ const STATUS_COLORS: Record<string, string> = {
   ANNULEE: '#EF4444',
 }
 
-const STATUS_LABELS: Record<string, string> = {
-  OUVERTE: 'Ouverte',
-  EN_COURS: 'En cours',
-  TERMINEE: 'Terminée',
-  ANNULEE: 'Annulée',
+const STATUS_LABEL_KEYS: Record<string, string> = {
+  OUVERTE: 'medecin.dashboard.status.open',
+  EN_COURS: 'medecin.dashboard.status.inProgress',
+  TERMINEE: 'medecin.dashboard.status.finished',
+  ANNULEE: 'medecin.dashboard.status.cancelled',
 }
 
 export default function DashboardAnalytics({ data }: { data: DashboardData | undefined }) {
-  if (!data) return null
+  const { t, i18n } = useTranslation()
+  const locale = i18n.language === 'en' ? 'en-GB' : 'fr-FR'
 
   // 1. Timeline Data (Area Chart)
   const timelineData = useMemo(() => {
-    const full = Array.isArray(data.timeline) ? data.timeline : []
+    const tl = data?.timeline
+    const full = Array.isArray(tl) ? tl : []
     const sliced = full.slice(-14) // 14 derniers jours
     return sliced.map((p) => ({
-      date: new Date(p.date).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' }),
+      date: new Date(p.date).toLocaleDateString(locale, { day: '2-digit', month: 'short' }),
       consultations: p.count,
     }))
-  }, [data.timeline])
+  }, [data, locale])
 
   // 2. Status Data (Donut Chart)
   const statusData = useMemo(() => {
-    const counts = data.statusCounts ?? {}
+    const counts = data?.statusCounts ?? {}
     return Object.keys(counts).map(key => ({
-      name: STATUS_LABELS[key] || key,
+      name: t(STATUS_LABEL_KEYS[key] || key),
       value: counts[key as StatutConsultation] || 0,
       color: STATUS_COLORS[key] || '#9CA3AF'
     })).filter(item => item.value > 0)
-  }, [data.statusCounts])
+  }, [data, t])
 
   // 3. Blood Type Data (Radar Chart)
   const bloodData = useMemo(() => {
-    const dist = data.bloodDistribution ?? {}
+    const dist = data?.bloodDistribution ?? {}
     return Object.keys(dist).map(key => ({
       groupe: key,
       patients: dist[key]
     }))
-  }, [data.bloodDistribution])
+  }, [data])
 
   // 4. Ratings Data (Bar Chart)
   const ratingsData = useMemo(() => {
-    const dist = data.ratingsDistribution ?? {}
+    const dist = data?.ratingsDistribution ?? {}
     return [1, 2, 3, 4, 5].map(star => ({
       etoiles: `${star} ⭐`,
       avis: dist[star] || 0
     }))
-  }, [data.ratingsDistribution])
+  }, [data])
+
+  if (!data) return null
 
   return (
     <div className="space-y-6">
@@ -70,8 +75,8 @@ export default function DashboardAnalytics({ data }: { data: DashboardData | und
         
         {/* --- Courbe d'évolution (Area Chart) --- */}
         <div className="rounded-2xl bg-white p-5 shadow-[0_2px_12px_rgba(0,0,0,0.06)]">
-          <h3 className="text-sm font-bold text-[#0F2C52] mb-1">Évolution des consultations</h3>
-          <p className="text-xs text-[#6B7280] mb-6">Volume sur les 14 derniers jours</p>
+          <h3 className="text-sm font-bold text-[#0F2C52] mb-1">{t('medecin.dashboard.analytics.evolution')}</h3>
+          <p className="text-xs text-[#6B7280] mb-6">{t('medecin.dashboard.analytics.evolutionSub')}</p>
           
           <div className="h-[240px] w-full">
             {timelineData.length > 0 ? (
@@ -92,7 +97,7 @@ export default function DashboardAnalytics({ data }: { data: DashboardData | und
                   <Area 
                     type="monotone" 
                     dataKey="consultations" 
-                    name="Consultations"
+                    name={t('medecin.dashboard.analytics.consultations')}
                     stroke="#4F46E5" 
                     strokeWidth={3}
                     fillOpacity={1} 
@@ -102,15 +107,15 @@ export default function DashboardAnalytics({ data }: { data: DashboardData | und
                 </AreaChart>
               </ResponsiveContainer>
             ) : (
-              <div className="flex h-full items-center justify-center text-sm text-[#9CA3AF]">Aucune donnée récente</div>
+              <div className="flex h-full items-center justify-center text-sm text-[#9CA3AF]">{t('medecin.dashboard.analytics.noRecentData')}</div>
             )}
           </div>
         </div>
 
         {/* --- Répartition des statuts (Donut Chart) --- */}
         <div className="rounded-2xl bg-white p-5 shadow-[0_2px_12px_rgba(0,0,0,0.06)]">
-          <h3 className="text-sm font-bold text-[#0F2C52] mb-1">Répartition par statut</h3>
-          <p className="text-xs text-[#6B7280] mb-2">Toutes les consultations</p>
+          <h3 className="text-sm font-bold text-[#0F2C52] mb-1">{t('medecin.dashboard.analytics.byStatus')}</h3>
+          <p className="text-xs text-[#6B7280] mb-2">{t('medecin.dashboard.analytics.allConsultations')}</p>
           
           <div className="h-[240px] w-full relative">
             {statusData.length > 0 ? (
@@ -138,7 +143,7 @@ export default function DashboardAnalytics({ data }: { data: DashboardData | und
                 </PieChart>
               </ResponsiveContainer>
             ) : (
-              <div className="flex h-full items-center justify-center text-sm text-[#9CA3AF]">Aucune donnée</div>
+              <div className="flex h-full items-center justify-center text-sm text-[#9CA3AF]">{t('medecin.dashboard.analytics.noData')}</div>
             )}
             
             {/* Custom Legend */}
@@ -146,7 +151,7 @@ export default function DashboardAnalytics({ data }: { data: DashboardData | und
                <span className="text-2xl font-bold text-[#0F2C52]">
                  {statusData.reduce((acc, curr) => acc + curr.value, 0)}
                </span>
-               <span className="text-[10px] text-[#6B7280]">Total</span>
+               <span className="text-[10px] text-[#6B7280]">{t('medecin.dashboard.analytics.total')}</span>
             </div>
           </div>
         </div>
@@ -156,8 +161,8 @@ export default function DashboardAnalytics({ data }: { data: DashboardData | und
         
         {/* --- Groupes Sanguins (Radar Chart) --- */}
         <div className="rounded-2xl bg-white p-5 shadow-[0_2px_12px_rgba(0,0,0,0.06)]">
-          <h3 className="text-sm font-bold text-[#0F2C52] mb-1">Profil sanguin</h3>
-          <p className="text-xs text-[#6B7280] mb-2">Répartition des patients</p>
+          <h3 className="text-sm font-bold text-[#0F2C52] mb-1">{t('medecin.dashboard.analytics.bloodProfile')}</h3>
+          <p className="text-xs text-[#6B7280] mb-2">{t('medecin.dashboard.analytics.patientsDistribution')}</p>
           
           <div className="h-[220px] w-full">
             {bloodData.length > 0 ? (
@@ -167,7 +172,7 @@ export default function DashboardAnalytics({ data }: { data: DashboardData | und
                   <PolarAngleAxis dataKey="groupe" tick={{ fill: '#4F46E5', fontSize: 11, fontWeight: 600 }} />
                   <PolarRadiusAxis angle={30} domain={[0, 'auto']} tick={false} axisLine={false} />
                   <Radar
-                    name="Patients"
+                    name={t('medecin.dashboard.analytics.patients')}
                     dataKey="patients"
                     stroke="#F43F5E"
                     strokeWidth={2}
@@ -179,15 +184,15 @@ export default function DashboardAnalytics({ data }: { data: DashboardData | und
                 </RadarChart>
               </ResponsiveContainer>
             ) : (
-              <div className="flex h-full items-center justify-center text-sm text-[#9CA3AF]">Aucune donnée</div>
+              <div className="flex h-full items-center justify-center text-sm text-[#9CA3AF]">{t('medecin.dashboard.analytics.noData')}</div>
             )}
           </div>
         </div>
 
         {/* --- Satisfaction (Bar Chart vertical) --- */}
         <div className="rounded-2xl bg-white p-5 shadow-[0_2px_12px_rgba(0,0,0,0.06)]">
-          <h3 className="text-sm font-bold text-[#0F2C52] mb-1">Satisfaction patient</h3>
-          <p className="text-xs text-[#6B7280] mb-4">Distribution des avis reçus</p>
+          <h3 className="text-sm font-bold text-[#0F2C52] mb-1">{t('medecin.dashboard.analytics.satisfaction')}</h3>
+          <p className="text-xs text-[#6B7280] mb-4">{t('medecin.dashboard.analytics.reviewsDistribution')}</p>
           
           <div className="h-[220px] w-full">
             {ratingsData.some(d => d.avis > 0) ? (
@@ -202,7 +207,7 @@ export default function DashboardAnalytics({ data }: { data: DashboardData | und
                   />
                   <Bar 
                     dataKey="avis" 
-                    name="Avis"
+                    name={t('medecin.dashboard.analytics.reviews')}
                     fill="#FBBF24" 
                     radius={[4, 4, 0, 0]} 
                     maxBarSize={40}
@@ -211,7 +216,7 @@ export default function DashboardAnalytics({ data }: { data: DashboardData | und
                 </BarChart>
               </ResponsiveContainer>
             ) : (
-              <div className="flex h-full items-center justify-center text-sm text-[#9CA3AF]">Aucun avis</div>
+              <div className="flex h-full items-center justify-center text-sm text-[#9CA3AF]">{t('medecin.dashboard.analytics.noReviews')}</div>
             )}
           </div>
         </div>

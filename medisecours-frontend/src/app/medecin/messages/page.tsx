@@ -13,6 +13,7 @@ if (typeof document !== 'undefined') {
 }
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
+import { useTranslation } from 'react-i18next'
 import { ArrowLeft, Send, CheckCheck, Check, Plus, X, ExternalLink, Loader2, Paperclip, Mic, Square, FileText, ImageIcon, Video, Camera, Search, ChevronDown } from 'lucide-react'
 import useSWR, { mutate as globalMutate } from 'swr'
 import api from '../../../api/axios'
@@ -50,23 +51,23 @@ function msgMediaUrl(m) {
   return mediaUrl(path)
 }
 
-function formatFileSize(bytes) {
+function formatFileSize(bytes, t) {
   if (!bytes) return ''
-  if (bytes < 1024) return bytes + ' o'
-  if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' Ko'
-  return (bytes / 1048576).toFixed(1) + ' Mo'
+  if (bytes < 1024) return bytes + ' ' + t('medecin.messages.bytesUnit')
+  if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' ' + t('medecin.messages.kbUnit')
+  return (bytes / 1048576).toFixed(1) + ' ' + t('medecin.messages.mbUnit')
 }
 
-function formatMsgTime(dateStr) {
+function formatMsgTime(dateStr, t, locale) {
   if (!dateStr) return ''
   const d = new Date(dateStr)
   const now = new Date()
   const diff = (now - d) / 1000
-  if (diff < 60) return "À l'instant"
-  if (diff < 3600) return Math.floor(diff / 60) + ' min'
-  if (diff < 86400) return d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
-  if (diff < 172800) return 'Hier ' + d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
-  return d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })
+  if (diff < 60) return t('medecin.messages.justNow')
+  if (diff < 3600) return t('medecin.messages.minutesAgo', { count: Math.floor(diff / 60) })
+  if (diff < 86400) return d.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' })
+  if (diff < 172800) return t('medecin.messages.yesterday', { time: d.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' }) })
+  return d.toLocaleDateString(locale, { day: 'numeric', month: 'short' })
 }
 
 function formatDuration(sec) {
@@ -110,13 +111,13 @@ function avatarInitials(name) {
   return name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
 }
 
-function lastMsgPreview(m) {
+function lastMsgPreview(m, t) {
   if (!m) return ''
   const kind = msgMediaKind(m)
-  if (kind === 'IMAGE') return '📷 Photo'
-  if (kind === 'VOIX') return '🎤 Message vocal'
-  if (kind === 'VIDEO') return '🎥 Vidéo'
-  if (kind === 'FICHIER') return '📎 ' + (m.media?.originalName || 'Fichier')
+  if (kind === 'IMAGE') return t('medecin.messages.photo')
+  if (kind === 'VOIX') return t('medecin.messages.voiceMessage')
+  if (kind === 'VIDEO') return t('medecin.messages.video')
+  if (kind === 'FICHIER') return t('medecin.messages.file', { name: m.media?.originalName || t('medecin.messages.fileFallback') })
   return m.contenu || ''
 }
 
@@ -174,8 +175,9 @@ function UserAvatar({ user: u, size = 40, className = '' }) {
 }
 
 export default function MedecinMessagesPage() {
+  const { t } = useTranslation()
   return (
-    <Suspense fallback={<LoadingSpinner label="Chargement…" />}>
+    <Suspense fallback={<LoadingSpinner label={t('common.loading')} />}>
       <MedecinMessagesContent />
     </Suspense>
   )
@@ -185,6 +187,8 @@ function MedecinMessagesContent() {
   const { user } = useAuth()
   const { setActiveConversationId, subscribeToMessages, subscribeToProfileChanges, onlineUsers, markConversationAsRead, msgNotifications } = useNotification()
   const toast = useToast()
+  const { t, i18n } = useTranslation()
+  const locale = i18n.language === 'en' ? 'en-GB' : 'fr-FR'
   const searchParams = useSearchParams()
   const preselectConv = searchParams.get('conversation')
 
@@ -429,8 +433,8 @@ function MedecinMessagesContent() {
   }, [activeMessagesRaw, mediaCache])
 
   useEffect(() => {
-    if (convError || msgError) toast.error('Impossible de charger la messagerie.')
-  }, [convError, msgError, toast])
+    if (convError || msgError) toast.error(t('medecin.messages.loadError'))
+  }, [convError, msgError, toast, t])
 
   function sameMsg(a, b) {
     const idA = String(a.id ?? a['@id'] ?? '')
@@ -607,7 +611,7 @@ function MedecinMessagesContent() {
       if (!convSearch.trim()) return true
       const q = convSearch.toLowerCase()
       const name = c.info ? `${c.info.prenom || ''} ${c.info.nom || ''}`.toLowerCase() : ''
-      const lastMsg = lastMsgPreview(c.dernierMessage).toLowerCase()
+      const lastMsg = lastMsgPreview(c.dernierMessage, t).toLowerCase()
       return name.includes(q) || lastMsg.includes(q)
     })
     return filtered.sort((a, b) => {
@@ -615,7 +619,7 @@ function MedecinMessagesContent() {
       const lb = convLastTime(b)
       return String(lb).localeCompare(String(la))
     })
-  }, [convMap, convSearch])
+  }, [convMap, convSearch, t])
 
   const openNewConversation = () => {
     setShowNew(true)
@@ -627,11 +631,11 @@ function MedecinMessagesContent() {
           const filtered = raw.filter(u => String(u.id) !== String(user?.id))
           setAllUsers(filtered)
           if (filtered.length === 0) {
-            toast.info('Aucun patient trouvé.')
+            toast.info(t('medecin.messages.noPatientFound'))
           }
         })
         .catch((err) => {
-          toast.error('Impossible de charger la liste des patients.')
+          toast.error(t('medecin.messages.loadPatientsError'))
         })
         .finally(() => setLoadingUsers(false))
     }
@@ -691,10 +695,10 @@ function MedecinMessagesContent() {
         }, { revalidate: true })
         setActiveId(String(conv.id))
       } catch {
-        toast.error('Impossible de charger la conversation.')
+        toast.error(t('medecin.messages.loadConversationError'))
       }
     })()
-  }, [preselectPatient, convLoading, conversations, user, toast, mutateConvs])
+  }, [preselectPatient, convLoading, conversations, user, toast, mutateConvs, t])
 
   function handleAttach(type) {
     setShowAttachMenu(false)
@@ -709,7 +713,7 @@ function MedecinMessagesContent() {
     e.target.value = ''
     for (const f of files) {
       if (f.size > MAX_MESSAGE_MEDIA_SIZE) {
-        toast.error(`${f.name} dépasse la limite de 25 Mo.`)
+        toast.error(t('medecin.messages.sizeLimit', { name: f.name }))
         continue
       }
       const preview = (isImageMime(f.type) || isVideoMime(f.type) || isAudioMime(f.type)) ? URL.createObjectURL(f) : null
@@ -726,7 +730,7 @@ function MedecinMessagesContent() {
   }
 
   function startRecording() {
-    if (!navigator.mediaDevices?.getUserMedia) { toast.error('Enregistrement vocal non supporté.'); return }
+    if (!navigator.mediaDevices?.getUserMedia) { toast.error(t('medecin.messages.voiceNotSupported')); return }
     setShowAttachMenu(false)
     navigator.mediaDevices.getUserMedia({ audio: true }).then((stream) => {
       streamRef.current = stream
@@ -744,7 +748,7 @@ function MedecinMessagesContent() {
       setRecording(true)
       setRecordTimer(0)
       recordTimerRef.current = setInterval(() => setRecordTimer((t) => t + 1), 1000)
-    }).catch(() => toast.error('Microphone non accessible.'))
+    }).catch(() => toast.error(t('medecin.messages.micError')))
   }
 
   function stopRecording() {
@@ -806,7 +810,7 @@ function MedecinMessagesContent() {
         setAllLoadedMsgs(prev => [optimistic, ...prev])
       }
       // Optimistic sidebar: show file preview instantly
-      optimisticConvMutate(caption || '📎 Fichier')
+      optimisticConvMutate(caption || t('medecin.messages.fileFallback'))
       setAttachments([])
       try {
         const uploads = await Promise.all(pending.map((att) => uploadFile(att.file)))
@@ -846,7 +850,7 @@ function MedecinMessagesContent() {
         }, { revalidate: false })
         mutateConvs()
       } catch (error) {
-        toast.error(error?.response?.data?.error || error?.response?.data?.detail || "Échec de l'envoi du média.")
+        toast.error(error?.response?.data?.error || error?.response?.data?.detail || t('medecin.messages.sendMediaError'))
         // Remove failed optimistic messages
         const tempIds = new Set(pending.map(a => a.tempId))
         setAllLoadedMsgs(prev => prev.filter(m => !tempIds.has(m.id)))
@@ -903,7 +907,7 @@ function MedecinMessagesContent() {
     } catch {
       // Remove failed optimistic message
       setAllLoadedMsgs(prev => prev.filter(m => m.id !== tempId))
-      toast.error("Échec de l'envoi du message.")
+      toast.error(t('medecin.messages.sendMessageError'))
     } finally {
       setSending(false)
     }
@@ -918,7 +922,7 @@ function MedecinMessagesContent() {
         <div className={`w-full lg:w-[360px] shrink-0 border-r border-gray-200 bg-white flex flex-col ${activeId ? 'hidden lg:flex' : 'flex'}`}>
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-4 border-b border-gray-200">
-            <h2 className="text-sm font-bold tracking-[0.15em] text-[#212121] uppercase">Messages</h2>
+            <h2 className="text-sm font-bold tracking-[0.15em] text-[#212121] uppercase">{t('medecin.messages.title')}</h2>
             <button onClick={openNewConversation} className="w-8 h-8 rounded-lg bg-[#2196F3] hover:bg-blue-600 text-white flex items-center justify-center transition-colors">
               <Plus className="w-4 h-4" />
             </button>
@@ -931,7 +935,7 @@ function MedecinMessagesContent() {
               <input
                 value={convSearch}
                 onChange={(e) => setConvSearch(e.target.value)}
-                placeholder="Rechercher une conversation..."
+                placeholder={t('medecin.messages.searchConvPlaceholder')}
                 className="w-full pl-9 pr-3 py-2 text-sm bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-[#2196F3]/20 focus:border-[#2196F3] transition-all"
               />
             </div>
@@ -941,11 +945,11 @@ function MedecinMessagesContent() {
           {/* Conversation list */}
           <div className="flex-1 overflow-y-auto">
             {sortedConvs.length === 0 ? (
-              <EmptyState title={convSearch ? 'Aucun résultat' : 'Aucune conversation'} description={convSearch ? 'Essayez un autre terme.' : 'Démarrez une conversation avec un patient.'} />
+              <EmptyState title={convSearch ? t('medecin.messages.noResults') : t('medecin.messages.noConversation')} description={convSearch ? t('medecin.messages.tryAnotherTerm') : t('medecin.messages.startConversation')} />
             ) : (
               sortedConvs.map((c) => {
                 const isActive = activeId === c.id
-                const name = c.info ? `${c.info.prenom || ''} ${c.info.nom || ''}`.trim() || 'Inconnu' : 'Inconnu'
+                const name = c.info ? `${c.info.prenom || ''} ${c.info.nom || ''}`.trim() || t('medecin.messages.unknown') : t('medecin.messages.unknown')
                 return (
                   <button
                     key={c.id}
@@ -968,13 +972,13 @@ function MedecinMessagesContent() {
                         </span>
                         {c.dernierMessage?.createdAt && (
                           <span className={`text-[11px] shrink-0 ${isActive ? 'text-white/80' : 'text-gray-400'}`}>
-                            {formatMsgTime(c.dernierMessage.createdAt)}
+                            {formatMsgTime(c.dernierMessage.createdAt, t, locale)}
                           </span>
                         )}
                       </div>
                       <div className="flex items-center justify-between gap-2 mt-0.5">
                         <span className={`text-xs truncate ${isActive ? 'text-white/80' : 'text-gray-500'}`}>
-                          {lastMsgPreview(c.dernierMessage)}
+                          {lastMsgPreview(c.dernierMessage, t)}
                         </span>
                         <div className="flex items-center gap-1.5 shrink-0">
                           {c.dernierMessage && idFromIri(c.dernierMessage.expediteur) === user?.id && (
@@ -1010,15 +1014,15 @@ function MedecinMessagesContent() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold text-[#212121]">
-                    {activeConv.info ? `${activeConv.info.prenom || ''} ${activeConv.info.nom || ''}`.trim() : 'Patient'}
+                    {activeConv.info ? `${activeConv.info.prenom || ''} ${activeConv.info.nom || ''}`.trim() : t('medecin.messages.patient')}
                   </p>
                   <span className="text-[11px] text-gray-400">
-                    {onlineUsers.has(String(activeConv.info?.id)) ? 'En ligne' : activeConv.info?.dernierePresence ? 'Vu ' + formatMsgTime(activeConv.info.dernierePresence) : 'Patient'}
+                    {onlineUsers.has(String(activeConv.info?.id)) ? t('medecin.messages.online') : activeConv.info?.dernierePresence ? t('medecin.messages.seenAgo', { time: formatMsgTime(activeConv.info.dernierePresence, t, locale) }) : t('medecin.messages.patient')}
                   </span>
                 </div>
                 <div className="flex items-center gap-2">
                   <Link href="/medecin/consultations" className="text-[11px] font-semibold text-[#2196F3] hover:text-blue-700 inline-flex items-center gap-1 shrink-0 transition-colors bg-blue-50 px-2 py-1 rounded-md">
-                    Consultation <ExternalLink className="w-3 h-3" />
+                    {t('medecin.messages.consultationLink')} <ExternalLink className="w-3 h-3" />
                   </Link>
                 </div>
               </div>
@@ -1034,14 +1038,14 @@ function MedecinMessagesContent() {
 
                 {dedupedMessages.length > 0 && (
                   <DateDivider label={
-                    new Date(dedupedMessages[0].createdAt).toLocaleDateString('fr-FR', { weekday: 'long' }).toUpperCase()
+                    new Date(dedupedMessages[0].createdAt).toLocaleDateString(locale, { weekday: 'long' }).toUpperCase()
                   } />
                 )}
                 {dedupedMessages.map((m, idx) => {
                   const mine = idFromIri(m.expediteur) === user?.id
                   const mediaKind = msgMediaKind(m)
                   const prevSameSender = idx > 0 && idFromIri(dedupedMessages[idx - 1].expediteur) === idFromIri(m.expediteur)
-                  const name = activeConv.info ? `${activeConv.info.prenom || ''} ${activeConv.info.nom || ''}`.trim() : 'Patient'
+                  const name = activeConv.info ? `${activeConv.info.prenom || ''} ${activeConv.info.nom || ''}`.trim() : t('medecin.messages.patient')
                   return (
                     <div key={m.id} className={`flex ${mine ? 'justify-end' : 'justify-start'} mb-3`}>
                       {!mine && !prevSameSender && (
@@ -1077,8 +1081,8 @@ function MedecinMessagesContent() {
                               <FileText className={`w-5 h-5 ${mine ? 'text-white' : 'text-[#212121]'}`} />
                             </div>
                             <div className="min-w-0 flex-1">
-                              <p className="text-sm font-semibold truncate">{m.media.originalName || 'Fichier'}</p>
-                              <p className={`text-[11px] ${mine ? 'text-white/70' : 'text-gray-500'}`}>{formatFileSize(m.media.size)}</p>
+                              <p className="text-sm font-semibold truncate">{m.media.originalName || t('medecin.messages.fileFallback')}</p>
+                              <p className={`text-[11px] ${mine ? 'text-white/70' : 'text-gray-500'}`}>{formatFileSize(m.media.size, t)}</p>
                             </div>
                           </a>
                         )}
@@ -1090,7 +1094,7 @@ function MedecinMessagesContent() {
                             <p className="text-sm leading-relaxed">{m.contenu}</p>
                             <div className={`flex items-center gap-1 mt-1 ${mine ? 'justify-end' : 'justify-start'}`}>
                               <span className={`text-[10px] ${mine ? 'text-white/60' : 'text-gray-400'}`}>
-                                {formatMsgTime(m.createdAt)}
+                                {formatMsgTime(m.createdAt, t, locale)}
                               </span>
                               {mine && <ReadStatus statut={m.statut} sending={m._sending} />}
                             </div>
@@ -1158,16 +1162,16 @@ function MedecinMessagesContent() {
                     {showAttachMenu && (
                       <div className="absolute bottom-full left-0 mb-2 bg-white rounded-2xl shadow-lg border border-gray-200 p-2 flex gap-1 z-10">
                         <button onClick={() => handleAttach('camera')} className="flex flex-col items-center gap-1 px-3 py-2 rounded-xl hover:bg-gray-50 text-[#212121] transition-colors">
-                          <Camera className="w-5 h-5" /><span className="text-[10px] font-medium">Appareil</span>
+                          <Camera className="w-5 h-5" /><span className="text-[10px] font-medium">{t('medecin.messages.attachCamera')}</span>
                         </button>
                         <button onClick={() => handleAttach('gallery')} className="flex flex-col items-center gap-1 px-3 py-2 rounded-xl hover:bg-gray-50 text-[#212121] transition-colors">
-                          <ImageIcon className="w-5 h-5" /><span className="text-[10px] font-medium">Photos</span>
+                          <ImageIcon className="w-5 h-5" /><span className="text-[10px] font-medium">{t('medecin.messages.attachPhotos')}</span>
                         </button>
                         <button onClick={() => handleAttach('doc')} className="flex flex-col items-center gap-1 px-3 py-2 rounded-xl hover:bg-gray-50 text-[#212121] transition-colors">
-                          <FileText className="w-5 h-5" /><span className="text-[10px] font-medium">Document</span>
+                          <FileText className="w-5 h-5" /><span className="text-[10px] font-medium">{t('medecin.messages.attachDocument')}</span>
                         </button>
                         <button onClick={() => handleAttach('voice')} className="flex flex-col items-center gap-1 px-3 py-2 rounded-xl hover:bg-gray-50 text-[#212121] transition-colors">
-                          <Mic className="w-5 h-5" /><span className="text-[10px] font-medium">Vocal</span>
+                          <Mic className="w-5 h-5" /><span className="text-[10px] font-medium">{t('medecin.messages.attachVoice')}</span>
                         </button>
                       </div>
                     )}
@@ -1181,7 +1185,7 @@ function MedecinMessagesContent() {
                         handleSend()
                       }
                     }}
-                    placeholder={recording ? 'Enregistrement en cours…' : uploadingMedia ? 'Téléchargement…' : 'Écrivez votre message…'}
+                    placeholder={recording ? t('medecin.messages.recordingPlaceholder') : uploadingMedia ? t('medecin.messages.uploadingPlaceholder') : t('medecin.messages.typeMessagePlaceholder')}
                     disabled={recording || uploadingMedia}
                     className="flex-1 text-sm text-[#212121] placeholder-gray-400 bg-transparent outline-none disabled:opacity-40"
                   />
@@ -1193,7 +1197,7 @@ function MedecinMessagesContent() {
                       draft.trim() || attachments.length > 0 ? 'text-[#2196F3] hover:text-blue-700' : 'text-gray-300'
                     } disabled:opacity-50`}
                   >
-                    {uploadingMedia ? <Loader2 className="w-4 h-4 animate-spin inline" /> : 'Envoyer'}
+                    {uploadingMedia ? <Loader2 className="w-4 h-4 animate-spin inline" /> : t('medecin.messages.send')}
                   </button>
                 </div>
               </div>
@@ -1208,8 +1212,8 @@ function MedecinMessagesContent() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                 </svg>
               </div>
-              <h3 className="font-semibold text-[#212121] text-lg mb-1">Sélectionnez une conversation</h3>
-              <p className="text-sm text-gray-500 max-w-xs">Choisissez un patient dans la liste pour consulter vos échanges.</p>
+              <h3 className="font-semibold text-[#212121] text-lg mb-1">{t('medecin.messages.selectConversation')}</h3>
+              <p className="text-sm text-gray-500 max-w-xs">{t('medecin.messages.selectConversationDesc')}</p>
             </div>
           )}
         </div>
@@ -1220,7 +1224,7 @@ function MedecinMessagesContent() {
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-6" onClick={() => setShowNew(false)}>
           <div onClick={(e) => e.stopPropagation()} className="bg-white rounded-2xl shadow-xl w-full max-w-md p-5">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="font-display font-bold text-[#212121]">Nouvelle conversation</h3>
+              <h3 className="font-display font-bold text-[#212121]">{t('medecin.messages.newConversation')}</h3>
               <button onClick={() => setShowNew(false)} className="p-1 rounded-lg hover:bg-gray-100 transition-colors"><X className="w-5 h-5 text-gray-400" /></button>
             </div>
 
@@ -1230,16 +1234,16 @@ function MedecinMessagesContent() {
               <input
                 value={userSearch}
                 onChange={(e) => setUserSearch(e.target.value)}
-                placeholder="Rechercher un utilisateur..."
+                placeholder={t('medecin.messages.searchUserPlaceholder')}
                 className="w-full pl-9 pr-3 py-2.5 text-sm bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-[#2196F3]/20 focus:border-[#2196F3] transition-all"
               />
             </div>
 
             <div className="space-y-1 max-h-72 overflow-y-auto">
               {loadingUsers ? (
-                <LoadingSpinner size="sm" label="Chargement des utilisateurs…" />
+                <LoadingSpinner size="sm" label={t('medecin.messages.loadingUsers')} />
               ) : allUsers.length === 0 ? (
-                <p className="text-sm text-gray-400 text-center py-8">Aucun utilisateur trouvé.</p>
+                <p className="text-sm text-gray-400 text-center py-8">{t('medecin.messages.noUserFound')}</p>
               ) : (
                 allUsers
                   .filter(u => {
@@ -1259,7 +1263,7 @@ function MedecinMessagesContent() {
                             const convId = await findOrCreateConv(u.id)
                             setActiveId(convId)
                           } catch {
-                            toast.error("Impossible de créer la conversation.")
+                            toast.error(t('medecin.messages.createConversationError'))
                           }
                         }}
                         className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-gray-50 text-left transition-colors"

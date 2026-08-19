@@ -17,6 +17,8 @@ import { fetcher } from '../../lib/fetcher'
 import EmptyState from '../../components/ui/EmptyState'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import Modal from '../../components/ui/Modal'
+import { useTranslation } from 'react-i18next'
+import type { TFunction } from 'i18next'
 
 const GROUPES_SANGUINS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-']
 const PHONE_RE = /^\+237\s?[26]\d{8}$/
@@ -42,47 +44,47 @@ interface PatientReport {
 }
 
 const REPORT_REASON_LABELS: Record<string, string> = {
-  COMPORTEMENT_INAPPROPRIE: 'Comportement inapproprié',
-  FAUSSE_INFORMATION: 'Informations fausses ou trompeuses',
-  HARCELEMENT: 'Harcèlement ou propos déplacés',
-  NEGLIGENCE: 'Négligence pendant la prise en charge',
-  FRAUDE: 'Fraude ou paiement suspect',
-  AUTRE: 'Autre motif',
+  COMPORTEMENT_INAPPROPRIE: 'visitor.profil.reasonComportement',
+  FAUSSE_INFORMATION: 'visitor.profil.reasonFausseInfo',
+  HARCELEMENT: 'visitor.profil.reasonHarcelement',
+  NEGLIGENCE: 'visitor.profil.reasonNegligence',
+  FRAUDE: 'visitor.profil.reasonFraude',
+  AUTRE: 'visitor.profil.reasonAutre',
 }
 
 const REPORT_STATUS_META: Record<ReportStatus, {
-  label: string
+  labelKey: string
   className: string
   icon: typeof Flag
 }> = {
   NOUVEAU: {
-    label: 'Reçu',
+    labelKey: 'visitor.profil.statusReceived',
     className: 'border-red-200 bg-red-50 text-red-700 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-200',
     icon: Flag,
   },
   EN_COURS: {
-    label: 'En cours d’examen',
+    labelKey: 'visitor.profil.statusReviewing',
     className: 'border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-200',
     icon: Clock3,
   },
   TRAITE: {
-    label: 'Traité',
+    labelKey: 'visitor.profil.statusProcessed',
     className: 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-200',
     icon: CheckCircle2,
   },
   REJETE: {
-    label: 'Rejeté',
+    labelKey: 'visitor.profil.statusRejected',
     className: 'border-slate-200 bg-slate-100 text-slate-700 dark:border-white/10 dark:bg-white/5 dark:text-slate-200',
     icon: XCircle,
   },
 }
 
-function validatePhone(v: string): { ok: boolean; message: string } | null {
-  const t = v.trim()
-  if (t === '') return null
-  return PHONE_RE.test(t)
-    ? { ok: true, message: 'Format valide' }
-    : { ok: false, message: `Format invalide — exemple : ${PHONE_EXAMPLE}` }
+function validatePhone(v: string, t: TFunction): { ok: boolean; message: string } | null {
+  const value = v.trim()
+  if (value === '') return null
+  return PHONE_RE.test(value)
+    ? { ok: true, message: t('visitor.profil.phoneValid') }
+    : { ok: false, message: t('visitor.profil.phoneInvalid', { example: PHONE_EXAMPLE }) }
 }
 
 function isFilled(v: unknown): boolean {
@@ -138,6 +140,7 @@ function FieldRow({ icon, label, value, placeholder, emptyLabel, editing, onChan
   hint?: string
   validation?: (v: string) => { ok: boolean; message: string } | null
 }) {
+  const { t } = useTranslation()
   const filled = isFilled(value)
   const feedback = editing && validation ? validation(value) : null
   const inputBorder = feedback
@@ -177,7 +180,7 @@ function FieldRow({ icon, label, value, placeholder, emptyLabel, editing, onChan
             onClick={onRequestEdit}
             className="mt-1.5 inline-flex items-center gap-1.5 text-sm text-slate-300 dark:text-slate-400 hover:text-blue-500 transition-colors"
           >
-            <Plus className="w-3.5 h-3.5" /> {emptyLabel || 'Non renseigné'}
+            <Plus className="w-3.5 h-3.5" /> {emptyLabel || t('visitor.profil.notProvided')}
           </button>
         )}
       </div>
@@ -190,6 +193,7 @@ function TagEditor({ tags, onChange, placeholder }: {
   onChange: (next: string[]) => void
   placeholder?: string
 }) {
+  const { t } = useTranslation()
   const [draft, setDraft] = useState('')
   const add = () => {
     const v = draft.trim()
@@ -206,14 +210,14 @@ function TagEditor({ tags, onChange, placeholder }: {
           placeholder={placeholder}
           className="flex-1 min-w-0 px-3 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50/50 dark:bg-primary-900/40 text-sm text-slate-800 dark:text-sable focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow"
         />
-        <button type="button" onClick={add} className="shrink-0 px-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold transition-colors">Ajouter</button>
+        <button type="button" onClick={add} className="shrink-0 px-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold transition-colors">{t('visitor.profil.addTag')}</button>
       </div>
       {tags.length > 0 && (
         <div className="flex flex-wrap gap-2">
-          {tags.map((t, i) => (
+          {tags.map((tag, i) => (
             <span key={i} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-red-50 dark:bg-red-500/10 text-red-600 dark:text-red-400 text-sm font-medium border border-red-100 dark:border-red-500/20">
-              <AlertTriangle className="w-3.5 h-3.5 shrink-0" /> {t}
-              <button type="button" onClick={() => onChange(tags.filter((_, j) => j !== i))} className="text-red-400 hover:text-red-600" title="Retirer">
+              <AlertTriangle className="w-3.5 h-3.5 shrink-0" /> {tag}
+              <button type="button" onClick={() => onChange(tags.filter((_, j) => j !== i))} className="text-red-400 hover:text-red-600" title={t('visitor.profil.remove')}>
                 <X className="w-3.5 h-3.5" />
               </button>
             </span>
@@ -228,6 +232,7 @@ function ContactsEditor({ contacts, onChange }: {
   contacts: Array<{ nom: string; telephone: string; lien: string }>
   onChange: (next: Array<{ nom: string; telephone: string; lien: string }>) => void
 }) {
+  const { t } = useTranslation()
   const update = (i: number, key: 'nom' | 'telephone' | 'lien', v: string) =>
     onChange(contacts.map((c, j) => (j === i ? { ...c, [key]: v } : c)))
   const remove = (i: number) => onChange(contacts.filter((_, j) => j !== i))
@@ -236,15 +241,15 @@ function ContactsEditor({ contacts, onChange }: {
       {contacts.map((c, i) => (
         <div key={i} className="rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50/50 dark:bg-primary-900/40 p-3 space-y-2">
           <div className="flex items-center justify-between">
-            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Contact {i + 1}</p>
-            <button type="button" onClick={() => remove(i)} className="p-1 text-red-400 hover:text-red-600" title="Supprimer">
+            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide">{t('visitor.profil.contactNumber', { number: i + 1 })}</p>
+            <button type="button" onClick={() => remove(i)} className="p-1 text-red-400 hover:text-red-600" title={t('visitor.profil.delete')}>
               <X className="w-4 h-4" />
             </button>
           </div>
           <input
             value={c.nom}
             onChange={(e) => update(i, 'nom', e.target.value)}
-            placeholder="Nom complet"
+            placeholder={t('visitor.profil.contactName')}
             className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-primary-900/40 text-sm text-slate-800 dark:text-sable focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow"
           />
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -252,21 +257,21 @@ function ContactsEditor({ contacts, onChange }: {
               <input
                 value={c.telephone}
                 onChange={(e) => update(i, 'telephone', e.target.value)}
-                placeholder={`Téléphone (ex : ${PHONE_EXAMPLE})`}
+                placeholder={t('visitor.profil.contactPhone', { example: PHONE_EXAMPLE })}
                 inputMode="tel"
                 className={`w-full px-3 py-2 rounded-lg border bg-white dark:bg-primary-900/40 text-sm text-slate-800 dark:text-sable focus:outline-none focus:ring-2 transition-shadow ${(() => {
-                  const fb = validatePhone(c.telephone)
+                  const fb = validatePhone(c.telephone, t)
                   return fb ? (fb.ok ? 'border-emerald-300 focus:ring-emerald-500 focus:border-emerald-500' : 'border-red-300 focus:ring-red-500 focus:border-red-500') : 'border-slate-200 focus:ring-blue-500 focus:border-blue-500'
                 })()}`}
               />
               {(() => {
-                const fb = validatePhone(c.telephone)
+                const fb = validatePhone(c.telephone, t)
                 return (
                   <p className={`mt-1 flex items-center gap-1.5 text-xs font-medium ${fb ? (fb.ok ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500 dark:text-red-400') : 'text-slate-400'}`}>
                     {fb ? (
                       fb.ok ? <CheckCircle2 className="w-3.5 h-3.5 shrink-0" /> : <AlertCircle className="w-3.5 h-3.5 shrink-0" />
                     ) : <Info className="w-3.5 h-3.5 shrink-0" />}
-                    {fb ? fb.message : `Format attendu : ${PHONE_EXAMPLE}`}
+                    {fb ? fb.message : t('visitor.profil.phoneExpected', { example: PHONE_EXAMPLE })}
                   </p>
                 )
               })()}
@@ -274,7 +279,7 @@ function ContactsEditor({ contacts, onChange }: {
             <input
               value={c.lien}
               onChange={(e) => update(i, 'lien', e.target.value)}
-              placeholder="Lien (ex : Mère)"
+              placeholder={t('visitor.profil.contactLink')}
               className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-primary-900/40 text-sm text-slate-800 dark:text-sable focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow"
             />
           </div>
@@ -285,7 +290,7 @@ function ContactsEditor({ contacts, onChange }: {
         onClick={() => onChange([...contacts, { nom: '', telephone: '', lien: '' }])}
         className="w-full flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl border-2 border-dashed border-red-200 dark:border-red-500/20 text-red-400 hover:text-red-500 hover:border-red-300 transition-colors text-sm font-medium"
       >
-        <Plus className="w-4 h-4" /> Ajouter un contact
+        <Plus className="w-4 h-4" /> {t('visitor.profil.addContact')}
       </button>
     </div>
   )
@@ -300,10 +305,10 @@ function disponibilitesLabel(d: unknown): string {
     .join(', ')
 }
 
-function formatReportDate(value?: string | null): string {
+function formatReportDate(value?: string | null, locale = 'fr-FR'): string {
   if (!value) return ''
 
-  return new Intl.DateTimeFormat('fr-FR', {
+  return new Intl.DateTimeFormat(locale, {
     day: '2-digit',
     month: 'long',
     year: 'numeric',
@@ -312,7 +317,12 @@ function formatReportDate(value?: string | null): string {
   }).format(new Date(value))
 }
 
+function reportDateLocale(language: string): string {
+  return language.startsWith('en') ? 'en-GB' : 'fr-FR'
+}
+
 function PatientReportCard({ report }: { report: PatientReport }) {
+  const { t, i18n } = useTranslation()
   const status = REPORT_STATUS_META[report.statut] ?? REPORT_STATUS_META.NOUVEAU
   const StatusIcon = status.icon
   const doctorName = `Dr ${report.medecin?.prenom ?? ''} ${report.medecin?.nom ?? ''}`
@@ -325,24 +335,24 @@ function PatientReportCard({ report }: { report: PatientReport }) {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
           <p className="truncate text-base font-extrabold text-slate-900 dark:text-white">
-            {doctorName === 'Dr' ? 'Médecin concerné' : doctorName}
+            {doctorName === 'Dr' ? t('visitor.profil.concernedDoctor') : doctorName}
           </p>
           <p className="mt-1 text-xs font-medium text-slate-500 dark:text-slate-300">
-            {report.medecin?.specialite || 'Spécialité non renseignée'}
+            {report.medecin?.specialite || t('visitor.profil.specialityNotProvided')}
           </p>
           <p className="mt-2 text-xs text-slate-400">
-            Envoyé le {formatReportDate(report.createdAt)}
+            {t('visitor.profil.sentOn', { date: formatReportDate(report.createdAt, reportDateLocale(i18n.language)) })}
           </p>
         </div>
         <span className={`inline-flex w-fit shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-bold ${status.className}`}>
           <StatusIcon className="h-3.5 w-3.5" />
-          {status.label}
+          {t(status.labelKey)}
         </span>
       </div>
 
       <div className="mt-4 rounded-2xl border border-slate-100 bg-slate-50 p-4 dark:border-white/10 dark:bg-primary-900/40">
         <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-400">
-          {REPORT_REASON_LABELS[report.motif] ?? report.motif}
+          {t(REPORT_REASON_LABELS[report.motif] ?? report.motif)}
         </p>
         <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-700 dark:text-slate-200">
           {report.description}
@@ -357,7 +367,7 @@ function PatientReportCard({ report }: { report: PatientReport }) {
         <div className="flex items-center gap-2">
           <MessageSquareText className={`h-4 w-4 ${report.noteAdmin ? 'text-blue-600 dark:text-blue-300' : 'text-slate-400'}`} />
           <p className="text-xs font-extrabold uppercase tracking-[0.14em] text-slate-700 dark:text-slate-200">
-            Réponse de l’administration
+            {t('visitor.profil.adminResponse')}
           </p>
         </div>
         {report.noteAdmin ? (
@@ -366,16 +376,16 @@ function PatientReportCard({ report }: { report: PatientReport }) {
               {report.noteAdmin}
             </p>
             <p className="mt-3 text-xs text-slate-400">
-              Mise à jour le {formatReportDate(responseDate)}
+              {t('visitor.profil.updatedOn', { date: formatReportDate(responseDate, reportDateLocale(i18n.language)) })}
             </p>
           </>
         ) : (
           <p className="mt-3 text-sm leading-6 text-slate-500 dark:text-slate-300">
             {report.statut === 'NOUVEAU'
-              ? 'Votre signalement a bien été reçu. Il n’a pas encore été examiné par un administrateur.'
+              ? t('visitor.profil.reportPending')
               : report.statut === 'EN_COURS'
-                ? 'Votre signalement est en cours d’examen. Aucune réponse écrite n’a encore été publiée.'
-                : 'Le dossier a été clôturé sans commentaire administratif complémentaire.'}
+                ? t('visitor.profil.reportReviewing')
+                : t('visitor.profil.reportClosed')}
           </p>
         )}
       </div>
@@ -390,6 +400,7 @@ function PatientReportRow({
   report: PatientReport
   onOpen: () => void
 }) {
+  const { t, i18n } = useTranslation()
   const status = REPORT_STATUS_META[report.statut] ?? REPORT_STATUS_META.NOUVEAU
   const StatusIcon = status.icon
   const doctorName = `Dr ${report.medecin?.prenom ?? ''} ${report.medecin?.nom ?? ''}`
@@ -407,20 +418,20 @@ function PatientReportRow({
       </span>
       <span className="min-w-0 flex-1">
         <span className="block truncate text-sm font-extrabold text-slate-900 dark:text-white">
-          {doctorName === 'Dr' ? 'Médecin concerné' : doctorName}
+          {doctorName === 'Dr' ? t('visitor.profil.concernedDoctor') : doctorName}
         </span>
         <span className="mt-1 block truncate text-xs text-slate-500 dark:text-slate-300">
-          {REPORT_REASON_LABELS[report.motif] ?? report.motif}
+          {t(REPORT_REASON_LABELS[report.motif] ?? report.motif)}
           <span className="mx-1.5 text-slate-300 dark:text-slate-600">·</span>
-          {new Date(report.createdAt).toLocaleDateString('fr-FR')}
+          {new Date(report.createdAt).toLocaleDateString(reportDateLocale(i18n.language))}
         </span>
         <span className="mt-1 block text-[11px] font-bold text-slate-500 dark:text-slate-300 sm:hidden">
-          {status.label}
+          {t(status.labelKey)}
         </span>
       </span>
       <span className={`hidden shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-bold sm:inline-flex ${status.className}`}>
         <StatusIcon className="h-3 w-3" />
-        {status.label}
+        {t(status.labelKey)}
       </span>
       <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-slate-400 transition-colors group-hover:bg-white group-hover:text-blue-600 dark:group-hover:bg-white/10">
         <Eye className="h-4 w-4" />
@@ -430,6 +441,7 @@ function PatientReportRow({
 }
 
 export default function ProfilPage() {
+  const { t } = useTranslation()
   const { user, updateUser } = useAuth()
   const { dark, toggleTheme } = useTheme()
   const toast = useToast()
@@ -473,7 +485,7 @@ export default function ProfilPage() {
 
   const handleSave = async () => {
     if (!isMedecin && form.telephone.trim() !== '' && !PHONE_RE.test(form.telephone.trim())) {
-      toast.error('Format camerounais attendu : +237 6XXXXXXXX ou +237 2XXXXXXXX')
+      toast.error(t('visitor.profil.phoneFormatError'))
       return
     }
     setSaving(true)
@@ -493,10 +505,10 @@ export default function ProfilPage() {
       }
       const { data } = await api.patch(`/api/users/${user.id}`, payload, { headers: { 'Content-Type': 'application/merge-patch+json' } })
       updateUser({ ...user, ...data })
-      toast.success('Profil mis à jour.')
+      toast.success(t('visitor.profil.updateSuccess'))
       setEditing(false)
     } catch {
-      toast.error('Échec de la mise à jour du profil.')
+      toast.error(t('visitor.profil.updateFailed'))
     } finally {
       setSaving(false)
     }
@@ -506,12 +518,12 @@ export default function ProfilPage() {
     const file = e.target.files?.[0]
     if (!file) return
     if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
-      toast.error('Format non autorise. Utilisez une image JPEG, PNG ou WebP.')
+      toast.error(t('visitor.profil.photoFormatError'))
       e.target.value = ''
       return
     }
     if (file.size > 5 * 1024 * 1024) {
-      toast.error('La photo ne doit pas depasser 5 Mo.')
+      toast.error(t('visitor.profil.photoTooBig'))
       e.target.value = ''
       return
     }
@@ -521,12 +533,12 @@ export default function ProfilPage() {
     try {
       const { data } = await api.post('/api/profile/photo', formData)
       updateUser({ ...user, photoProfil: data.photoProfil })
-      toast.success('Photo de profil mise à jour.')
+      toast.success(t('visitor.profil.photoSuccess'))
     } catch (error: any) {
       toast.error(
         error?.response?.data?.error
         || error?.response?.data?.detail
-        || "Échec de l'envoi de la photo.",
+        || t('visitor.profil.photoFailed'),
       )
     } finally {
       setUploading(false)
@@ -543,14 +555,14 @@ export default function ProfilPage() {
     ? [isFilled(form.specialite), isFilled(medecinDispo), isFilled(user.numeroOrdre || ''), Boolean(user.photoProfil)]
     : [isFilled(form.telephone), isFilled(form.quartier), isFilled(form.groupeSanguin), form.allergies.length > 0, visibleContacts.length > 0, Boolean(user.photoProfil)]
   const completion = Math.round((profileChecks.filter(Boolean).length / profileChecks.length) * 100)
-  const roleLabel = isMedecin ? 'Professionnel de santé' : 'Patient'
-  const primaryLocation = isMedecin ? (form.specialite || 'Spécialité non renseignée') : (form.quartier || 'Localisation non renseignée')
+  const roleLabel = isMedecin ? t('visitor.profil.healthProfessional') : t('visitor.profil.patient')
+  const primaryLocation = isMedecin ? (form.specialite || t('visitor.profil.specialityNotProvided')) : (form.quartier || t('visitor.profil.locationNotProvided'))
   return (
     <div className="min-h-[calc(100dvh-6rem)] bg-[#F7FAFC] dark:bg-primary-900">
       <Modal
         isOpen={Boolean(selectedReport)}
         onClose={() => setSelectedReport(null)}
-        title="Détail du signalement"
+        title={t('visitor.profil.reportDetailTitle')}
         size="lg"
       >
         {selectedReport && <PatientReportCard report={selectedReport} />}
@@ -559,7 +571,7 @@ export default function ProfilPage() {
       <Modal
         isOpen={reportsHistoryOpen}
         onClose={() => setReportsHistoryOpen(false)}
-        title="Historique des signalements"
+        title={t('visitor.profil.reportsHistoryTitle')}
         size="lg"
       >
         <div className="max-h-[65dvh] divide-y divide-slate-100 overflow-y-auto rounded-2xl border border-slate-200 dark:divide-white/10 dark:border-white/10">
@@ -579,10 +591,10 @@ export default function ProfilPage() {
       <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8 py-6 sm:py-8 lg:py-10">
         <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <p className="text-xs font-bold uppercase tracking-[0.18em] text-blue-600 dark:text-blue-300">Espace personnel</p>
-            <h1 className="mt-2 font-display text-2xl sm:text-3xl font-extrabold text-slate-950 dark:text-white">Profil {isMedecin ? 'médecin' : 'patient'}</h1>
+            <p className="text-xs font-bold uppercase tracking-[0.18em] text-blue-600 dark:text-blue-300">{t('visitor.profil.space')}</p>
+            <h1 className="mt-2 font-display text-2xl sm:text-3xl font-extrabold text-slate-950 dark:text-white">{isMedecin ? t('visitor.profil.titleDoctor') : t('visitor.profil.titlePatient')}</h1>
             <p className="mt-2 max-w-2xl text-sm text-slate-500 dark:text-slate-300">
-              Gérez les informations utilisées pour votre suivi, vos contacts et votre dossier médical numérique.
+              {t('visitor.profil.intro')}
             </p>
           </div>
 
@@ -592,7 +604,7 @@ export default function ProfilPage() {
                 onClick={() => setEditing(false)}
                 className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-600 shadow-sm transition-colors hover:border-red-200 hover:text-red-600 dark:border-white/10 dark:bg-primary-800 dark:text-slate-200"
               >
-                <X className="h-4 w-4" /> Annuler
+                <X className="h-4 w-4" /> {t('visitor.profil.cancel')}
               </button>
             )}
             <button
@@ -600,7 +612,7 @@ export default function ProfilPage() {
               disabled={saving}
               className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-bold text-white shadow-sm shadow-blue-600/20 transition-colors hover:bg-blue-700 disabled:opacity-60"
             >
-              {editing ? <><Save className="h-4 w-4" /> {saving ? 'Enregistrement...' : 'Enregistrer'}</> : <><Edit3 className="h-4 w-4" /> Modifier le profil</>}
+              {editing ? <><Save className="h-4 w-4" /> {saving ? t('visitor.profil.saving') : t('visitor.profil.save')}</> : <><Edit3 className="h-4 w-4" /> {t('visitor.profil.editProfile')}</>}
             </button>
           </div>
         </div>
@@ -619,7 +631,7 @@ export default function ProfilPage() {
                   onClick={() => fileRef.current?.click()}
                   disabled={uploading}
                   className="absolute -bottom-2 -right-2 flex h-10 w-10 items-center justify-center rounded-2xl bg-slate-950 text-white shadow-md ring-4 ring-white transition-colors hover:bg-blue-700 disabled:opacity-60 dark:ring-primary-800"
-                  title="Changer la photo de profil"
+                  title={t('visitor.profil.changePhoto')}
                 >
                   <Camera className="h-4 w-4" />
                 </button>
@@ -632,18 +644,18 @@ export default function ProfilPage() {
                     <ShieldCheck className="h-3.5 w-3.5" /> {roleLabel}
                   </span>
                   <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-200">
-                    <Lock className="h-3.5 w-3.5" /> Données protégées
+                    <Lock className="h-3.5 w-3.5" /> {t('visitor.profil.protectedData')}
                   </span>
                 </div>
                 <h2 className="mt-3 truncate font-display text-2xl font-extrabold text-slate-950 dark:text-white">{user.prenom} {user.nom}</h2>
                 <p className="mt-1 truncate text-sm font-medium text-slate-500 dark:text-slate-300">{user.email}</p>
                 <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <div className="rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3 dark:border-white/10 dark:bg-primary-900/40">
-                    <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400">Contact principal</p>
-                    <p className="mt-1 truncate text-sm font-semibold text-slate-800 dark:text-sable">{form.telephone || 'Téléphone non renseigné'}</p>
+                    <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400">{t('visitor.profil.mainContact')}</p>
+                    <p className="mt-1 truncate text-sm font-semibold text-slate-800 dark:text-sable">{form.telephone || t('visitor.profil.phoneNotProvided')}</p>
                   </div>
                   <div className="rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3 dark:border-white/10 dark:bg-primary-900/40">
-                    <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400">Repère médical</p>
+                    <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400">{t('visitor.profil.medicalMarker')}</p>
                     <p className="mt-1 truncate text-sm font-semibold text-slate-800 dark:text-sable">{primaryLocation}</p>
                   </div>
                 </div>
@@ -654,8 +666,8 @@ export default function ProfilPage() {
           <aside className="rounded-[28px] border border-slate-200/80 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-primary-800/80 sm:p-6">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <p className="text-xs font-bold uppercase tracking-[0.16em] text-slate-400">Dossier médical</p>
-                <h2 className="mt-2 font-display text-xl font-extrabold text-slate-950 dark:text-white">Complétude</h2>
+                <p className="text-xs font-bold uppercase tracking-[0.16em] text-slate-400">{t('visitor.profil.medicalRecord')}</p>
+                <h2 className="mt-2 font-display text-xl font-extrabold text-slate-950 dark:text-white">{t('visitor.profil.completion')}</h2>
               </div>
               <span className="rounded-2xl bg-blue-600 px-3 py-1.5 text-sm font-extrabold text-white">{completion}%</span>
             </div>
@@ -664,16 +676,16 @@ export default function ProfilPage() {
             </div>
             <div className="mt-5 grid grid-cols-2 gap-3 text-sm">
               <div className="rounded-2xl border border-slate-100 bg-slate-50 p-3 dark:border-white/10 dark:bg-primary-900/40">
-                <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400">Groupe</p>
+                <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400">{t('visitor.profil.group')}</p>
                 <p className="mt-1 font-extrabold text-slate-900 dark:text-white">{form.groupeSanguin || '-'}</p>
               </div>
               <div className="rounded-2xl border border-slate-100 bg-slate-50 p-3 dark:border-white/10 dark:bg-primary-900/40">
-                <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400">Allergies</p>
+                <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400">{t('visitor.profil.allergies')}</p>
                 <p className="mt-1 font-extrabold text-slate-900 dark:text-white">{form.allergies.length}</p>
               </div>
             </div>
             <p className="mt-5 text-sm leading-6 text-slate-500 dark:text-slate-300">
-              Un profil complet aide les professionnels de santé à mieux comprendre votre situation lors d’une consultation.
+              {t('visitor.profil.completionHint')}
             </p>
           </aside>
         </div>
@@ -683,27 +695,27 @@ export default function ProfilPage() {
             {!isMedecin ? (
               <>
                 <Card className="rounded-[24px] p-5 sm:p-6">
-                  <CardHeading icon={<Phone className="w-4 h-4" />} title="Identité et coordonnées" />
+                  <CardHeading icon={<Phone className="w-4 h-4" />} title={t('visitor.profil.identity')} />
                   <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
                     <FieldRow
                       icon={<Phone className="w-4 h-4" />}
-                      label="Téléphone"
+                      label={t('visitor.profil.phone')}
                       value={form.telephone}
-                      placeholder={`Ex : ${PHONE_EXAMPLE}`}
-                      emptyLabel="Ajouter votre téléphone"
+                      placeholder={t('visitor.profil.phoneExample', { example: PHONE_EXAMPLE })}
+                      emptyLabel={t('visitor.profil.addPhone')}
                       editing={editing}
                       onChange={set('telephone')}
                       onRequestEdit={() => setEditing(true)}
                       inputMode="tel"
-                      hint={`Format attendu : ${PHONE_EXAMPLE}`}
-                      validation={validatePhone}
+                      hint={t('visitor.profil.phoneExpected', { example: PHONE_EXAMPLE })}
+                      validation={(v) => validatePhone(v, t)}
                     />
                     <FieldRow
                       icon={<MapPin className="w-4 h-4" />}
-                      label="Quartier / Localisation"
+                      label={t('visitor.profil.neighborhood')}
                       value={form.quartier}
-                      placeholder="Ex : Gombe, Kinshasa"
-                      emptyLabel="Ajouter votre quartier"
+                      placeholder={t('visitor.profil.neighborhoodExample')}
+                      emptyLabel={t('visitor.profil.addNeighborhood')}
                       editing={editing}
                       onChange={set('quartier')}
                       onRequestEdit={() => setEditing(true)}
@@ -714,34 +726,34 @@ export default function ProfilPage() {
 
                 <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
                   <Card className="rounded-[24px] p-5 sm:p-6">
-                    <CardHeading icon={<Droplet className="w-4 h-4" />} title="Groupe sanguin" badgeClass="bg-red-50 dark:bg-red-500/10 text-red-500" />
+                    <CardHeading icon={<Droplet className="w-4 h-4" />} title={t('visitor.profil.bloodGroup')} badgeClass="bg-red-50 dark:bg-red-500/10 text-red-500" />
                     {editing ? (
                       <select
                         value={form.groupeSanguin || ''}
                         onChange={set('groupeSanguin')}
                         className="w-full rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2.5 text-sm text-slate-800 transition-shadow focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-white/10 dark:bg-primary-900/40 dark:text-sable"
                       >
-                        <option value="">Non spécifié</option>
+                        <option value="">{t('visitor.profil.notSpecified')}</option>
                         {GROUPES_SANGUINS.map((g) => <option key={g} value={g}>{g}</option>)}
                       </select>
                     ) : form.groupeSanguin ? (
                       <div className="flex items-center justify-between gap-3 rounded-2xl border border-red-100 bg-red-50 px-4 py-4 dark:border-red-500/20 dark:bg-red-500/10">
-                        <span className="text-sm font-semibold text-slate-500 dark:text-slate-300">Groupe renseigné</span>
+                        <span className="text-sm font-semibold text-slate-500 dark:text-slate-300">{t('visitor.profil.groupProvided')}</span>
                         <span className="inline-flex items-center gap-2 rounded-full bg-red-600 px-4 py-2 text-sm font-extrabold text-white shadow-sm shadow-red-600/20">
                           <Droplet className="h-4 w-4" /> {form.groupeSanguin}
                         </span>
                       </div>
                     ) : (
                       <button onClick={() => setEditing(true)} className="inline-flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-700 transition-colors hover:bg-amber-100">
-                        <Plus className="h-4 w-4" /> Renseigner le groupe sanguin
+                        <Plus className="h-4 w-4" /> {t('visitor.profil.fillBloodGroup')}
                       </button>
                     )}
                   </Card>
 
                   <Card className="rounded-[24px] p-5 sm:p-6">
-                    <CardHeading icon={<HeartPulse className="w-4 h-4" />} title="Allergies" badgeClass="bg-red-50 dark:bg-red-500/10 text-red-500" />
+                    <CardHeading icon={<HeartPulse className="w-4 h-4" />} title={t('visitor.profil.allergies')} badgeClass="bg-red-50 dark:bg-red-500/10 text-red-500" />
                     {editing ? (
-                      <TagEditor tags={form.allergies} onChange={(next) => setForm((f: any) => ({ ...f, allergies: next }))} placeholder="Ex : Pénicilline" />
+                      <TagEditor tags={form.allergies} onChange={(next) => setForm((f: any) => ({ ...f, allergies: next }))} placeholder={t('visitor.profil.allergyExample')} />
                     ) : form.allergies.length > 0 ? (
                       <div className="flex flex-wrap gap-2">
                         {form.allergies.map((a: string, i: number) => (
@@ -752,14 +764,14 @@ export default function ProfilPage() {
                       </div>
                     ) : (
                       <div className="flex items-center gap-2 rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-300">
-                        <ShieldCheck className="h-4 w-4 shrink-0" /> Aucune allergie signalée
+                        <ShieldCheck className="h-4 w-4 shrink-0" /> {t('visitor.profil.noAllergy')}
                       </div>
                     )}
                   </Card>
                 </div>
 
                 <Card accent="border-l-4 border-l-red-500" className="rounded-[24px] p-5 sm:p-6">
-                  <CardHeading icon={<Siren className="w-4 h-4" />} title="Contacts d’urgence" badgeClass="bg-red-50 dark:bg-red-500/10 text-red-500" />
+                  <CardHeading icon={<Siren className="w-4 h-4" />} title={t('visitor.profil.emergencyContacts')} badgeClass="bg-red-50 dark:bg-red-500/10 text-red-500" />
                   {editing ? (
                     <ContactsEditor contacts={form.contactsUrgence} onChange={(next) => setForm((f: any) => ({ ...f, contactsUrgence: next }))} />
                   ) : visibleContacts.length > 0 ? (
@@ -770,7 +782,7 @@ export default function ProfilPage() {
                             <Phone className="h-4 w-4" />
                           </span>
                           <div className="min-w-0 flex-1">
-                            <p className="truncate text-sm font-extrabold text-slate-900 dark:text-white">{c.nom || 'Contact'}</p>
+                            <p className="truncate text-sm font-extrabold text-slate-900 dark:text-white">{c.nom || t('visitor.profil.contact')}</p>
                             <p className="truncate text-xs font-medium text-slate-500 dark:text-slate-300">{c.telephone}{c.lien ? ` · ${c.lien}` : ''}</p>
                           </div>
                         </div>
@@ -778,7 +790,7 @@ export default function ProfilPage() {
                     </div>
                   ) : (
                     <button onClick={() => setEditing(true)} className="flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-red-200 px-4 py-4 text-sm font-bold text-red-500 transition-colors hover:border-red-300 hover:bg-red-50 dark:border-red-500/20 dark:hover:bg-red-500/10">
-                      <Plus className="h-4 w-4" /> Ajouter un contact d’urgence
+                      <Plus className="h-4 w-4" /> {t('visitor.profil.addEmergencyContact')}
                     </button>
                   )}
                 </Card>
@@ -787,30 +799,30 @@ export default function ProfilPage() {
                   <div className="flex flex-col gap-2 border-b border-slate-100 p-5 dark:border-white/10 sm:flex-row sm:items-center sm:justify-between sm:p-6">
                     <CardHeading
                       icon={<Flag className="h-4 w-4" />}
-                      title="Mes signalements"
+                      title={t('visitor.profil.myReports')}
                       badgeClass="bg-red-50 dark:bg-red-500/10 text-red-600"
                     />
                     {!reportsLoading && !reportsError && (
                       <span className="w-fit rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-600 dark:bg-white/10 dark:text-slate-200">
-                        {reports.length} dossier{reports.length > 1 ? 's' : ''}
+                        {t('visitor.profil.reportsCount', { count: reports.length })}
                       </span>
                     )}
                   </div>
 
                   {reportsLoading ? (
-                    <LoadingSpinner label="Chargement des signalements..." />
+                    <LoadingSpinner label={t('visitor.profil.loadingReports')} />
                   ) : reportsError ? (
                     <div className="p-6">
                       <div className="flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-200">
                         <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-                        Impossible de charger l’historique de vos signalements.
+                        {t('visitor.profil.reportsError')}
                       </div>
                     </div>
                   ) : reports.length === 0 ? (
                     <EmptyState
                       icon={Flag}
-                      title="Aucun signalement"
-                      description="Les signalements envoyés à l’administration apparaîtront ici avec leur état de traitement."
+                      title={t('visitor.profil.noReportsTitle')}
+                      description={t('visitor.profil.noReportsDesc')}
                     />
                   ) : (
                     <div className="divide-y divide-slate-100 dark:divide-white/10">
@@ -828,7 +840,7 @@ export default function ProfilPage() {
                             onClick={() => setReportsHistoryOpen(true)}
                             className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 text-sm font-bold text-slate-700 transition-colors hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700 dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:border-blue-500/30 dark:hover:bg-blue-500/10"
                           >
-                            Voir les {reports.length} signalements
+                            {t('visitor.profil.viewReports', { count: reports.length })}
                             <ChevronRight className="h-4 w-4" />
                           </button>
                         </div>
@@ -840,16 +852,16 @@ export default function ProfilPage() {
             ) : (
               <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
                 <Card className="rounded-[24px] p-5 sm:p-6">
-                  <CardHeading icon={<Stethoscope className="w-4 h-4" />} title="Pratique" />
-                  <FieldRow icon={<Stethoscope className="w-4 h-4" />} label="Spécialité" value={form.specialite} placeholder="Ex : Cardiologie" emptyLabel="Ajouter votre spécialité" editing={editing} onChange={set('specialite')} onRequestEdit={() => setEditing(true)} />
+                  <CardHeading icon={<Stethoscope className="w-4 h-4" />} title={t('visitor.profil.practice')} />
+                  <FieldRow icon={<Stethoscope className="w-4 h-4" />} label={t('visitor.profil.speciality')} value={form.specialite} placeholder={t('visitor.profil.specialityExample')} emptyLabel={t('visitor.profil.addSpeciality')} editing={editing} onChange={set('specialite')} onRequestEdit={() => setEditing(true)} />
                 </Card>
                 <Card className="rounded-[24px] p-5 sm:p-6">
-                  <CardHeading icon={<BadgeCheck className="w-4 h-4" />} title="Accréditation" />
-                  <FieldRow icon={<BadgeCheck className="w-4 h-4" />} label="Numéro d'ordre" value={user.numeroOrdre || ''} emptyLabel="Non renseigné" editing={false} onRequestEdit={() => setEditing(true)} />
+                  <CardHeading icon={<BadgeCheck className="w-4 h-4" />} title={t('visitor.profil.accreditation')} />
+                  <FieldRow icon={<BadgeCheck className="w-4 h-4" />} label={t('visitor.profil.orderNumber')} value={user.numeroOrdre || ''} emptyLabel={t('visitor.profil.notProvided')} editing={false} onRequestEdit={() => setEditing(true)} />
                 </Card>
                 <Card className="rounded-[24px] p-5 sm:p-6 md:col-span-2">
-                  <CardHeading icon={<CalendarClock className="w-4 h-4" />} title="Disponibilités" />
-                  <FieldRow icon={<CalendarClock className="w-4 h-4" />} label="Horaires" value={medecinDispo} placeholder="Ex : Lun - Ven, 8h - 17h" emptyLabel="Ajouter vos disponibilités" editing={editing} onChange={set('disponibilitesTexte')} onRequestEdit={() => setEditing(true)} />
+                  <CardHeading icon={<CalendarClock className="w-4 h-4" />} title={t('visitor.profil.availability')} />
+                  <FieldRow icon={<CalendarClock className="w-4 h-4" />} label={t('visitor.profil.schedule')} value={medecinDispo} placeholder={t('visitor.profil.scheduleExample')} emptyLabel={t('visitor.profil.addAvailability')} editing={editing} onChange={set('disponibilitesTexte')} onRequestEdit={() => setEditing(true)} />
                 </Card>
               </div>
             )}
@@ -859,21 +871,21 @@ export default function ProfilPage() {
             <Card className="rounded-[24px] p-5 sm:p-6">
               <CardHeading
                 icon={dark ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
-                title="Apparence"
+                title={t('visitor.profil.appearance')}
                 badgeClass="bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-300"
               />
               <div className="flex items-center justify-between gap-4">
                 <div className="min-w-0">
-                  <p className="text-sm font-bold text-slate-800 dark:text-sable">Thème sombre</p>
+                  <p className="text-sm font-bold text-slate-800 dark:text-sable">{t('visitor.profil.darkTheme')}</p>
                   <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-300">
-                    Adaptez l’affichage de votre espace patient à votre préférence.
+                    {t('visitor.profil.darkThemeDesc')}
                   </p>
                 </div>
                 <button
                   type="button"
                   role="switch"
                   aria-checked={dark}
-                  aria-label={dark ? 'Désactiver le thème sombre' : 'Activer le thème sombre'}
+                  aria-label={dark ? t('visitor.profil.disableDarkTheme') : t('visitor.profil.enableDarkTheme')}
                   onClick={toggleTheme}
                   className={`relative h-7 w-12 shrink-0 rounded-full border transition-colors ${
                     dark
@@ -893,23 +905,23 @@ export default function ProfilPage() {
             </Card>
 
             <Card className="rounded-[24px] p-5 sm:p-6">
-              <CardHeading icon={<ShieldCheck className="w-4 h-4" />} title="Confidentialité" />
+              <CardHeading icon={<ShieldCheck className="w-4 h-4" />} title={t('visitor.profil.privacy')} />
               <div className="space-y-3 text-sm text-slate-600 dark:text-slate-300">
                 <div className="flex gap-3">
                   <Lock className="mt-0.5 h-4 w-4 shrink-0 text-blue-600" />
-                  <p>Vos données médicales restent protégées et utilisées uniquement pour votre prise en charge.</p>
+                  <p>{t('visitor.profil.privacyData')}</p>
                 </div>
                 <div className="flex gap-3">
                   <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
-                  <p>Les champs sensibles sont séparés pour être lisibles rapidement en consultation.</p>
+                  <p>{t('visitor.profil.privacyFields')}</p>
                 </div>
               </div>
             </Card>
 
             <Card className="rounded-[24px] p-5 sm:p-6">
-              <CardHeading icon={<Info className="w-4 h-4" />} title="Conseil" badgeClass="bg-amber-50 dark:bg-amber-500/10 text-amber-600" />
+              <CardHeading icon={<Info className="w-4 h-4" />} title={t('visitor.profil.tip')} badgeClass="bg-amber-50 dark:bg-amber-500/10 text-amber-600" />
               <p className="text-sm leading-6 text-slate-600 dark:text-slate-300">
-                Ajoutez au minimum un contact d’urgence, votre groupe sanguin et vos allergies connues pour faciliter la prise en charge rapide.
+                {t('visitor.profil.tipText')}
               </p>
             </Card>
           </aside>

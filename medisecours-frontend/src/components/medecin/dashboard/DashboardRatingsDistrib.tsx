@@ -1,6 +1,7 @@
 'use client'
 
 import { Star } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 
 const RATING_COLORS = ['#EF4444', '#F97316', '#F59E0B', '#22C55E', '#10B981']
 
@@ -13,6 +14,7 @@ export default function DashboardRatingsDistrib({
   totalAvis: number
   noteMoyenne?: number
 }) {
+  const { t } = useTranslation()
   const counts = [
     ratingsDistribution[1] || 0,
     ratingsDistribution[2] || 0,
@@ -33,8 +35,8 @@ export default function DashboardRatingsDistrib({
   if (total === 0) {
     return (
       <div className="rounded-2xl bg-white p-5 shadow-[0_2px_12px_rgba(0,0,0,0.06)]">
-        <h3 className="text-sm font-bold text-[#0F2C52] mb-1">Notes & avis</h3>
-        <div className="flex h-[200px] items-center justify-center"><p className="text-sm text-[#9CA3AF]">Aucun avis</p></div>
+        <h3 className="text-sm font-bold text-[#0F2C52] mb-1">{t('medecin.dashboard.ratings.title')}</h3>
+        <div className="flex h-[200px] items-center justify-center"><p className="text-sm text-[#9CA3AF]">{t('medecin.dashboard.ratings.noReviews')}</p></div>
       </div>
     )
   }
@@ -42,7 +44,7 @@ export default function DashboardRatingsDistrib({
   return (
     <div className="rounded-2xl bg-white p-5 shadow-[0_2px_12px_rgba(0,0,0,0.06)]">
       <div className="flex items-center justify-between mb-1">
-        <h3 className="text-sm font-bold text-[#0F2C52]">Notes & avis</h3>
+        <h3 className="text-sm font-bold text-[#0F2C52]">{t('medecin.dashboard.ratings.title')}</h3>
         {noteMoyenne > 0 && (
           <div className="flex items-center gap-1">
             <Star className="h-3.5 w-3.5 text-amber-400" fill="currentColor" />
@@ -51,7 +53,7 @@ export default function DashboardRatingsDistrib({
           </div>
         )}
       </div>
-      <p className="text-xs text-[#6B7280] mb-3">{total} avis reçus</p>
+      <p className="text-xs text-[#6B7280] mb-3">{t('medecin.dashboard.ratings.received', { count: total })}</p>
 
       <div className="space-y-2">
         {distrib.map((d) => (

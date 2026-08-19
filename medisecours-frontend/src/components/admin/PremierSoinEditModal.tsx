@@ -1,6 +1,7 @@
 // @ts-nocheck
 'use client'
 import { useState, useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Save, X, AlertTriangle, ChevronsUpDown, Check } from 'lucide-react'
 import { Combobox } from '@headlessui/react'
 import { createPortal } from 'react-dom'
@@ -23,6 +24,7 @@ export default function PremierSoinEditModal({
   const [localSaving, setLocalSaving] = useState(false)
   const [localErrors, setLocalErrors] = useState({})
   const [query, setQuery] = useState('')
+  const { t } = useTranslation()
   const isNew = !editing?.id
   const isControlled = !!onFieldChange
 
@@ -80,7 +82,7 @@ export default function PremierSoinEditModal({
         violations.forEach((v) => { map[v.field || v.propertyPath] = v.message })
         setLocalErrors(map)
       } else {
-        alert(err?.response?.data?.error || "Erreur lors de l'enregistrement.")
+        alert(err?.response?.data?.error || t('admin.premierSoinModal.toastSaveError'))
       }
     } finally {
       setLocalSaving(false)
@@ -125,7 +127,7 @@ export default function PremierSoinEditModal({
               <span className="text-xl leading-none text-white font-bold">+</span>
             </div>
             <div>
-              <h2 className="text-lg font-bold text-white">{isNew ? 'Nouveau premier soin' : 'Modifier le premier soin'}</h2>
+              <h2 className="text-lg font-bold text-white">{isNew ? t('admin.premierSoinModal.titleNew') : t('admin.premierSoinModal.titleEdit')}</h2>
               {currentMaladie && (
                 <p className="mt-0.5 text-sm text-white/60">{currentMaladie.nom}</p>
               )}
@@ -136,19 +138,19 @@ export default function PremierSoinEditModal({
         <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
           <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
             <div>
-              <label className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.18em] text-[#7a8578]">Titre</label>
+              <label className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.18em] text-[#7a8578]">{t('admin.premierSoinModal.titre')}</label>
               <input
                 type="text"
                 value={getValue('titre')}
                 onChange={(e) => setValue('titre', e.target.value)}
-                placeholder="Titre du premier soin"
+                placeholder={t('admin.premierSoinModal.placeholderTitre')}
                 className={`w-full rounded-2xl border px-4 py-3 text-sm text-[#223023] outline-none transition focus:bg-white ${errs.titre ? 'border-[#d9534f] bg-[#fef2f2] focus:border-[#d9534f]' : 'border-[#dfe5db] bg-[#f8faf6] focus:border-[#bfd0bd]'}`}
               />
               {errs.titre && <p className="mt-1.5 flex items-center gap-1 text-xs text-[#d9534f]"><AlertTriangle className="h-3 w-3 shrink-0" /> {errs.titre}</p>}
             </div>
 
             <div>
-              <label className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.18em] text-[#7a8578]">Maladie liée</label>
+              <label className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.18em] text-[#7a8578]">{t('admin.premierSoinModal.maladieLiee')}</label>
               <Combobox
                 value={currentMaladie}
                 onChange={(m) => setValue('maladie', m?.['@id'] || '')}
@@ -159,7 +161,7 @@ export default function PremierSoinEditModal({
                       onChange={(e) => setQuery(e.target.value)}
                       displayValue={(m) => m?.nom || ''}
                       className="w-full border-none bg-transparent px-4 py-3 text-sm text-[#223023] outline-none placeholder:text-[#aab3a8]"
-                      placeholder="Rechercher une maladie..."
+                      placeholder={t('admin.premierSoinModal.rechercherMaladie')}
                     />
                     <Combobox.Button className="px-2 py-3 shrink-0">
                       <ChevronsUpDown className="h-4 w-4 text-[#7a8578]" />
@@ -168,7 +170,7 @@ export default function PremierSoinEditModal({
                   <Combobox.Options className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-2xl border border-[#dfe5db] bg-white shadow-lg">
                     {filteredMaladies.length === 0 ? (
                       <div className="px-4 py-8 text-center text-sm text-[#aab3a8]">
-                        Aucune maladie trouvée
+                        {t('admin.premierSoinModal.aucuneMaladie')}
                       </div>
                     ) : (
                       filteredMaladies.map((m) => (
@@ -201,7 +203,7 @@ export default function PremierSoinEditModal({
             </div>
 
             <div>
-              <label className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.18em] text-[#7a8578]">Niveau d&apos;urgence</label>
+              <label className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.18em] text-[#7a8578]">{t('admin.premierSoinModal.niveauUrgence')}</label>
               <select
                 value={getValue('niveauUrgence')}
                 onChange={(e) => setValue('niveauUrgence', e.target.value)}
@@ -216,24 +218,24 @@ export default function PremierSoinEditModal({
             </div>
 
             <div>
-              <label className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.18em] text-[#7a8578]">Description</label>
+              <label className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.18em] text-[#7a8578]">{t('admin.premierSoinModal.description')}</label>
               <textarea
                 value={getValue('description')}
                 onChange={(e) => setValue('description', e.target.value)}
                 rows={4}
-                placeholder="Description détaillée du geste de premier soin..."
+                placeholder={t('admin.premierSoinModal.placeholderDescription')}
                 className={`w-full rounded-2xl border px-4 py-3 text-sm text-[#223023] outline-none transition focus:bg-white ${errs.description ? 'border-[#d9534f] bg-[#fef2f2] focus:border-[#d9534f]' : 'border-[#dfe5db] bg-[#f8faf6] focus:border-[#bfd0bd]'}`}
               />
               {errs.description && <p className="mt-1.5 flex items-center gap-1 text-xs text-[#d9534f]"><AlertTriangle className="h-3 w-3 shrink-0" /> {errs.description}</p>}
             </div>
 
             <div>
-              <label className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.18em] text-[#7a8578]">Symptômes (optionnel)</label>
+              <label className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.18em] text-[#7a8578]">{t('admin.premierSoinModal.symptomesOptionnel')}</label>
               <textarea
                 value={getValue('symptomes') || ''}
                 onChange={(e) => setValue('symptomes', e.target.value)}
                 rows={3}
-                placeholder="Symptômes associés..."
+                placeholder={t('admin.premierSoinModal.symptomesAssocies')}
                 className="w-full rounded-2xl border border-[#dfe5db] bg-[#f8faf6] px-4 py-3 text-sm text-[#223023] outline-none transition focus:border-[#bfd0bd] focus:bg-white"
               />
             </div>
@@ -246,7 +248,7 @@ export default function PremierSoinEditModal({
                 onClick={onClose}
                 className="rounded-2xl border border-[#dfe5db] bg-white px-5 py-2.5 text-sm font-semibold text-[#566355] transition hover:bg-[#edf2ea]"
               >
-                Annuler
+                {t('admin.premierSoinModal.cancel')}
               </button>
               <button
                 type="submit"
@@ -254,7 +256,7 @@ export default function PremierSoinEditModal({
                 className="inline-flex items-center gap-2 rounded-2xl bg-[#2f6b45] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-[#1f4a2e] disabled:opacity-50"
               >
                 <Save className="h-4 w-4" />
-                {isSaving ? 'Enregistrement...' : 'Enregistrer'}
+                {isSaving ? t('admin.premierSoinModal.saving') : t('admin.premierSoinModal.save')}
               </button>
             </div>
           </div>

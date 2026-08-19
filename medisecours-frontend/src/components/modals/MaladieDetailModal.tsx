@@ -3,6 +3,7 @@
 import { useEffect, useCallback } from 'react'
 import Image from 'next/image'
 import { motion, AnimatePresence } from 'framer-motion'
+import { useTranslation } from 'react-i18next'
 import {
   X, AlertTriangle, ShieldCheck, Activity,
   Stethoscope, Pill, Siren, FileText, Bug
@@ -26,6 +27,7 @@ interface MaladieDetailModalProps {
 }
 
 export default function MaladieDetailModal({ maladie, onClose }: MaladieDetailModalProps) {
+  const { t, i18n } = useTranslation()
 
   /* ─── Fermeture via la touche Escape ─── */
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
@@ -48,7 +50,7 @@ export default function MaladieDetailModal({ maladie, onClose }: MaladieDetailMo
   const severityKey = maladie.niveauGravite?.toUpperCase() || 'DEFAULT'
   const severity = SEVERITY_CONFIG[severityKey] || SEVERITY_CONFIG['DEFAULT']
   const imgSrc = maladie.imageUrl || maladie.photo || PLACEHOLDER_IMG
-  const categorieName = maladie.categorie?.nom || 'Médecine générale'
+  const categorieName = maladie.categorie?.nom || t('visitor.components.maladieDetail.categoryFallback')
   const isUrgent = maladie.urgence === true
   const isContagieux = maladie.contagieux === true
 
@@ -56,8 +58,9 @@ export default function MaladieDetailModal({ maladie, onClose }: MaladieDetailMo
   const premiersSoins: any[] = maladie.premiersSoins ?? []
 
   /* ─── Formatage de la date d'ajout ─── */
+  const dateLocale = i18n.language.startsWith('en') ? 'en-GB' : 'fr-FR'
   const dateAjout = maladie.createdAt
-    ? new Date(maladie.createdAt).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })
+    ? new Date(maladie.createdAt).toLocaleDateString(dateLocale, { day: 'numeric', month: 'long', year: 'numeric' })
     : null
 
   return (
@@ -85,7 +88,7 @@ export default function MaladieDetailModal({ maladie, onClose }: MaladieDetailMo
           {/* ─── Bouton fermer (✕) ─── */}
           <button
             onClick={onClose}
-            aria-label="Fermer"
+            aria-label={t('visitor.components.maladieDetail.close')}
             className="absolute top-4 right-4 z-10 w-9 h-9 flex items-center justify-center rounded-full bg-black/30 backdrop-blur-sm text-white hover:bg-black/50 transition-colors"
           >
             <X className="w-5 h-5" />
@@ -118,7 +121,7 @@ export default function MaladieDetailModal({ maladie, onClose }: MaladieDetailMo
               <div className="absolute bottom-4 right-5">
                 <span className="inline-flex items-center gap-1 bg-red-500 text-white text-xs font-bold uppercase tracking-wider px-3 py-1.5 rounded-full shadow-lg animate-pulse">
                   <Siren className="w-3.5 h-3.5" />
-                  Urgence
+                  {t('visitor.components.maladieDetail.urgentCare')}
                 </span>
               </div>
             )}
@@ -131,7 +134,7 @@ export default function MaladieDetailModal({ maladie, onClose }: MaladieDetailMo
             <div>
               <p className="text-sm text-gray-500 mb-1">
                 <span className="mr-1">📍</span>{categorieName}
-                {dateAjout && <span className="ml-3 text-gray-400">· Ajouté le {dateAjout}</span>}
+                {dateAjout && <span className="ml-3 text-gray-400">· {t('visitor.components.maladieDetail.addedOn', { date: dateAjout })}</span>}
               </p>
               <h2 className="text-2xl font-extrabold text-slate-800 leading-tight">
                 {maladie.nom}
@@ -142,16 +145,16 @@ export default function MaladieDetailModal({ maladie, onClose }: MaladieDetailMo
             <div className="flex flex-wrap gap-2">
               <span className={`inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full ${severity.bg} ${severity.text} border ${severity.bg.replace('bg-', 'border-')}`}>
                 <Activity className="w-3.5 h-3.5" />
-                Gravité : {severity.label}
+                {t('visitor.components.maladieDetail.severity', { label: severity.label })}
               </span>
               <span className={`inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full ${isContagieux ? 'bg-rose-50 text-rose-700 border-rose-100' : 'bg-emerald-50 text-emerald-700 border-emerald-100'} border`}>
                 <Bug className="w-3.5 h-3.5" />
-                {isContagieux ? 'Contagieux' : 'Non contagieux'}
+                {isContagieux ? t('visitor.components.maladieCard.contagious') : t('visitor.components.maladieDetail.notContagious')}
               </span>
               {isUrgent && (
                 <span className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full bg-red-50 text-red-700 border border-red-100">
                   <Siren className="w-3.5 h-3.5" />
-                  Prise en charge urgente
+                  {t('visitor.components.maladieDetail.urgentCare')}
                 </span>
               )}
             </div>
@@ -161,7 +164,7 @@ export default function MaladieDetailModal({ maladie, onClose }: MaladieDetailMo
               <div>
                 <h3 className="flex items-center gap-2 text-sm font-bold text-slate-700 uppercase tracking-wide mb-2">
                   <FileText className="w-4 h-4 text-slate-400" />
-                  Description
+                  {t('visitor.components.maladieDetail.description')}
                 </h3>
                 <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
                   <p className="text-slate-700 text-sm leading-relaxed whitespace-pre-line">
@@ -176,7 +179,7 @@ export default function MaladieDetailModal({ maladie, onClose }: MaladieDetailMo
               <div>
                 <h3 className="flex items-center gap-2 text-sm font-bold text-slate-700 uppercase tracking-wide mb-2">
                   <Stethoscope className="w-4 h-4 text-slate-400" />
-                  Symptômes associés
+                  {t('visitor.components.maladieDetail.symptoms')}
                 </h3>
                 <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
                   <ul className="space-y-1.5">
@@ -196,7 +199,7 @@ export default function MaladieDetailModal({ maladie, onClose }: MaladieDetailMo
               <div>
                 <h3 className="flex items-center gap-2 text-sm font-bold text-slate-700 uppercase tracking-wide mb-2">
                   <AlertTriangle className="w-4 h-4 text-slate-400" />
-                  Causes
+                  {t('visitor.components.maladieDetail.causes')}
                 </h3>
                 <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
                   <p className="text-slate-700 text-sm leading-relaxed whitespace-pre-line">
@@ -211,7 +214,7 @@ export default function MaladieDetailModal({ maladie, onClose }: MaladieDetailMo
               <div>
                 <h3 className="flex items-center gap-2 text-sm font-bold text-slate-700 uppercase tracking-wide mb-3">
                   <ShieldCheck className="w-4 h-4 text-emerald-500" />
-                  Gestes de premiers secours
+                  {t('visitor.components.maladieDetail.firstAid')}
                 </h3>
                 <div className="space-y-3">
                   {premiersSoins.map((ps: any, i: number) => (
@@ -240,7 +243,7 @@ export default function MaladieDetailModal({ maladie, onClose }: MaladieDetailMo
               <div>
                 <h3 className="flex items-center gap-2 text-sm font-bold text-slate-700 uppercase tracking-wide mb-2">
                   <ShieldCheck className="w-4 h-4 text-slate-400" />
-                  Précautions
+                  {t('visitor.components.maladieDetail.precautions')}
                 </h3>
                 <div className="bg-amber-50/60 p-4 rounded-2xl border border-amber-100">
                   <p className="text-slate-700 text-sm leading-relaxed whitespace-pre-line">
@@ -255,7 +258,7 @@ export default function MaladieDetailModal({ maladie, onClose }: MaladieDetailMo
               <div>
                 <h3 className="flex items-center gap-2 text-sm font-bold text-slate-700 uppercase tracking-wide mb-2">
                   <Pill className="w-4 h-4 text-slate-400" />
-                  Traitement
+                  {t('visitor.components.maladieDetail.treatment')}
                 </h3>
                 <div className="bg-blue-50/60 p-4 rounded-2xl border border-blue-100">
                   <p className="text-slate-700 text-sm leading-relaxed whitespace-pre-line">

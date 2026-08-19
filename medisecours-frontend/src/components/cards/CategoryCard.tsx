@@ -1,7 +1,11 @@
+'use client'
+
 import { ArrowRight } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { CategoryIcon } from '../ui/CategoryIcon'
 
 export default function CategoryCard({ category, onExplore }: { category: any; onExplore: (cat: any) => void }) {
+  const { t } = useTranslation()
   const count = category.maladies?.length ?? 0
   const color = category.couleur || '#10B981'
 
@@ -16,7 +20,7 @@ export default function CategoryCard({ category, onExplore }: { category: any; o
             <CategoryIcon iconName={category.icone} categoryName={category.nom} size="md" />
           </div>
           <span className="text-[11px] font-bold tracking-wide uppercase px-3 py-1.5 rounded-full bg-slate-50 dark:bg-white/[0.03] text-slate-500 dark:text-slate-400 border border-slate-100 dark:border-white/[0.05]">
-            {count} maladie{count > 1 ? 's' : ''}
+            {t('visitor.components.categoryCard.diseaseCount', { count })}
           </span>
         </div>
 
@@ -32,7 +36,7 @@ export default function CategoryCard({ category, onExplore }: { category: any; o
         onClick={(e) => { e.stopPropagation(); onExplore(category) }}
         className="mt-6 flex items-center gap-2 text-sm font-semibold text-slate-900 dark:text-white group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors cursor-pointer"
       >
-        Explorer la catégorie
+        {t('visitor.components.categoryCard.explore')}
         <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
       </button>
     </div>

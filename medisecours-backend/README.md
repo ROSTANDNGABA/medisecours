@@ -993,6 +993,13 @@ Rate limiting actif. Attendre la fenêtre configurée :
 
 ## Historique des corrections majeures
 
+### 17/08/2026 — Internationalisation backend (i18n)
+
+- **TranslationNormalizer** — normalizer Symfony qui intercepte chaque `Maladie`, `Categorie`, `PremierSoin` sérialisé par API Platform et remplace dynamiquement les champs français par les versions anglaises (`nomEn`, `descriptionEn`, etc.) lorsque l'en-tête `Accept-Language: en` est envoyé
+- **TranslateDatabaseCommand** — commande Symfony (`app:translate-database`) qui traduit automatiquement tous les champs texte de la BDD en anglais via Google Translate (1 145 maladies, 513 protocoles, 26 catégories)
+- **ContentLocalizer + LocaleResolver** — services dédiés à la résolution de la langue demandée via `Accept-Language` et à la sélection du contenu localisé (français/anglais) pour les protocoles de premiers gestes publics
+- **Prescription state machine** — ajout de `input: false` et `read: false` sur les endpoints `/sign`, `/send`, `/cancel`, `/replace` pour corriger le bug des prescriptions bloquées en statut BROUILLON
+
 ### 25/07/2026 — Refonte Dashboard Médecin
 
 - **MedecinDashboardService** — agrégats SQL pur (COUNT/GROUP BY), aucun hydratation entité inutile
@@ -1026,6 +1033,578 @@ Rate limiting actif. Attendre la fenêtre configurée :
 
 ---
 
+## Modèles Backend — Entités Doctrine (détaillé)
+
+Cette section décrit **chaque entité** (modèle Doctrine ORM) du backend. Chaque entité est mappée à une table PostgreSQL et exposée via API Platform.
+
+---
+
+### 🔐 Système Utilisateur (Héritage Single Table)
+
+Les quatre entités suivantes partagent une **seule table `user`** en base de données via l'héritage Doctrine `SINGLE_TABLE`. Une colonne discriminateur `type` (`patient`, `medecin`, `admin`) détermine le type réel de chaque enregistrement. Cela optimise les jointures et unifie l'authentification JWT.
+
+#### 1. `User` (classe abstraite)
+
+| Aspect | Détail |
+|---|---|
+| **Rôle** | Entité racine pour l'authentification (JWT), la sécurité Symfony et les profils communs |
+| **Table** | `user` (partagée par Patient, Medecin, Admin) |
+| **ID** | UUID v4 (généré automatiquement par Doctrine) |
+
+**Champs principaux :**
+
+| Champ | Type | Description |
+|---|---|---|
+| `email` | string(180), unique | Adresse email de connexion |
+| `roles` | JSON array | Rôles Symfony (`ROLE_USER`, `ROLE_PATIENT`, etc.) |
+| `password` | string (hashé) | Bcrypt, min 8 car., 1 majuscule, 1 minuscule, 1 chiffre, 1 spécial |
+| `nom` / `prenom` | string(255) | Identité de l'utilisateur |
+| `telephone` | string | Format camerounais validé : `+237 6XXXXXXXX` |
+| `quartier` | string | Quartier de résidence |
+| `photoProfil` | string | URL de la photo de profil |
+| `actif` / `banni` | bool | Gestion du statut du compte |
+| `estEnLigne` | bool | Indicateur de présence temps réel |
+| `dernierePresence` | DateTimeImmutable | Dernière activité |
+| `emailVerified` | bool | Vérification de l'adresse email |
+| `emailVerificationToken` | string | Token de vérification (effacé après usage) |
+| `passwordResetToken` | string | Token de réinitialisation du mot de passe |
+
+**Relations :** `OneToMany` → Message (messages envoyés), `ManyToMany` → Conversation (fils de discussion)
+
+---
+
+#### 2. `Patient` (hérite de User)
+
+| Aspect | Détail |
+|---|---|
+| **Rôle** | Fiche médicale d'urgence et données de santé du patient |
+| **Discriminateur** | `type = 'patient'` |
+| **Rôle auto** | `ROLE_PATIENT` ajouté automatiquement |
+
+**Champs spécifiques :**
+
+| Champ | Type | Description |
+|---|---|---|
+| `groupeSanguin` | string | Validé par regex : `A+`, `B-`, `AB+`, `O-`, etc. |
+| `allergies` | JSON array | Ex: `["Pénicilline", "Arachides"]` |
+| `contactsUrgence` | JSON array | Ex: `[{"nom":"Mère", "telephone":"+237...", "lien":"parent"}]` |
+
+---
+
+#### 3. `Medecin` (hérite de User)
+
+| Aspect | Détail |
+|---|---|
+| **Rôle** | Praticien de santé avec pièces justificatives et disponibilités |
+| **Discriminateur** | `type = 'medecin'` |
+| **Rôle auto** | `ROLE_MEDECIN` |
+| **Validation** | Doit être approuvé par un admin (`estValide: true`) |
+
+**Champs spécifiques :**
+
+| Champ | Type | Description |
+|---|---|---|
+| `specialite` | string | Ex: "Cardiologie", "Généraliste" |
+| `numeroOrdre` | string | Identifiant à l'Ordre National des Médecins (ONMC) |
+| `estValide` | bool (défaut `false`) | Validé par un administrateur |
+| `typePieceIdentite` | string | `'CNI'` ou `'PASSPORT'` |
+| `disponibilites` | JSON | `[{"jour":"lundi","debut":"08:00","fin":"17:00"}]` |
+
+**Relations :** `OneToOne` → MediaObject (pièce identité recto), `OneToOne` → MediaObject (verso), `OneToOne` → MediaObject (selfie vérification)
+
+**Méthodes clés :** `isDisponibleMaintenant()` — calcul en temps réel selon le fuseau `Africa/Douala`
+
+---
+
+#### 4. `Admin` (hérite de User)
+
+| Aspect | Détail |
+|---|---|
+| **Rôle** | Super-utilisateur avec accès complet au dashboard admin |
+| **Discriminateur** | `type = 'admin'` |
+| **Rôle auto** | `ROLE_ADMIN` |
+
+Pas de champs spécifiques — hérite de tous les champs et relations de `User`.
+
+---
+
+### 🏥 Catalogue Médical
+
+#### 5. `Categorie`
+
+| Aspect | Détail |
+|---|---|
+| **Rôle** | Classification des pathologies médicales par catégorie |
+| **Table** | `categorie` |
+| **Bilingue** | ✅ `nomEn`, `descriptionEn` |
+
+**Champs principaux :**
+
+| Champ | Type | Description |
+|---|---|---|
+| `nom` / `nomEn` | string(255) | Nom FR et EN |
+| `description` / `descriptionEn` | text | Description FR et EN |
+| `couleur` | string(7) | Code hexadécimal (`#1E3A5F`) |
+| `icone` | string(100) | Nom d'icône pour le frontend |
+
+**Relations :** `OneToMany` → Maladie, `OneToMany` → MediaObject (images)
+
+---
+
+#### 6. `Maladie`
+
+| Aspect | Détail |
+|---|---|
+| **Rôle** | Fiche pathologique complète avec symptômes, causes, traitements |
+| **Table** | `maladie` (1 145 enregistrements) |
+| **Bilingue** | ✅ 7 champs traduits |
+| **Recherche** | Full-text PostgreSQL via `MaladieSearchProvider` |
+
+**Champs principaux :**
+
+| Champ FR | Champ EN | Description |
+|---|---|---|
+| `nom` | `nomEn` | Nom de la maladie |
+| `description` | `descriptionEn` | Description détaillée |
+| `symptomes` | `symptomesEn` | Liste des symptômes |
+| `precautions` | `precautionsEn` | Précautions à prendre |
+| `traitement` | `traitementEn` | Protocole de traitement |
+| `causes` | `causesEn` | Causes de la maladie |
+| `typeAccident` | `typeAccidentEn` | Type d'accident (si applicable) |
+
+| Champ | Type | Description |
+|---|---|---|
+| `niveauGravite` | string | `LÉGÈRE`, `MODÉRÉE`, `SÉVÈRE`, `CRITIQUE`, `VARIABLE` |
+| `contagieux` | bool | Maladie transmissible |
+| `urgence` | bool | Nécessite une intervention urgente |
+| `isAccident` | bool | Catégorie accident |
+| `patientVisible` | bool | Visible dans le catalogue patient |
+| `patientPriority` | int | Ordre d'affichage pour les patients |
+
+**Relations :** `ManyToOne` → Categorie, `OneToMany` → PremierSoin, `OneToMany` → MediaObject, `OneToMany` → MaladieSymptome
+
+---
+
+#### 7. `PremierSoin`
+
+| Aspect | Détail |
+|---|---|
+| **Rôle** | Protocole de premiers soins rattaché à une maladie |
+| **Bilingue** | ✅ `titreEn`, `descriptionEn`, `symptomesEn` |
+
+**Champs principaux :**
+
+| Champ FR | Champ EN | Description |
+|---|---|---|
+| `titre` | `titreEn` | Titre du protocole |
+| `description` | `descriptionEn` | Instructions détaillées |
+| `symptomes` | `symptomesEn` | Symptômes associés |
+
+| Champ | Type | Description |
+|---|---|---|
+| `niveauUrgence` | string | `FAIBLE`, `MOYEN`, `ÉLEVÉ`, `CRITIQUE` |
+
+**Relations :** `ManyToOne` → Maladie
+
+---
+
+#### 8. `Symptome`
+
+| Aspect | Détail |
+|---|---|
+| **Rôle** | Catalogue unitaire de symptômes pour la recherche et le triage |
+
+**Champs :** `nom`, `slug` (unique), `synonymes` (JSON array), `ordre` (priorité d'affichage)
+
+**Relations :** `OneToMany` → MaladieSymptome
+
+---
+
+#### 9. `MaladieSymptome` (table de liaison pondérée)
+
+| Aspect | Détail |
+|---|---|
+| **Rôle** | Relie une maladie à un symptôme avec un poids clinique |
+| **Usage** | Moteur de triage diagnostique (`SymptomTriageService`) |
+
+**Champs :**
+
+| Champ | Type | Description |
+|---|---|---|
+| `poids` | int (1-10) | Coefficient clinique |
+| `frequence` | string | `TRES_FREQUENT`, `FREQUENT`, `OCCASIONNEL`, `RARE` |
+| `obligatoire` | bool | Symptôme pathognomonique (indispensable au diagnostic) |
+| `contradictoire` | bool | Symptôme qui infirme la pathologie |
+| `gravite` | string | Niveau de gravité associé |
+
+**Relations :** `ManyToOne` → Maladie, `ManyToOne` → Symptome (contrainte unique sur le couple)
+
+---
+
+### 🩺 Consultations & Prescriptions
+
+#### 10. `Consultation`
+
+| Aspect | Détail |
+|---|---|
+| **Rôle** | Téléconsultation ou prise en charge entre un patient et un médecin |
+| **Cycle de vie** | `OUVERTE` → `EN_COURS` → `TERMINEE` (ou `ANNULEE`) |
+
+**Champs principaux :**
+
+| Champ | Type | Description |
+|---|---|---|
+| `statut` | string | `OUVERTE`, `EN_COURS`, `TERMINEE`, `ANNULEE` |
+| `priorite` | string | `NORMALE`, `URGENTE`, `CRITIQUE` |
+| `motif` | string(255) | Raison de la consultation |
+| `compteRendu` | text | Notes cliniques du médecin |
+| `dateConsultation` | DateTimeImmutable | Date planifiée |
+| `closedAt` | DateTimeImmutable | Rempli automatiquement quand `statut = TERMINEE` |
+
+**Relations :** `ManyToOne` → Patient (obligatoire), `ManyToOne` → Medecin (nullable si non encore assigné), `OneToMany` → Message, `OneToMany` → Prescription
+
+---
+
+#### 11. `Prescription` (ordonnance médicale)
+
+| Aspect | Détail |
+|---|---|
+| **Rôle** | Ordonnance numérique complète avec cycle de vie et signature |
+| **Référence** | Unique, format `ORD-XXXXXXXXXX` (généré automatiquement) |
+| **Cycle de vie** | `BROUILLON` → `SIGNEE` → `TRANSMISE` (ou `ANNULEE` / `REMPLACEE` / `EXPIREE`) |
+| **Versioning** | Champ `version` + relation `supersededBy` pour le remplacement |
+
+**Champs principaux :**
+
+| Champ | Type | Description |
+|---|---|---|
+| `reference` | string(40), unique | Identifiant public de l'ordonnance |
+| `diagnostic` | text | Diagnostic médical |
+| `statut` | string | Machine à états (6 statuts possibles) |
+| `recommandations` | text | Recommandations du médecin |
+| `signedAt` | DateTimeImmutable | Horodatage de la signature |
+| `sentAt` | DateTimeImmutable | Horodatage de la transmission |
+| `cancelledAt` | DateTimeImmutable | Horodatage de l'annulation |
+| `cancelReason` | text | Motif de l'annulation |
+| `expiresAt` | DateTimeImmutable | Date d'expiration |
+| `version` | int | Numéro de version |
+
+**Relations :** `ManyToOne` → Consultation, `ManyToOne` → Medecin, `ManyToOne` → Patient, `OneToMany` → PrescriptionItem, `ManyToOne` → Prescription (`supersededBy`)
+
+**Endpoints d'action :**
+
+| Endpoint | Action | Transition |
+|---|---|---|
+| `POST /prescriptions/{id}/sign` | Signer | BROUILLON → SIGNEE |
+| `POST /prescriptions/{id}/send` | Transmettre au patient | SIGNEE → TRANSMISE |
+| `POST /prescriptions/{id}/cancel` | Annuler | BROUILLON/SIGNEE → ANNULEE |
+| `POST /prescriptions/{id}/replace` | Remplacer | SIGNEE/TRANSMISE → REMPLACEE + nouvelle version |
+
+---
+
+#### 12. `PrescriptionItem` (ligne de médicament)
+
+| Aspect | Détail |
+|---|---|
+| **Rôle** | Ligne unitaire de médicament au sein d'une prescription |
+
+**Champs :**
+
+| Champ | Type | Description |
+|---|---|---|
+| `nom` | string | Nom commercial ou DCI de la molécule |
+| `posologie` | string | Schéma posologique |
+| `duree` | string | Durée textuelle (ex: "7 jours") |
+| `dureeJours` | int | Durée numérique en jours |
+| `forme` | string | Comprimé, sirop, injectable, suppositoire, etc. |
+| `dosage` / `unite` | int / string | Ex: 500 mg, 10 ml |
+| `voieAdministration` | string | Orale, intraveineuse, cutanée, etc. |
+| `frequence` | string | Ex: "3 fois par jour", "matin et soir" |
+| `momentPrise` | string | "Pendant les repas", "à jeun" |
+| `quantite` | int | Nombre de boîtes / flacons |
+| `instructions` | text | Précautions particulières |
+| `siBesoin` | bool | Médicament en cas de crise / douleur uniquement |
+
+**Relations :** `ManyToOne` → Prescription
+
+---
+
+### 💬 Messagerie Temps Réel
+
+#### 13. `Conversation`
+
+| Aspect | Détail |
+|---|---|
+| **Rôle** | Fil de discussion entre plusieurs participants (1-to-1 ou groupe) |
+| **Déduplication** | Clé unique `pairKey` (longueur 73) empêche les doublons de conversations directes |
+
+**Champs :** `titre`, `pairKey` (unique), `createdAt`, `updatedAt`
+
+**Relations :** `ManyToMany` → User (participants), `OneToMany` → Message, `ManyToOne` → Message (`dernierMessage` — pour le tri dans la liste)
+
+---
+
+#### 14. `Message`
+
+| Aspect | Détail |
+|---|---|
+| **Rôle** | Message unitaire avec support multimédia et suppression douce |
+| **Soft Delete** | `Gedmo\SoftDeleteable` — le message est marqué supprimé sans être effacé de la base |
+
+**Constantes de statut :** `ENVOYE`, `LIVRE`, `LU`
+**Types de message :** `TEXTE`, `VOIX`, `IMAGE`, `VIDEO`, `FICHIER`
+
+**Champs principaux :**
+
+| Champ | Type | Description |
+|---|---|---|
+| `contenu` | text (max 10 000 car.) | Corps du message |
+| `typeMessage` | string | Type du média |
+| `dureeVoix` | int | Durée en secondes (messages vocaux) |
+| `estModifie` / `estTransfere` | bool | Indicateurs d'édition et de transfert |
+| `supprimePourExpediteur` / `supprimePourDestinataire` | bool | Suppression unilatérale |
+
+**Relations :** `ManyToOne` → User (expéditeur), `ManyToOne` → Conversation, `ManyToOne` → Consultation (nullable), `ManyToOne` → MediaObject (pièce jointe), `ManyToOne` → Message (`messageParent` — réponse)
+
+---
+
+### 🏥 Centres de Santé & Géolocalisation
+
+#### 15. `CentreDeSante`
+
+| Aspect | Détail |
+|---|---|
+| **Rôle** | Répertoire géoréférencé des établissements de santé au Cameroun |
+| **Recherche** | Formule Haversine en SQL natif pour la proximité GPS |
+
+**Types de centres :** `hopital_general`, `hopital_de_district`, `chu`, `cma`, `csi`, `clinique_privee`, `pharmacie`, `laboratoire`, `centre_specialise`
+
+**Champs principaux :**
+
+| Champ | Type | Description |
+|---|---|---|
+| `nom` | string | Nom de l'établissement |
+| `type` | string | Type parmi les 9 types ci-dessus |
+| `statut` | string | `public`, `prive`, `associatif` |
+| `adresse`, `ville`, `quartier` | string | Localisation textuelle |
+| `region` | string | 10 régions du Cameroun (Adamaoua, Centre, Est, etc.) |
+| `latitude` / `longitude` | float | Coordonnées GPS (WGS84) |
+| `telephone`, `email`, `siteWeb` | string | Coordonnées de contact |
+| `horaires` | string | Heures d'ouverture |
+| `specialites` / `services` | JSON array | Spécialités et services offerts |
+| `estActif` | bool | Centre en activité |
+| `urgences24h` | bool | Urgences disponibles 24h/24 |
+| `distance` | float (virtuel) | Calculé à la volée par la recherche Haversine (non persisté) |
+
+**Relations :** `OneToMany` → MediaObject (images)
+
+---
+
+### ⭐ Avis & Signalements
+
+#### 16. `Avis`
+
+| Aspect | Détail |
+|---|---|
+| **Rôle** | Évaluation laissée par un patient à un médecin |
+
+**Champs :** `note` (int 1-5), `commentaire` (text 10-2000 car.), `signale` (bool), `raisonSignalement` (string)
+
+**Relations :** `ManyToOne` → Patient, `ManyToOne` → Medecin
+
+---
+
+#### 17. `SignalementMedecin`
+
+| Aspect | Détail |
+|---|---|
+| **Rôle** | Signalement formel déposé par un patient contre un praticien |
+
+**Motifs possibles :** `COMPORTEMENT_INAPPROPRIE`, `FAUSSE_INFORMATION`, `HARCELEMENT`, `NEGLIGENCE`, `FRAUDE`, `AUTRE`
+**Statuts de traitement :** `NOUVEAU`, `EN_COURS`, `TRAITE`, `REJETE`
+
+**Champs :** `motif`, `description`, `statut`, `noteAdmin` (notes internes), `traiteAt`
+
+**Relations :** `ManyToOne` → Patient, `ManyToOne` → Medecin
+
+---
+
+### 🆘 Protocoles Premiers Gestes (API publique)
+
+#### 18. `ProtocolePremiersGestes`
+
+| Aspect | Détail |
+|---|---|
+| **Rôle** | Protocole d'urgence de premiers secours, versionné et bilingue |
+| **Table** | `protocole_premiers_gestes` (513 enregistrements) |
+| **Bilingue** | ✅ `titreEn`, `restrictionsPopulationsEn`, `sourceCliniqueEn` |
+| **Cycle publication** | `BROUILLON` → `EN_REVUE` → `PUBLIE` (ou `RETIRE`) |
+
+**Champs principaux :**
+
+| Champ | Type | Description |
+|---|---|---|
+| `slug` | string (unique avec `version`) | Identifiant URL-friendly |
+| `titre` / `titreEn` | string | Titre FR et EN |
+| `version` | string | Ex: "1.0", "2.0" |
+| `statut` | string | Cycle de publication |
+| `niveauUrgence` | string | `FAIBLE`, `MOYEN`, `ELEVE`, `CRITIQUE` |
+| `population` | string | `TOUS`, `ADULTE`, `ENFANT`, `NOURRISSON`, `FEMME_ENCEINTE` |
+| `categorie` | string | Catégorie de protocole |
+| `masterSlug` / `variantKey` | string | Gestion des variantes d'un même protocole |
+| `restrictionsPopulations` / `En` | text | Contre-indications FR et EN |
+| `sourceClinique` / `En` | text | Références médicales FR et EN |
+
+**Relations :** `OneToMany` → ProtocoleEtape (étapes ordonnées, cascade persist/remove, orphanRemoval)
+
+**Méthodes clés :** `compareVersions()`, `nextVersion()`, `duplicateAsNewVersion()`
+
+---
+
+#### 19. `ProtocoleEtape`
+
+| Aspect | Détail |
+|---|---|
+| **Rôle** | Étape chronologique d'un protocole de premiers gestes |
+| **Bilingue** | ✅ `titreEn`, `instructionEn` |
+
+**Champs :** `position` (rang), `type` (ex: `FAIRE`, `EVITER`, `APPELER`, `SURVEILLER`, `RECONNAITRE`, `PROTEGER`), `titre`/`titreEn`, `instruction`/`instructionEn`
+
+**Relations :** `ManyToOne` → ProtocolePremiersGestes
+
+---
+
+### 📎 Fichiers & Médias
+
+#### 20. `MediaObject`
+
+| Aspect | Détail |
+|---|---|
+| **Rôle** | Gestion des fichiers téléversés (VichUploader) avec fallback base64 |
+| **Usages** | `general`, `identity_document`, `identity_photo` |
+
+**Champs :** `filePath`, `originalName`, `mimeType`, `size`, `data` (contenu base64), `isPublic`, `purpose`
+
+**Relations :** `ManyToOne` → User, `ManyToOne` → CentreDeSante, `ManyToOne` → Categorie, `ManyToOne` → Maladie
+
+---
+
+### 🔔 Notifications
+
+#### 21. `Notification`
+
+| Aspect | Détail |
+|---|---|
+| **Rôle** | Notifications in-app pour les utilisateurs |
+
+**Champs :** `type` (string 80 car.), `title` (string 160 car.), `body` (text), `link` (URL in-app), `readAt` (null si non lue)
+
+**Relations :** `ManyToOne` → User (destinataire)
+
+---
+
+### 🔒 Sécurité & Audit
+
+#### 22. `RefreshToken`
+
+| Aspect | Détail |
+|---|---|
+| **Rôle** | Gestion des refresh tokens JWT avec rotation et détection de replay |
+
+**Champs :** `tokenHash` (SHA-256 unique), `family` (identifiant de famille pour invalider la chaîne en cas de replay), `expiresAt`, `revokedAt`
+
+**Relations :** `ManyToOne` → User
+
+**Méthodes :** `revoke()`, `isUsable()`
+
+---
+
+#### 23. `ProtocoleConsultation`
+
+| Aspect | Détail |
+|---|---|
+| **Rôle** | Journal anonyme des consultations de protocoles (audit sans données personnelles) |
+
+**Champs :** `slug`, `version`, `consultedAt`
+
+---
+
+#### 24. `ProtocoleRechercheStat`
+
+| Aspect | Détail |
+|---|---|
+| **Rôle** | Statistiques journalières agrégées sur les recherches de protocoles |
+
+**Champs :** `statDate`, `totalCount`, `withResultCount`, `withoutResultCount`
+
+---
+
+#### 25. `ReferenceDataVersion`
+
+| Aspect | Détail |
+|---|---|
+| **Rôle** | Versioning des jeux de données de référence (read-only) |
+
+**Champs :** `dataset` (PK), `catalogVersion`, `appliedAt`
+
+---
+
+### 📊 Diagramme des Relations
+
+```
+┌──────────┐     ┌──────────┐     ┌──────────┐
+│   User   │     │  Admin   │     │ Patient  │
+│(abstract)│◄────│          │     │          │
+│          │◄────│          │     │groupeSang│
+│  email   │     └──────────┘     │allergies │
+│  roles   │                      │contacts  │
+│  nom     │◄────┌──────────┐     └──────────┘
+│  prenom  │     │ Medecin  │
+│  tel     │     │specialite│
+└────┬─────┘     │estValide │
+     │           │disponib. │
+     │           └──────────┘
+     │
+     ├── OneToMany ──► Message
+     ├── ManyToMany ──► Conversation
+     └── OneToMany ──► Notification
+
+┌────────────┐     ┌────────────┐     ┌──────────────┐
+│ Categorie  │◄────│  Maladie   │────►│ PremierSoin  │
+│ nom/nomEn  │     │ nom/nomEn  │     │ titre/titreEn│
+│ description│     │ description│     │ description  │
+│ couleur    │     │ symptomes  │     │ niveauUrgence│
+│ icone      │     │ traitement │     └──────────────┘
+└────────────┘     │ niveauGrav │
+                   └─────┬──────┘
+                         │
+                         ├── OneToMany ──► MaladieSymptome ──► Symptome
+                         └── OneToMany ──► MediaObject
+
+┌──────────────┐     ┌──────────────┐     ┌──────────────────┐
+│ Consultation │────►│ Prescription │────►│ PrescriptionItem │
+│ patient      │     │ reference    │     │ nom (molécule)   │
+│ medecin      │     │ diagnostic   │     │ posologie        │
+│ statut       │     │ statut       │     │ dosage / unité   │
+│ motif        │     │ signedAt     │     │ forme / voie     │
+│ priorite     │     │ version      │     │ fréquence        │
+│ compteRendu  │     └──────────────┘     └──────────────────┘
+│ messages     │
+└──────────────┘
+
+┌───────────────────────┐     ┌──────────────┐
+│ProtocolePremiersGestes│────►│ProtocoleEtape│
+│ slug / version        │     │ position     │
+│ titre / titreEn       │     │ type         │
+│ niveauUrgence         │     │ instruction  │
+│ population            │     │ instructionEn│
+│ statut (publication)  │     └──────────────┘
+└───────────────────────┘
+```
+
+---
+
 ## Date de mise à jour
 
-Documentation mise à jour le **25/07/2026**.
+Documentation mise à jour le **17/08/2026**.
+

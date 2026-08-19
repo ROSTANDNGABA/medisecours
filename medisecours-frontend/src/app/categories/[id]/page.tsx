@@ -9,11 +9,13 @@ import LoadingSpinner from '../../../components/ui/LoadingSpinner'
 import EmptyState from '../../../components/ui/EmptyState'
 import { useToast } from '../../../components/ui/Toast'
 import { CategoryIcon } from '../../../components/ui/CategoryIcon'
+import { useTranslation } from 'react-i18next'
 
 const GRAVITES = ['LÉGÈRE', 'MODÉRÉE', 'SÉVÈRE', 'CRITIQUE', 'VARIABLE']
 
 export default function CategoryDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
+  const { t } = useTranslation()
   const [category, setCategory] = useState<any>(null)
   const [maladies, setMaladies] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -36,7 +38,7 @@ export default function CategoryDetailPage({ params }: { params: Promise<{ id: s
       } catch (err: any) {
         if (!active) return
         if (err.response?.status === 404) setNotFound(true)
-        else toast.error('Impossible de charger cette catégorie.')
+        else toast.error(t('visitor.categories.loadError'))
       } finally {
         if (active) setLoading(false)
       }
@@ -46,13 +48,13 @@ export default function CategoryDetailPage({ params }: { params: Promise<{ id: s
 
   const filtered = gravite ? maladies.filter((m: any) => m.niveauGravite === gravite) : maladies
 
-  if (loading) return <LoadingSpinner label="Chargement…" />
+  if (loading) return <LoadingSpinner label={t('visitor.categories.loading')} />
   if (notFound || !category) {
     return (
       <EmptyState
-        title="Catégorie introuvable"
-        description="Cette catégorie n'existe pas ou a été supprimée."
-        action={<Link href="/categories" className="text-mint-500 font-semibold text-sm">← Retour aux catégories</Link>}
+        title={t('visitor.categories.emptyTitle')}
+        description={t('visitor.categories.emptyDesc')}
+        action={<Link href="/categories" className="text-mint-500 font-semibold text-sm"><ArrowLeft className="w-4 h-4 mr-1 inline" />{t('visitor.categories.previous')}</Link>}
       />
     )
   }
@@ -62,7 +64,7 @@ export default function CategoryDetailPage({ params }: { params: Promise<{ id: s
       <div className="py-12 px-6" style={{ backgroundColor: `${category.couleur}14` }}>
         <div className="max-w-5xl mx-auto">
           <Link href="/categories" className="inline-flex items-center gap-1 text-sm text-primary-300 hover:text-mint-500 mb-4">
-            <ArrowLeft className="w-4 h-4" /> Catégories
+            <ArrowLeft className="w-4 h-4" /> {t('visitor.categories.title')}
           </Link>
           <div className="flex items-center gap-3 mb-2">
             <CategoryIcon iconName={category.icone} categoryName={category.nom} size="md" />
@@ -79,7 +81,7 @@ export default function CategoryDetailPage({ params }: { params: Promise<{ id: s
             onClick={() => setGravite('')}
             className={`px-3 py-1.5 rounded-full text-xs font-semibold ${!gravite ? 'bg-primary-500 text-white' : 'bg-primary-100 dark:bg-primary-700 text-primary-700 dark:text-sable'}`}
           >
-            Toutes
+            {t('common.all')}
           </button>
           {GRAVITES.map((g) => (
             <button
@@ -93,7 +95,7 @@ export default function CategoryDetailPage({ params }: { params: Promise<{ id: s
         </div>
 
         {filtered.length === 0 ? (
-          <EmptyState title="Aucune maladie ici" description="Aucune maladie ne correspond à ce filtre pour cette catégorie." />
+          <EmptyState title={t('visitor.categories.diseasesEmptyTitle')} description={t('visitor.categories.diseasesEmptyDesc')} />
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
             {filtered.map((m: any) => <MaladieCard key={m.id} maladie={m} />)}

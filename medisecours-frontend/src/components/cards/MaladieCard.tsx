@@ -1,6 +1,9 @@
+'use client'
+
 import Link from 'next/link'
 import Image from 'next/image'
 import { ArrowRight, ShieldCheck, AlertTriangle, Activity } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 
 const SEVERITY_CONFIG: Record<string, { label: string; color: string; bg: string; border: string }> = {
   'CRITIQUE':  { label: 'CRITIQUE',  color: 'text-red-600',    bg: 'bg-red-50',    border: 'border-red-100' },
@@ -18,11 +21,12 @@ interface MaladieCardProps {
 }
 
 export default function MaladieCard({ maladie }: MaladieCardProps) {
+  const { t } = useTranslation()
   const severityKey = maladie.niveauGravite?.toUpperCase() || 'DEFAULT'
   const severity = SEVERITY_CONFIG[severityKey] || SEVERITY_CONFIG['DEFAULT']
 
   const imgSrc = maladie.imageUrl || maladie.photo || PLACEHOLDER_IMG
-  const categorieName = maladie.categorie?.nom || 'Médecine générale'
+  const categorieName = maladie.categorie?.nom || t('visitor.components.maladieCard.categoryFallback')
   const isUrgent = maladie.urgence === true
   const isContagieux = maladie.contagieux === true
 
@@ -46,7 +50,7 @@ export default function MaladieCard({ maladie }: MaladieCardProps) {
         <div className="absolute top-3 left-3">
           <span className="inline-flex items-center gap-1.5 bg-white/90 dark:bg-slate-800/90 backdrop-blur-sm text-gray-700 dark:text-slate-300 text-xs font-semibold px-3 py-1.5 rounded-full shadow-sm">
             <ShieldCheck className="w-3.5 h-3.5 text-emerald-500 dark:text-emerald-400" />
-            Guide disponible
+            {t('visitor.components.maladieCard.guideAvailable')}
           </span>
         </div>
 
@@ -55,7 +59,7 @@ export default function MaladieCard({ maladie }: MaladieCardProps) {
           <div className="absolute top-3 right-3">
             <span className="inline-flex items-center gap-1 bg-red-500 text-white text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full shadow-sm">
               <AlertTriangle className="w-3 h-3" />
-              Urgent
+              {t('visitor.components.maladieCard.urgent')}
             </span>
           </div>
         )}
@@ -82,11 +86,11 @@ export default function MaladieCard({ maladie }: MaladieCardProps) {
           </div>
           <div className="flex items-center gap-1.5 text-gray-500 dark:text-slate-400">
             <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
-            <span className="text-xs font-medium">{isUrgent ? 'Urgence' : 'Non urgent'}</span>
+            <span className="text-xs font-medium">{isUrgent ? t('visitor.components.maladieCard.emergency') : t('visitor.components.maladieCard.notUrgent')}</span>
           </div>
           <div className="flex items-center gap-1.5 text-gray-500 dark:text-slate-400">
             <ShieldCheck className="w-3.5 h-3.5 shrink-0" />
-            <span className="text-xs font-medium">{isContagieux ? 'Contagieux' : 'Non contag.'}</span>
+            <span className="text-xs font-medium">{isContagieux ? t('visitor.components.maladieCard.contagious') : t('visitor.components.maladieCard.notContagious')}</span>
           </div>
         </div>
 
@@ -97,7 +101,7 @@ export default function MaladieCard({ maladie }: MaladieCardProps) {
           </span>
 
           <span className="inline-flex items-center gap-1.5 bg-[#143d2c] dark:bg-mint-500 text-white dark:text-slate-900 px-4 py-2.5 rounded-xl font-bold text-sm group-hover:bg-[#1a5038] dark:group-hover:bg-mint-400 transition-colors">
-            Voir guide
+            {t('visitor.components.maladieCard.viewGuide')}
             <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
           </span>
         </div>

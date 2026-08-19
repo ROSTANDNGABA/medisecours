@@ -2,6 +2,8 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState, Suspense } from 'react'
+import { useTranslation } from 'react-i18next'
+import i18n from '../../../i18n'
 import { API_BASE, resolveImgPath } from '../../../lib/config'
 
 const msgAnim = { animation: 'msgIn .25s ease-out both' }
@@ -53,23 +55,24 @@ function msgMediaUrl(m) {
   return mediaUrl(path)
 }
 
-function formatFileSize(bytes) {
+function formatFileSize(bytes, t) {
   if (!bytes) return ''
-  if (bytes < 1024) return bytes + ' o'
-  if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' Ko'
-  return (bytes / 1048576).toFixed(1) + ' Mo'
+  if (bytes < 1024) return t('patient.messages.fileSizeB', { size: bytes })
+  if (bytes < 1048576) return t('patient.messages.fileSizeKB', { size: (bytes / 1024).toFixed(1) })
+  return t('patient.messages.fileSizeMB', { size: (bytes / 1048576).toFixed(1) })
 }
 
-function formatMsgTime(dateStr) {
+function formatMsgTime(dateStr, t) {
   if (!dateStr) return ''
   const d = new Date(dateStr)
   const now = new Date()
   const diff = (now - d) / 1000
-  if (diff < 60) return "À l'instant"
-  if (diff < 3600) return Math.floor(diff / 60) + ' min'
-  if (diff < 86400) return d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
-  if (diff < 172800) return 'Hier ' + d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
-  return d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })
+  const locale = i18n.language === 'en' ? 'en-GB' : 'fr-FR'
+  if (diff < 60) return t('patient.messages.timeJustNow')
+  if (diff < 3600) return t('patient.messages.timeMinutes', { count: Math.floor(diff / 60) })
+  if (diff < 86400) return d.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' })
+  if (diff < 172800) return t('patient.messages.timeYesterday', { time: d.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' }) })
+  return d.toLocaleDateString(locale, { day: 'numeric', month: 'short' })
 }
 
 function formatDuration(sec) {
@@ -103,13 +106,13 @@ function msgMediaKind(m) {
   return m?.typeMessage || 'TEXTE'
 }
 
-function lastMsgPreview(m) {
+function lastMsgPreview(m, t) {
   if (!m) return ''
   const kind = msgMediaKind(m)
-  if (kind === 'IMAGE') return '📷 Photo'
-  if (kind === 'VOIX') return '🎤 Message vocal'
-  if (kind === 'VIDEO') return '🎥 Vidéo'
-  if (kind === 'FICHIER') return '📎 ' + (m.media?.originalName || 'Fichier')
+  if (kind === 'IMAGE') return '📷 ' + t('patient.messages.previewImage')
+  if (kind === 'VOIX') return '🎤 ' + t('patient.messages.previewVoice')
+  if (kind === 'VIDEO') return '🎥 ' + t('patient.messages.previewVideo')
+  if (kind === 'FICHIER') return '📎 ' + (m.media?.originalName || t('patient.messages.file'))
   return m.contenu || ''
 }
 
@@ -120,8 +123,9 @@ function sameMsg(a, b) {
 }
 
 export default function PatientMessagesPage() {
+  const { t } = useTranslation()
   return (
-    <Suspense fallback={<LoadingSpinner label="Chargement…" />}>
+    <Suspense fallback={<LoadingSpinner label={t('common.loading')} />}>
       <PatientMessagesContent />
     </Suspense>
   )
@@ -136,6 +140,7 @@ function PatientMessagesContent() {
     onlineUsers,
   } = useNotification()
   const toast = useToast()
+  const { t } = useTranslation()
   const searchParams = useSearchParams()
   const preselectConv = searchParams.get('conversation')
 
@@ -390,8 +395,8 @@ function PatientMessagesContent() {
   }, [activeMessagesRaw, mediaCache])
 
   useEffect(() => {
-    if (convError || msgError) toast.error('Impossible de charger la messagerie.')
-  }, [convError, msgError, toast])
+    if (convError || msgError) toast.error(t('patient.messages.loadError'))
+  }, [convError, msgError, toast, t])
 
   useEffect(() => {
     const unsubscribeMessages = subscribeToMessages((msg) => {
@@ -572,7 +577,7 @@ function PatientMessagesContent() {
       const q = convSearch.toLowerCase()
       const info = getUserInfo(c.other)
       const name = info ? `${info.prenom || ''} ${info.nom || ''}`.toLowerCase() : ''
-      const lastMsg = lastMsgPreview(c.dernierMessage).toLowerCase()
+      const lastMsg = lastMsgPreview(c.dernierMessage, t).toLowerCase()
       return name.includes(q) || lastMsg.includes(q)
     })
     return filtered.sort((a, b) => {
@@ -580,7 +585,7 @@ function PatientMessagesContent() {
       const lb = convLastTime(b)
       return String(lb).localeCompare(String(la))
     })
-  }, [convMap, convSearch, getUserInfo])
+  }, [convMap, convSearch, getUserInfo, t])
 
   const openNewConversation = () => {
     setShowNew(true)
@@ -592,10 +597,10 @@ function PatientMessagesContent() {
           const filtered = raw.filter(u => String(u.id) !== String(user?.id))
           setAllUsers(filtered)
           if (filtered.length === 0) {
-            toast.info('Aucun medecin trouve.')
+            toast.info(t('patient.messages.noDoctorFound'))
           }
         })
-        .catch(() => toast.error('Impossible de charger la liste des medecins.'))
+        .catch(() => toast.error(t('patient.messages.doctorsLoadError')))
         .finally(() => setLoadingUsers(false))
     }
   }
@@ -648,7 +653,7 @@ function PatientMessagesContent() {
     e.target.value = ''
     for (const f of files) {
       if (f.size > MAX_MESSAGE_MEDIA_SIZE) {
-        toast.error(`${f.name} dépasse la limite de 25 Mo.`)
+        toast.error(t('patient.messages.fileTooLarge', { name: f.name }))
         continue
       }
       const preview = (isImageMime(f.type) || isVideoMime(f.type) || isAudioMime(f.type)) ? URL.createObjectURL(f) : null
@@ -665,7 +670,7 @@ function PatientMessagesContent() {
   }
 
   function startRecording() {
-    if (!navigator.mediaDevices?.getUserMedia) { toast.error('Enregistrement vocal non supporté.'); return }
+    if (!navigator.mediaDevices?.getUserMedia) { toast.error(t('patient.messages.voiceNotSupported')); return }
     setShowAttachMenu(false)
     navigator.mediaDevices.getUserMedia({ audio: true }).then((stream) => {
       streamRef.current = stream
@@ -675,7 +680,7 @@ function PatientMessagesContent() {
       mr.onstop = () => {
         const blob = new Blob(chunks, { type: mr.mimeType })
         setRecordingBlob(blob)
-        setAttachments((prev) => [...prev, { id: crypto.randomUUID?.() || Date.now() + '-' + Math.random(), file: blob, preview: URL.createObjectURL(blob), name: 'Message vocal.webm', size: blob.size, mime: mr.mimeType }])
+        setAttachments((prev) => [...prev, { id: crypto.randomUUID?.() || Date.now() + '-' + Math.random(), file: blob, preview: URL.createObjectURL(blob), name: t('patient.messages.voiceFileName'), size: blob.size, mime: mr.mimeType }])
         stream.getTracks().forEach((t) => t.stop())
       }
       recorderRef.current = mr
@@ -683,7 +688,7 @@ function PatientMessagesContent() {
       setRecording(true)
       setRecordTimer(0)
       recordTimerRef.current = setInterval(() => setRecordTimer((t) => t + 1), 1000)
-    }).catch(() => toast.error('Microphone non accessible.'))
+    }).catch(() => toast.error(t('patient.messages.micUnavailable')))
   }
 
   function stopRecording() {
@@ -744,7 +749,7 @@ function PatientMessagesContent() {
         }
         setAllLoadedMsgs(prev => [optimistic, ...prev])
       }
-      optimisticConvMutate(caption || '📎 Fichier')
+      optimisticConvMutate(caption || '📎 ' + t('patient.messages.file'))
       setAttachments([])
       try {
         const uploads = await Promise.all(pending.map((att) => uploadFile(att.file)))
@@ -782,7 +787,7 @@ function PatientMessagesContent() {
           return { ...currentCache, 'hydra:member': next }
         }, { revalidate: false })
       } catch (error) {
-        toast.error(error?.response?.data?.error || error?.response?.data?.detail || "Échec de l'envoi du média.")
+        toast.error(error?.response?.data?.error || error?.response?.data?.detail || t('patient.messages.mediaSendError'))
         const tempIds = new Set(pending.map(a => a.tempId))
         setAllLoadedMsgs(prev => prev.filter(m => !tempIds.has(m.id)))
       } finally {
@@ -833,7 +838,7 @@ function PatientMessagesContent() {
       }, { revalidate: false })
     } catch {
       setAllLoadedMsgs(prev => prev.filter(m => m.id !== tempId))
-      toast.error("Échec de l'envoi du message.")
+      toast.error(t('patient.messages.messageSendError'))
     } finally {
       setSending(false)
     }
@@ -853,7 +858,7 @@ function PatientMessagesContent() {
         >
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-4 border-b border-gray-200">
-            <h2 className="text-sm font-bold tracking-[0.15em] text-[#212121] uppercase">Messages</h2>
+            <h2 className="text-sm font-bold tracking-[0.15em] text-[#212121] uppercase">{t('layout.messages')}</h2>
             <button onClick={openNewConversation} className="w-8 h-8 rounded-lg bg-[#2196F3] hover:bg-blue-600 text-white flex items-center justify-center transition-colors">
               <Plus className="w-4 h-4" />
             </button>
@@ -866,7 +871,7 @@ function PatientMessagesContent() {
               <input
                 value={convSearch}
                 onChange={(e) => setConvSearch(e.target.value)}
-                placeholder="Rechercher une conversation..."
+                placeholder={t('patient.messages.searchConversation')}
                 className="w-full pl-9 pr-3 py-2 text-sm bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-[#2196F3]/20 focus:border-[#2196F3] transition-all"
               />
             </div>
@@ -875,12 +880,12 @@ function PatientMessagesContent() {
           {/* Conversation list */}
           <div className="flex-1 overflow-y-auto min-h-0">
             {sortedConvs.length === 0 ? (
-              <EmptyState title={convSearch ? 'Aucun résultat' : 'Aucune conversation'} description={convSearch ? 'Essayez un autre terme.' : 'Contactez un médecin depuis la liste.'} />
+              <EmptyState title={convSearch ? t('patient.messages.noResultTitle') : t('patient.messages.noConversationTitle')} description={convSearch ? t('patient.messages.noResultDesc') : t('patient.messages.noConversationDesc')} />
             ) : (
               sortedConvs.map((c) => {
                 const isActive = activeId === c.id
                 const info = getUserInfo(c.other)
-                const name = info ? `${info.prenom || ''} ${info.nom || ''}`.trim() || 'Médecin' : 'Médecin'
+                const name = info ? `${info.prenom || ''} ${info.nom || ''}`.trim() || t('patient.doctor') : t('patient.doctor')
                 return (
                   <button
                     key={c.id}
@@ -898,17 +903,17 @@ function PatientMessagesContent() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between gap-2">
                         <span className={`text-sm font-semibold truncate ${isActive ? 'text-white' : 'text-[#212121]'}`}>
-                          Dr {name}
+                          {t('patient.doctorTitle', { name })}
                         </span>
                         {c.dernierMessage?.createdAt && (
                           <span className={`text-[11px] shrink-0 ${isActive ? 'text-white/80' : 'text-gray-400'}`}>
-                            {formatMsgTime(c.dernierMessage.createdAt)}
+                            {formatMsgTime(c.dernierMessage.createdAt, t)}
                           </span>
                         )}
                       </div>
                       <div className="flex items-center justify-between gap-2 mt-0.5">
                         <span className={`text-xs truncate ${isActive ? 'text-white/80' : 'text-gray-500'}`}>
-                          {lastMsgPreview(c.dernierMessage)}
+                          {lastMsgPreview(c.dernierMessage, t)}
                         </span>
                         <div className="flex items-center gap-1.5 shrink-0">
                           {c.dernierMessage && idFromIri(c.dernierMessage.expediteur) === user?.id && (
@@ -951,15 +956,19 @@ function PatientMessagesContent() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold text-[#212121]">
-                    Dr {getUserInfo(activeConv.other) ? `${getUserInfo(activeConv.other).prenom || ''} ${getUserInfo(activeConv.other).nom || ''}`.trim() : 'Médecin'}
+                    {t('patient.doctorTitle', {
+                      name: getUserInfo(activeConv.other)
+                        ? `${getUserInfo(activeConv.other).prenom || ''} ${getUserInfo(activeConv.other).nom || ''}`.trim()
+                        : t('patient.doctor'),
+                    })}
                   </p>
                   <span className="text-[11px] text-gray-400">
-                    {onlineUsers.has(String(getUserInfo(activeConv.other)?.id)) ? 'En ligne' : getUserInfo(activeConv.other)?.dernierePresence ? 'Vu ' + formatMsgTime(getUserInfo(activeConv.other).dernierePresence) : 'Médecin'}
+                    {onlineUsers.has(String(getUserInfo(activeConv.other)?.id)) ? t('patient.messages.online') : getUserInfo(activeConv.other)?.dernierePresence ? t('patient.messages.lastSeen', { time: formatMsgTime(getUserInfo(activeConv.other).dernierePresence, t) }) : t('patient.doctor')}
                   </span>
                 </div>
                 <div className="flex items-center gap-2">
                   <Link href="/patient/consultations" className="text-[11px] font-semibold text-[#2196F3] hover:text-blue-700 inline-flex items-center gap-1 shrink-0 transition-colors bg-blue-50 px-2 py-1 rounded-md">
-                    Consultations <ExternalLink className="w-3 h-3" />
+                    {t('consultations.title')} <ExternalLink className="w-3 h-3" />
                   </Link>
                 </div>
               </div>
@@ -974,7 +983,7 @@ function PatientMessagesContent() {
 
                 {dedupedMessages.length > 0 && (
                   <DateDivider label={
-                    new Date(dedupedMessages[0].createdAt).toLocaleDateString('fr-FR', { weekday: 'long' }).toUpperCase()
+                    new Date(dedupedMessages[0].createdAt).toLocaleDateString(i18n.language === 'en' ? 'en-GB' : 'fr-FR', { weekday: 'long' }).toUpperCase()
                   } />
                 )}
                 {dedupedMessages.map((m, idx) => {
@@ -983,7 +992,7 @@ function PatientMessagesContent() {
                   const isLatest = idx === dedupedMessages.length - 1
                   const prevSameSender = idx > 0 && idFromIri(dedupedMessages[idx - 1].expediteur) === idFromIri(m.expediteur)
                   const convInfo = getUserInfo(activeConv.other)
-                  const name = convInfo ? `${convInfo.prenom || ''} ${convInfo.nom || ''}`.trim() : 'Médecin'
+                  const name = convInfo ? `${convInfo.prenom || ''} ${convInfo.nom || ''}`.trim() : t('patient.doctor')
                   return (
                     <div key={m.id} className={`flex ${mine ? 'justify-end' : 'justify-start'} mb-3`}>
                       {!mine && !prevSameSender && (
@@ -1019,8 +1028,8 @@ function PatientMessagesContent() {
                               <FileText className={`w-5 h-5 ${mine ? 'text-white' : 'text-[#212121]'}`} />
                             </div>
                             <div className="min-w-0 flex-1">
-                              <p className="text-sm font-semibold truncate">{m.media.originalName || 'Fichier'}</p>
-                              <p className={`text-[11px] ${mine ? 'text-white/70' : 'text-gray-500'}`}>{formatFileSize(m.media.size)}</p>
+                              <p className="text-sm font-semibold truncate">{m.media.originalName || t('patient.messages.file')}</p>
+                              <p className={`text-[11px] ${mine ? 'text-white/70' : 'text-gray-500'}`}>{formatFileSize(m.media.size, t)}</p>
                             </div>
                           </a>
                         )}
@@ -1032,7 +1041,7 @@ function PatientMessagesContent() {
                             <p className="text-sm leading-relaxed">{m.contenu}</p>
                             <div className={`flex items-center gap-1 mt-1 ${mine ? 'justify-end' : 'justify-start'}`}>
                               <span className={`text-[10px] ${mine ? 'text-white/60' : 'text-gray-400'}`}>
-                                {formatMsgTime(m.createdAt)}
+                                {formatMsgTime(m.createdAt, t)}
                               </span>
                               {mine && <ReadStatus statut={m.statut} sending={m._sending} />}
                             </div>
@@ -1097,16 +1106,16 @@ function PatientMessagesContent() {
                     {showAttachMenu && (
                       <div className="absolute bottom-full left-0 mb-2 bg-white rounded-2xl shadow-lg border border-gray-200 p-2 flex gap-1 z-10">
                         <button onClick={() => handleAttach('camera')} className="flex flex-col items-center gap-1 px-3 py-2 rounded-xl hover:bg-gray-50 text-[#212121] transition-colors">
-                          <Camera className="w-5 h-5" /><span className="text-[10px] font-medium">Appareil</span>
+                          <Camera className="w-5 h-5" /><span className="text-[10px] font-medium">{t('patient.messages.attachCamera')}</span>
                         </button>
                         <button onClick={() => handleAttach('gallery')} className="flex flex-col items-center gap-1 px-3 py-2 rounded-xl hover:bg-gray-50 text-[#212121] transition-colors">
-                          <ImageIcon className="w-5 h-5" /><span className="text-[10px] font-medium">Photos</span>
+                          <ImageIcon className="w-5 h-5" /><span className="text-[10px] font-medium">{t('patient.messages.attachPhotos')}</span>
                         </button>
                         <button onClick={() => handleAttach('doc')} className="flex flex-col items-center gap-1 px-3 py-2 rounded-xl hover:bg-gray-50 text-[#212121] transition-colors">
-                          <FileText className="w-5 h-5" /><span className="text-[10px] font-medium">Document</span>
+                          <FileText className="w-5 h-5" /><span className="text-[10px] font-medium">{t('patient.messages.attachDocument')}</span>
                         </button>
                         <button onClick={() => handleAttach('voice')} className="flex flex-col items-center gap-1 px-3 py-2 rounded-xl hover:bg-gray-50 text-[#212121] transition-colors">
-                          <Mic className="w-5 h-5" /><span className="text-[10px] font-medium">Vocal</span>
+                          <Mic className="w-5 h-5" /><span className="text-[10px] font-medium">{t('patient.messages.attachVoice')}</span>
                         </button>
                       </div>
                     )}
@@ -1121,7 +1130,7 @@ function PatientMessagesContent() {
                         handleSend()
                       }
                     }}
-                    placeholder={recording ? 'Enregistrement en cours…' : uploadingMedia ? 'Téléchargement…' : 'Écrivez votre message…'}
+                    placeholder={recording ? t('patient.messages.recordingPlaceholder') : uploadingMedia ? t('patient.messages.uploadingPlaceholder') : t('patient.messages.inputPlaceholder')}
                     disabled={recording || uploadingMedia}
                     className="flex-1 text-sm text-[#212121] placeholder-gray-400 bg-transparent outline-none disabled:opacity-40"
                   />
@@ -1133,7 +1142,7 @@ function PatientMessagesContent() {
                       draft.trim() || attachments.length > 0 ? 'text-[#2196F3] hover:text-blue-700' : 'text-gray-300'
                     } disabled:opacity-50`}
                   >
-                    {uploadingMedia ? <Loader2 className="w-4 h-4 animate-spin inline" /> : 'Envoyer'}
+                    {uploadingMedia ? <Loader2 className="w-4 h-4 animate-spin inline" /> : t('patient.messages.send')}
                   </button>
                 </div>
               </div>
@@ -1148,8 +1157,8 @@ function PatientMessagesContent() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                 </svg>
               </div>
-              <h3 className="font-semibold text-[#212121] text-lg mb-1">Sélectionnez une conversation</h3>
-              <p className="text-sm text-gray-500 max-w-xs">Choisissez un médecin dans la liste pour consulter vos échanges.</p>
+              <h3 className="font-semibold text-[#212121] text-lg mb-1">{t('patient.messages.selectConversationTitle')}</h3>
+              <p className="text-sm text-gray-500 max-w-xs">{t('patient.messages.selectConversationDesc')}</p>
             </div>
           )}
         </motion.div>
@@ -1185,8 +1194,8 @@ function PatientMessagesContent() {
 
                 {/* Header */}
                 <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200">
-                  <h3 className="font-display font-bold text-base text-[#212121]">Nouvelle conversation</h3>
-                  <button onClick={() => setShowNew(false)} className="p-1.5 rounded-full text-gray-400 hover:bg-gray-100 transition-colors" aria-label="Fermer">
+                  <h3 className="font-display font-bold text-base text-[#212121]">{t('patient.messages.newConversation')}</h3>
+                  <button onClick={() => setShowNew(false)} className="p-1.5 rounded-full text-gray-400 hover:bg-gray-100 transition-colors" aria-label={t('common.close')}>
                     <X className="w-5 h-5" />
                   </button>
                 </div>
@@ -1198,7 +1207,7 @@ function PatientMessagesContent() {
                     <input
                       value={userSearch}
                       onChange={(e) => setUserSearch(e.target.value)}
-                      placeholder="Rechercher un médecin..."
+                      placeholder={t('patient.messages.searchDoctor')}
                       className="w-full pl-9 pr-3 py-2.5 text-sm bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-[#2196F3]/20 focus:border-[#2196F3] transition-all"
                     />
                   </div>
@@ -1207,9 +1216,9 @@ function PatientMessagesContent() {
                 {/* Doctor list */}
                 <div className="flex-1 overflow-y-auto py-1">
                   {loadingUsers ? (
-                    <LoadingSpinner size="sm" label="Chargement des médecins…" />
+                    <LoadingSpinner size="sm" label={t('patient.messages.doctorsLoading')} />
                   ) : allUsers.length === 0 ? (
-                    <p className="text-sm text-gray-400 text-center py-8">Aucun médecin trouvé.</p>
+                    <p className="text-sm text-gray-400 text-center py-8">{t('patient.messages.noDoctorFound')}</p>
                   ) : (
                     allUsers
                       .filter(u => {
@@ -1229,14 +1238,14 @@ function PatientMessagesContent() {
                                 const convId = await findOrCreateConv(u.id)
                                 setActiveId(convId)
                               } catch {
-                                toast.error("Impossible de créer la conversation.")
+                                toast.error(t('patient.messages.createConversationError'))
                               }
                             }}
                             className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-gray-50 transition-colors"
                           >
                             <UserAvatar user={u} size={40} />
                             <div className="min-w-0">
-                              <p className="text-sm font-semibold text-[#212121] truncate">Dr {name}</p>
+                              <p className="text-sm font-semibold text-[#212121] truncate">{t('patient.doctorTitle', { name })}</p>
                               <p className="text-xs text-gray-400 truncate">{u.email || ''}</p>
                             </div>
                           </button>

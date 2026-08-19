@@ -5,6 +5,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Menu } from 'lucide-react'
 import { SWRConfig } from 'swr'
+import { useTranslation } from 'react-i18next'
 import { useAuth } from '../../hooks/useAuth'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import MedecinSidebar from '../../components/medecin/MedecinSidebar'
@@ -13,21 +14,21 @@ import { NotificationProvider } from '../../contexts/NotificationContext'
 import FloatingHelpButton from '../../components/layout/FloatingHelpButton'
 import { swrConfig } from '../../lib/fetcher'
 
-const PAGE_TITLES = {
-  '/medecin': "Vue d'ensemble",
-  '/medecin/patients': 'Mes Patients',
-  '/medecin/consultations': 'Consultations',
-  '/medecin/prescriptions': 'Prescriptions',
-  '/medecin/pharmacy': 'Pharmacie',
-  '/medecin/messages': 'Messages',
-  '/medecin/rapports': 'Rapports',
-  '/medecin/notifications': 'Notifications',
+const PAGE_TITLE_KEYS: Record<string, string> = {
+  '/medecin': 'layout.overview',
+  '/medecin/patients': 'layout.patients',
+  '/medecin/consultations': 'consultations.title',
+  '/medecin/prescriptions': 'prescriptions.title',
+  '/medecin/pharmacy': 'layout.pharmacy',
+  '/medecin/messages': 'layout.messages',
+  '/medecin/rapports': 'layout.reports',
+  '/medecin/notifications': 'layout.notifications',
 }
 
 function SidebarWrapper({ setMobileOpen }: { setMobileOpen: (open: boolean) => void }) {
   return (
     <div className="hidden md:block">
-      <div className="sticky top-0 h-screen w-[220px] shrink-0 overflow-y-auto">
+      <div className="sticky top-0 h-screen w-[256px] shrink-0 overflow-y-auto">
         <MedecinSidebar setMobileOpen={setMobileOpen} />
       </div>
     </div>
@@ -47,11 +48,11 @@ function MobileDrawer({ open, onClose }: { open: boolean; onClose: () => void })
             onClick={onClose}
           />
           <motion.aside
-            initial={{ x: -220 }}
+            initial={{ x: -288 }}
             animate={{ x: 0 }}
-            exit={{ x: -220 }}
+            exit={{ x: -288 }}
             transition={{ type: 'tween', duration: 0.2 }}
-            className="fixed inset-y-0 left-0 z-50 w-[220px] md:hidden"
+            className="fixed inset-y-0 left-0 z-50 w-[288px] md:hidden"
           >
             <MedecinSidebar setMobileOpen={onClose} />
           </motion.aside>
@@ -63,6 +64,7 @@ function MobileDrawer({ open, onClose }: { open: boolean; onClose: () => void })
 
 export default function MedecinLayout({ children }: { children: React.ReactNode }) {
   const { user, isMedecin, mounted } = useAuth()
+  const { t } = useTranslation()
   const pathname = usePathname()
   const router = useRouter()
   const [mobileOpen, setMobileOpen] = useState(false)
@@ -84,12 +86,12 @@ export default function MedecinLayout({ children }: { children: React.ReactNode 
   if (!mounted || !isMedecin) {
     return (
       <div className="dashboard-theme dashboard-shell flex min-h-screen items-center justify-center">
-        <LoadingSpinner label="Chargement de l'espace médecin…" />
+        <LoadingSpinner label={t('medecin.loadingSpace')} />
       </div>
     )
   }
 
-  const pageTitle = PAGE_TITLES[pathname as keyof typeof PAGE_TITLES] || 'Espace Médecin'
+  const pageTitle = t(PAGE_TITLE_KEYS[pathname as keyof typeof PAGE_TITLE_KEYS] || 'layout.medecinSpace')
 
   return (
     <div className="dashboard-theme dashboard-shell flex min-h-screen">
@@ -104,7 +106,7 @@ export default function MedecinLayout({ children }: { children: React.ReactNode 
                 <button
                   className="flex items-center justify-center rounded-xl p-2 text-[#6B7280] hover:bg-[#F3F4F6] md:hidden"
                   onClick={() => setMobileOpen(true)}
-                  aria-label="Ouvrir le menu"
+                  aria-label={t('medecin.openMenu')}
                 >
                   <Menu className="h-5 w-5" />
                 </button>

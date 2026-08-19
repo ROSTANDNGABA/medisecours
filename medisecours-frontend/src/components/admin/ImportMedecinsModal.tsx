@@ -2,6 +2,7 @@
 'use client'
 
 import { useState, useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Dialog } from '@headlessui/react'
 import { motion } from 'framer-motion'
 import { Upload, X, FileSpreadsheet, AlertCircle, CheckCircle, Download } from 'lucide-react'
@@ -15,6 +16,7 @@ export function ImportMedecinsModal({ isOpen, onClose, onSuccess }) {
   const [results,     setResults]     = useState(null)
   const fileInputRef = useRef(null)
   const toast = useToast()
+  const { t } = useTranslation()
 
   const handleFileDrop = (e) => {
     e.preventDefault()
@@ -30,11 +32,11 @@ export function ImportMedecinsModal({ isOpen, onClose, onSuccess }) {
   const validateAndSetFile = (f) => {
     const ext = f.name.split('.').pop()?.toLowerCase()
     if (!['csv', 'xlsx', 'xls'].includes(ext)) {
-      toast.error('Format non supporté. Utilisez CSV ou Excel (.xlsx, .xls).')
+      toast.error(t('admin.import.formatError'))
       return
     }
     if (f.size > 10 * 1024 * 1024) {
-      toast.error('Fichier trop volumineux (max 10 MB).')
+      toast.error(t('admin.import.max10'))
       return
     }
     setFile(f)
@@ -42,7 +44,7 @@ export function ImportMedecinsModal({ isOpen, onClose, onSuccess }) {
   }
 
   const handleImport = async () => {
-    if (!file) { toast.error('Veuillez sélectionner un fichier.'); return }
+    if (!file) { toast.error(t('admin.import.selectFile')); return }
 
     setIsUploading(true)
     setProgress(0)
@@ -59,16 +61,16 @@ export function ImportMedecinsModal({ isOpen, onClose, onSuccess }) {
       setResults(data)
 
       if (data.errors === 0) {
-        toast.success(`${data.imported} médecin(s) importé(s) avec succès.`)
+        toast.success(t('admin.import.importSuccessMedecins', { imported: data.imported }))
       } else {
-        toast.success(`${data.imported} importé(s), ${data.errors} erreur(s). Consultez le rapport.`)
+        toast.success(t('admin.import.importPartialMedecins', { imported: data.imported, errors: data.errors }))
       }
 
       if (data.imported > 0 && onSuccess) {
         setTimeout(() => { onSuccess(); onClose() }, 3000)
       }
     } catch (err) {
-      toast.error(err.response?.data?.error || "Erreur lors de l'import.")
+      toast.error(err.response?.data?.error || t('admin.import.importError'))
     } finally {
       setIsUploading(false)
     }
@@ -83,7 +85,7 @@ export function ImportMedecinsModal({ isOpen, onClose, onSuccess }) {
       a.href = url; a.download = 'template_import_medecins.csv'; a.click()
       URL.revokeObjectURL(url)
     } catch {
-      toast.error('Erreur lors du téléchargement du template.')
+      toast.error(t('admin.import.templateError'))
     }
   }
 
@@ -106,7 +108,7 @@ export function ImportMedecinsModal({ isOpen, onClose, onSuccess }) {
           {/* Header */}
           <div className="flex items-center justify-between mb-5">
             <Dialog.Title className="font-display font-bold text-xl text-primary-900 dark:text-sable">
-              Importer des médecins
+              {t('admin.import.titleMedecins')}
             </Dialog.Title>
             <button onClick={handleClose} className="text-primary-300 hover:text-primary-700">
               <X className="w-6 h-6" />
@@ -129,10 +131,10 @@ export function ImportMedecinsModal({ isOpen, onClose, onSuccess }) {
                 <>
                   <Upload className="w-10 h-10 mx-auto text-primary-300 mb-3" />
                   <p className="text-sm font-semibold text-primary-700 dark:text-sable">
-                    Glissez-déposez votre fichier ici
+                    {t('admin.import.dropHere')}
                   </p>
                   <p className="text-xs text-primary-300 mt-1">
-                    ou cliquez pour parcourir
+                    {t('admin.import.clickBrowse')}
                   </p>
                   <input
                     ref={fileInputRef}
@@ -142,7 +144,7 @@ export function ImportMedecinsModal({ isOpen, onClose, onSuccess }) {
                     className="hidden"
                   />
                   <p className="text-xs text-primary-300 mt-3">
-                    CSV, Excel (.xlsx, .xls) — Max 10 MB
+                    {t('admin.import.formats')}
                   </p>
                 </>
               ) : (
@@ -171,7 +173,7 @@ export function ImportMedecinsModal({ isOpen, onClose, onSuccess }) {
                     style={{ width: `${progress}%` }}
                   />
                 </div>
-                <p className="text-xs text-primary-300 text-center">Import en cours… {progress}%</p>
+                <p className="text-xs text-primary-300 text-center">{t('admin.import.importing', { progress })}</p>
               </div>
             )}
 
@@ -189,21 +191,21 @@ export function ImportMedecinsModal({ isOpen, onClose, onSuccess }) {
                   }
                   <div className="flex-1 min-w-0">
                     <p className="font-semibold text-primary-900 dark:text-sable text-sm">
-                      {results.imported} médecin(s) importé(s)
-                      {results.errors > 0 && `, ${results.errors} erreur(s)`}
+                      {t('admin.import.importedMedecins', { count: results.imported })}
+                      {results.errors > 0 && t('admin.import.errorCount', { count: results.errors })}
                     </p>
                     <p className="text-xs text-primary-300 mt-0.5">
-                      Les médecins importés sont en attente de validation admin.
+                      {t('admin.import.awaitingValidation')}
                     </p>
                     {Array.isArray(results.errorLog) && results.errorLog.length > 0 && (
                       <details className="mt-2">
                         <summary className="text-xs text-urgence-500 cursor-pointer font-semibold">
-                          Voir les erreurs ({results.errorLog.length})
+                          {t('admin.import.seeErrors', { count: results.errorLog.length })}
                         </summary>
                         <div className="mt-2 max-h-36 overflow-y-auto space-y-1">
                           {results.errorLog.map((err, i) => (
                             <div key={i} className="text-xs text-urgence-600 bg-urgence-50 px-2 py-1 rounded">
-                              Ligne {err.ligne} ({err.email}) : {err.error}
+                              {t('admin.import.rowLine', { row: err.ligne })} ({err.email}) : {err.error}
                             </div>
                           ))}
                         </div>
@@ -217,13 +219,13 @@ export function ImportMedecinsModal({ isOpen, onClose, onSuccess }) {
             {/* Colonnes attendues */}
             <div className="rounded-xl bg-primary-50 dark:bg-primary-900/40 p-3">
               <p className="text-xs font-semibold text-primary-500 dark:text-sable mb-1">
-                Colonnes requises dans le fichier :
+                {t('admin.import.colonnesRequises')}
               </p>
               <p className="text-xs text-primary-400 font-mono">
                 email, password, nom, prenom, telephone, specialite, numeroOrdre
               </p>
               <p className="text-xs text-primary-300 mt-1">
-                Colonnes optionnelles : quartier
+                {t('admin.import.colonnesOptionnelles')}
               </p>
             </div>
 
@@ -233,14 +235,14 @@ export function ImportMedecinsModal({ isOpen, onClose, onSuccess }) {
                 onClick={handleDownloadTemplate}
                 className="inline-flex items-center gap-1.5 text-sm text-mint-500 hover:text-mint-700 font-semibold"
               >
-                <Download className="w-4 h-4" /> Template CSV
+                <Download className="w-4 h-4" /> {t('admin.import.templateCsv')}
               </button>
               <div className="flex gap-3">
                 <button
                   onClick={handleClose}
                   className="px-4 py-2 text-sm text-primary-500 dark:text-sable hover:text-primary-700 font-medium"
                 >
-                  Annuler
+                  {t('admin.import.cancel')}
                 </button>
                 <button
                   onClick={handleImport}
@@ -248,7 +250,7 @@ export function ImportMedecinsModal({ isOpen, onClose, onSuccess }) {
                   className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-mint-500 hover:bg-mint-700 text-white text-sm font-semibold disabled:opacity-60 transition"
                 >
                   <Upload className="w-4 h-4" />
-                  {isUploading ? 'Import en cours…' : 'Importer'}
+                  {isUploading ? t('admin.import.importingDots') : t('admin.import.importer')}
                 </button>
               </div>
             </div>

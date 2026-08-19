@@ -8,6 +8,7 @@ use App\Entity\ProtocoleConsultation;
 use App\Entity\ProtocoleRechercheStat;
 use App\Repository\ProtocolePremiersGestesRepository;
 use App\Service\CameroonFirstAidPriorityService;
+use App\Service\ContentLocalizer;
 use App\Service\FirstAidProtocolPublicSerializer;
 use App\Service\FirstAidProtocolSearchService;
 use Doctrine\ORM\EntityManagerInterface;
@@ -31,6 +32,7 @@ final class PublicFirstAidProtocolController extends AbstractController
         private readonly CameroonFirstAidPriorityService $priorityService,
         private readonly FirstAidProtocolPublicSerializer $serializer,
         private readonly FirstAidProtocolSearchService $searchService,
+        private readonly ContentLocalizer $localizer,
         private readonly EntityManagerInterface $entityManager,
         #[Autowire(service: 'limiter.api_first_aid')] private readonly RateLimiterFactory $publicApiLimiter,
     ) {
@@ -40,7 +42,7 @@ final class PublicFirstAidProtocolController extends AbstractController
     public function list(Request $request): JsonResponse
     {
         if ($this->rejected($request)) {
-            return $this->json(['message' => 'Trop de demandes. Réessayez dans quelques instants.'], Response::HTTP_TOO_MANY_REQUESTS);
+            return $this->json(['message' => $this->rateLimitMessage()], Response::HTTP_TOO_MANY_REQUESTS);
         }
 
         $page = max(1, $request->query->getInt('page', 1));
@@ -72,7 +74,7 @@ final class PublicFirstAidProtocolController extends AbstractController
     public function categories(Request $request): JsonResponse
     {
         if ($this->rejected($request)) {
-            return $this->json(['message' => 'Trop de demandes. Réessayez dans quelques instants.'], Response::HTTP_TOO_MANY_REQUESTS);
+            return $this->json(['message' => $this->rateLimitMessage()], Response::HTTP_TOO_MANY_REQUESTS);
         }
 
         $protocols = $this->protocolRepository->findAllPublic();
@@ -84,7 +86,8 @@ final class PublicFirstAidProtocolController extends AbstractController
 
         $items = [];
         foreach (FirstAidProtocolSearchService::CATEGORIES as $slug => $label) {
-            $items[] = ['slug' => $slug, 'label' => $label, 'count' => $counts[$slug] ?? 0];
+            $labelEn = FirstAidProtocolSearchService::CATEGORIES_EN[$slug] ?? $label;
+            $items[] = ['slug' => $slug, 'label' => $this->localizer->pick($label, $labelEn), 'count' => $counts[$slug] ?? 0];
         }
 
         return $this->json($items);
@@ -94,12 +97,15 @@ final class PublicFirstAidProtocolController extends AbstractController
     public function search(Request $request): JsonResponse
     {
         if ($this->rejected($request)) {
-            return $this->json(['message' => 'Trop de demandes. Réessayez dans quelques instants.'], Response::HTTP_TOO_MANY_REQUESTS);
+            return $this->json(['message' => $this->rateLimitMessage()], Response::HTTP_TOO_MANY_REQUESTS);
         }
 
         $query = trim((string) $request->query->get('q', ''));
         if ($query === '' || mb_strlen($query) > 200) {
-            return $this->json(['message' => 'Paramètre q manquant ou trop long.'], Response::HTTP_UNPROCESSABLE_ENTITY);
+            $message = $this->localizer->isEnglish()
+                ? 'Missing or too long "q" parameter.'
+                : 'Paramètre q manquant ou trop long.';
+            return $this->json(['message' => $message], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
         $protocols = $this->protocolRepository->findAllPublic();
@@ -118,7 +124,7 @@ final class PublicFirstAidProtocolController extends AbstractController
     public function detail(string $slug, Request $request): JsonResponse
     {
         if ($this->rejected($request)) {
-            return $this->json(['message' => 'Trop de demandes. Réessayez dans quelques instants.'], Response::HTTP_TOO_MANY_REQUESTS);
+            return $this->json(['message' => $this->rateLimitMessage()], Response::HTTP_TOO_MANY_REQUESTS);
         }
 
         $protocol = $this->protocolRepository->findPublicOneBySlug($slug);
@@ -149,6 +155,13 @@ final class PublicFirstAidProtocolController extends AbstractController
 
         $stat->record($hasResult);
         $this->entityManager->flush();
+    }
+
+    private function rateLimitMessage(): string
+    {
+        return $this->localizer->isEnglish()
+            ? 'Too many requests. Please try again in a few moments.'
+            : 'Trop de demandes. Réessayez dans quelques instants.';
     }
 
     private function rejected(Request $request): bool

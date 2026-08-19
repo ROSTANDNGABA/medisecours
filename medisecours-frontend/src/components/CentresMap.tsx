@@ -3,6 +3,7 @@
 import React, { useEffect, useMemo } from 'react'
 import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from 'react-leaflet'
 import L from 'leaflet'
+import { useTranslation } from 'react-i18next'
 
 // ─── Fix default Leaflet icon paths ─────────────────────────────────────────
 delete (L.Icon.Default.prototype as any)._getIconUrl
@@ -192,6 +193,7 @@ const CentreMarker = React.memo(({
   isDest: boolean
   onSelect?: (id: number) => void
 }) => {
+  const { t } = useTranslation()
   return (
     <Marker
       position={[c.latitude, c.longitude]}
@@ -200,7 +202,7 @@ const CentreMarker = React.memo(({
       eventHandlers={{ click: () => onSelect?.(c.id) }}
     >
       <Popup>
-        <div className="text-sm" role="dialog" aria-label={`Détails pour ${c.nom}`}>
+        <div className="text-sm" role="dialog" aria-label={t('visitor.components.centresMap.detailsFor', { name: c.nom })}>
           <p className="font-semibold">{c.nom}</p>
           <p>{c.adresse}</p>
           {c.telephone && <p>{c.telephone}</p>}
@@ -237,6 +239,7 @@ export default function CentresMap({
   isFallback = false,
   destination,
 }: CentresMapProps) {
+  const { t } = useTranslation()
   // Convert GeoJSON [lng, lat] to Leaflet [lat, lng]
   const routePositions: [number, number][] | null = useMemo(() => {
     return route
@@ -283,11 +286,11 @@ export default function CentresMap({
           position={[position.lat, position.lng]}
           icon={patientIcon}
           zIndexOffset={1000}
-          title="Votre position actuelle"
+          title={t('visitor.components.centresMap.yourPosition')}
         >
           <Popup>
-            <div className="text-sm font-medium text-center" role="dialog" aria-label="Votre position actuelle">
-              📍 Votre position actuelle
+            <div className="text-sm font-medium text-center" role="dialog" aria-label={t('visitor.components.centresMap.yourPosition')}>
+              📍 {t('visitor.components.centresMap.yourPosition')}
             </div>
           </Popup>
         </Marker>
@@ -312,7 +315,7 @@ export default function CentresMap({
           title={destination.nom}
         >
           <Popup>
-            <div className="text-sm" role="dialog" aria-label={`Détails pour ${destination.nom}`}>
+            <div className="text-sm" role="dialog" aria-label={t('visitor.components.centresMap.detailsFor', { name: destination.nom })}>
               <p className="font-semibold">{destination.nom}</p>
             </div>
           </Popup>

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, Fragment } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Dialog, Transition } from '@headlessui/react';
 import {
     Upload,
@@ -21,6 +22,7 @@ export function ImportPremiersSoinsModal({ isOpen, onClose, onSuccess }: { isOpe
     const [results, setResults] = useState<any>(null);
     const [updateExisting, setUpdateExisting] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const { t } = useTranslation();
 
     const handleFileDrop = (e: React.DragEvent) => {
         e.preventDefault();
@@ -46,12 +48,12 @@ export function ImportPremiersSoinsModal({ isOpen, onClose, onSuccess }: { isOpe
         ];
 
         if (!validTypes.includes(file.type)) {
-            alert('Format de fichier non supporté. Utilisez CSV ou Excel (.xlsx)');
+            alert(t('admin.import.formatError'));
             return;
         }
 
         if (file.size > 10 * 1024 * 1024) {
-            alert('Fichier trop volumineux (max 10MB)');
+            alert(t('admin.import.max10'));
             return;
         }
 
@@ -61,7 +63,7 @@ export function ImportPremiersSoinsModal({ isOpen, onClose, onSuccess }: { isOpe
 
     const handleImport = async () => {
         if (!file) {
-            alert('Veuillez sélectionner un fichier');
+            alert(t('admin.import.selectFile'));
             return;
         }
 
@@ -81,12 +83,12 @@ export function ImportPremiersSoinsModal({ isOpen, onClose, onSuccess }: { isOpe
             setResults(data.data);
 
             const { imported, updated, errors, warnings } = data.data;
-            let message = `Import terminé : ${imported} premiers soins importés`;
-            if (updated > 0) message += `, ${updated} mises à jour`;
-            if (errors > 0) message += `, ${errors} erreurs`;
-            if (warnings?.length > 0) message += `, ${warnings.length} avertissements`;
+            let message = t('admin.import.importedPremiersSoins', { count: imported });
+            if (updated > 0) message += t('admin.import.updatedCountFem', { count: updated });
+            if (errors > 0) message += t('admin.import.errorCountPlain', { count: errors });
+            if (warnings?.length > 0) message += t('admin.import.warningCount', { count: warnings.length });
 
-            alert(message);
+            alert(t('admin.import.importSuccess', { message }));
 
             if (imported > 0 || updated > 0) {
                 setTimeout(() => {
@@ -95,7 +97,7 @@ export function ImportPremiersSoinsModal({ isOpen, onClose, onSuccess }: { isOpe
                 }, 2000);
             }
         } catch (error: any) {
-            const msg = error?.response?.data?.error || error.message || 'Erreur lors de l\'import';
+            const msg = error?.response?.data?.error || error.message || t('admin.import.importError');
             alert(msg);
         } finally {
             setIsUploading(false);
@@ -117,7 +119,7 @@ export function ImportPremiersSoinsModal({ isOpen, onClose, onSuccess }: { isOpe
             document.body.removeChild(a);
             window.URL.revokeObjectURL(url);
         } catch (error: any) {
-            alert('Erreur lors du téléchargement du template');
+            alert(t('admin.import.templateError'));
         }
     };
 
@@ -150,7 +152,7 @@ export function ImportPremiersSoinsModal({ isOpen, onClose, onSuccess }: { isOpe
                             <Dialog.Panel className="dashboard-theme w-full max-w-3xl transform overflow-hidden rounded-2xl bg-white p-6 shadow-xl transition-all">
                                 <div className="flex items-center justify-between mb-4">
                                     <Dialog.Title className="text-xl font-semibold text-gray-900">
-                                        Importer des Premiers Soins
+                                        {t('admin.import.titlePremiersSoins')}
                                     </Dialog.Title>
                                     <button
                                         onClick={onClose}
@@ -165,12 +167,12 @@ export function ImportPremiersSoinsModal({ isOpen, onClose, onSuccess }: { isOpe
                                         <div className="flex items-start">
                                             <AlertCircle className="h-5 w-5 text-blue-600 mt-0.5 mr-2 flex-shrink-0" />
                                             <div className="text-sm text-blue-800">
-                                                <p className="font-medium">Informations importantes :</p>
+                                                <p className="font-medium">{t('admin.import.infoImportant')}</p>
                                                 <ul className="list-disc pl-4 mt-1 space-y-1">
-                                                    <li>Le fichier doit contenir les colonnes : titre, description, niveauUrgence, maladieNom</li>
-                                                    <li>Le niveau d&apos;urgence doit être : FAIBLE, MOYEN, ÉLEVÉ ou CRITIQUE</li>
-                                                    <li>Si la maladie n&apos;existe pas, elle sera créée automatiquement dans la catégorie spécifiée</li>
-                                                    <li>L&apos;administrateur pourra modifier la catégorie de la maladie après l&apos;import</li>
+                                                    <li>{t('admin.import.infoPremiersSoins1')}</li>
+                                                    <li>{t('admin.import.infoPremiersSoins2')}</li>
+                                                    <li>{t('admin.import.infoPremiersSoins3')}</li>
+                                                    <li>{t('admin.import.infoPremiersSoins4')}</li>
                                                 </ul>
                                             </div>
                                         </div>
@@ -188,13 +190,13 @@ export function ImportPremiersSoinsModal({ isOpen, onClose, onSuccess }: { isOpe
                                             <>
                                                 <Upload className="h-12 w-12 mx-auto text-gray-400" />
                                                 <p className="mt-2 text-sm text-gray-600">
-                                                    Glissez-déposez votre fichier ici, ou
+                                                    {t('admin.import.dropHereOr')}
                                                 </p>
                                                 <button
                                                     onClick={() => fileInputRef.current?.click()}
                                                     className="mt-2 inline-flex items-center px-4 py-2 bg-primary-500 text-white rounded-md hover:bg-primary-600"
                                                 >
-                                                    Parcourir
+                                                    {t('admin.import.browse')}
                                                 </button>
                                                 <input
                                                     ref={fileInputRef}
@@ -204,7 +206,7 @@ export function ImportPremiersSoinsModal({ isOpen, onClose, onSuccess }: { isOpe
                                                     className="hidden"
                                                 />
                                                 <p className="mt-2 text-xs text-gray-500">
-                                                    Formats supportés : CSV, Excel (.xlsx, .xls) | Max: 10MB
+                                                    {t('admin.import.formatsSupportes')}
                                                 </p>
                                             </>
                                         ) : (
@@ -236,7 +238,7 @@ export function ImportPremiersSoinsModal({ isOpen, onClose, onSuccess }: { isOpe
                                                 className="rounded text-primary-500 focus:ring-primary-500"
                                             />
                                             <span className="text-sm text-gray-700">
-                                                Mettre à jour les premiers soins existants (même titre + même maladie)
+                                                {t('admin.import.updateExistingPremiersSoins')}
                                             </span>
                                         </label>
                                         <button
@@ -244,7 +246,7 @@ export function ImportPremiersSoinsModal({ isOpen, onClose, onSuccess }: { isOpe
                                             className="ml-auto flex items-center space-x-2 text-sm text-primary-500 hover:text-primary-600"
                                         >
                                             <Download className="h-4 w-4" />
-                                            <span>Télécharger le template</span>
+                                            <span>{t('admin.import.downloadTemplate')}</span>
                                         </button>
                                     </div>
 
@@ -258,7 +260,7 @@ export function ImportPremiersSoinsModal({ isOpen, onClose, onSuccess }: { isOpe
                                                 />
                                             </div>
                                             <p className="text-sm text-gray-600 text-center">
-                                                Import en cours... {progress}%
+                                                {t('admin.import.importing', { progress })}
                                             </p>
                                         </div>
                                     )}
@@ -282,28 +284,28 @@ export function ImportPremiersSoinsModal({ isOpen, onClose, onSuccess }: { isOpe
                                                 )}
                                                 <div className="flex-1">
                                                     <p className="font-medium">
-                                                        {results.imported} premiers soins importés
-                                                        {results.updated > 0 && `, ${results.updated} mises à jour`}
-                                                        {results.errors > 0 && `, ${results.errors} erreurs`}
+                                                        {t('admin.import.importedPremiersSoins', { count: results.imported })}
+                                                        {results.updated > 0 && t('admin.import.updatedCountFem', { count: results.updated })}
+                                                        {results.errors > 0 && t('admin.import.errorCountPlain', { count: results.errors })}
                                                         {results.warnings?.length > 0 &&
-                                                            `, ${results.warnings.length} avertissements`
+                                                            t('admin.import.warningCount', { count: results.warnings.length })
                                                         }
                                                     </p>
 
                                                     {(results.errorLog?.length > 0 || results.warnings?.length > 0) && (
                                                         <details className="mt-2">
                                                             <summary className="text-sm text-gray-600 cursor-pointer hover:text-gray-800">
-                                                                Voir les détails ({results.errorLog?.length || 0} erreurs, {results.warnings?.length || 0} avertissements)
+                                                                {t('admin.import.detailsPlain', { count: results.errorLog?.length || 0, count2: results.warnings?.length || 0 })}
                                                             </summary>
                                                             <div className="mt-2 max-h-60 overflow-y-auto text-sm space-y-1">
                                                                 {results.errorLog?.map((error: any, index: number) => (
                                                                     <div key={`error-${index}`} className="text-red-600 bg-red-50 p-2 rounded">
-                                                                        <strong>Ligne {error.row}:</strong> {error.error}
+                                                                        <strong>{t('admin.import.rowError', { row: error.row, error: error.error })}</strong>
                                                                     </div>
                                                                 ))}
                                                                 {results.warnings?.map((warning: any, index: number) => (
                                                                     <div key={`warning-${index}`} className="text-yellow-600 bg-yellow-50 p-2 rounded">
-                                                                        <strong>Ligne {warning.row}:</strong> {warning.message}
+                                                                        <strong>{t('admin.import.rowError', { row: warning.row, error: warning.message })}</strong>
                                                                     </div>
                                                                 ))}
                                                             </div>
@@ -323,14 +325,14 @@ export function ImportPremiersSoinsModal({ isOpen, onClose, onSuccess }: { isOpe
                                             onClick={onClose}
                                             className="px-4 py-2 text-gray-600 hover:text-gray-800"
                                         >
-                                            Annuler
+                                            {t('admin.import.cancel')}
                                         </button>
                                         <button
                                             onClick={handleImport}
                                             disabled={!file || isUploading}
                                             className="px-6 py-2 bg-primary-500 text-white rounded-md hover:bg-primary-600 disabled:opacity-50 disabled:cursor-not-allowed"
                                         >
-                                            {isUploading ? 'Import en cours...' : 'Importer'}
+                                            {isUploading ? t('admin.import.importingDots') : t('admin.import.importer')}
                                         </button>
                                     </div>
                                 </div>

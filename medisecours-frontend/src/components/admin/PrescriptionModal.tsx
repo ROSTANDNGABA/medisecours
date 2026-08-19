@@ -2,6 +2,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, Plus, Trash2, Loader2, Download } from 'lucide-react'
 import { createPortal } from 'react-dom'
@@ -9,12 +10,12 @@ import api from '../../api/axios'
 import { useToast } from '../ui/Toast'
 import { useAuth } from '../../hooks/useAuth'
 import PrescriptionPDFTemplate from './PrescriptionPDFTemplate'
-import jsPDF from 'jspdf'
-import html2canvas from 'html2canvas'
+import { downloadPrescriptionPDF } from '../../lib/prescriptionPdf'
 
 export default function PrescriptionModal({ consultation, onClose, onSaved }) {
   const toast = useToast()
   const { user } = useAuth()
+  const { t } = useTranslation()
   const [diagnostic, setDiagnostic] = useState('')
   const [medicaments, setMedicaments] = useState([{ nom: '', posologie: '', duree: '' }])
   const [recommandations, setRecommandations] = useState('')
@@ -39,37 +40,12 @@ export default function PrescriptionModal({ consultation, onClose, onSaved }) {
       setDownloading(true)
       const element = document.getElementById('prescription-pdf-content')
       if (!element) return
-      
-      const clone = element.cloneNode(true)
-      clone.style.position = 'fixed'
-      clone.style.top = '0'
-      clone.style.left = '0'
-      clone.style.zIndex = '-9999'
-      clone.style.transform = 'none'
-      document.body.appendChild(clone)
-      
-      const canvas = await html2canvas(clone, { 
-        scale: 2, 
-        useCORS: true,
-        logging: false,
-        backgroundColor: '#ffffff'
-      })
-      
-      document.body.removeChild(clone)
-      
-      const imgData = canvas.toDataURL('image/png')
-      
-      const pdf = new jsPDF('p', 'mm', 'a4')
-      const pdfWidth = pdf.internal.pageSize.getWidth()
-      const pdfHeight = (canvas.height * pdfWidth) / canvas.width
-      
-      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight)
-      
+
       const patientName = `${consultation.patient?.prenom || ''}_${consultation.patient?.nom || ''}`.trim()
-      pdf.save(`Ordonnance_${patientName || 'Patient'}.pdf`)
+      await downloadPrescriptionPDF(element, t('admin.prescriptionLegacy.pdfName', { name: patientName || 'Patient' }))
     } catch (err) {
       console.error('Erreur PDF:', err)
-      toast.error('La génération du PDF a échoué.')
+      toast.error(t('admin.prescriptionLegacy.toastPdfError'))
     } finally {
       setDownloading(false)
     }
@@ -80,18 +56,19 @@ export default function PrescriptionModal({ consultation, onClose, onSaved }) {
     if (!diagnostic.trim()) return
     setSaving(true)
     try {
-      await api.post('/api/prescriptions', {
+      const response = await api.post('/api/prescriptions', {
         consultation: `/api/consultations/${consultation.id}`,
         diagnostic: diagnostic.trim(),
         medicaments: medicaments.filter((m) => m.nom.trim()),
         recommandations: recommandations.trim() || null,
       })
-      toast.success('Ordonnance enregistrée !')
+      await api.post(`/api/prescriptions/${response.data?.id}/sign`, {})
+      toast.success(t('admin.prescriptionLegacy.toastSaved'))
       setSaving(false)
       setPreviewMode(true)
       onSaved?.()
     } catch {
-      toast.error('Échec de l\'enregistrement.')
+      toast.error(t('admin.prescriptionLegacy.toastError'))
       setSaving(false)
     }
   }
@@ -124,9 +101,9 @@ export default function PrescriptionModal({ consultation, onClose, onSaved }) {
               <>
                 <div className="flex items-center justify-between p-4 border-b border-gray-100 shrink-0">
                   <div>
-                    <h3 className="font-semibold text-primary-900 dark:text-sable">Ordonnance médicale</h3>
+                    <h3 className="font-semibold text-primary-900 dark:text-sable">{t('admin.prescriptionLegacy.titlePreview')}</h3>
                     <p className="text-xs text-primary-300">
-                      Patient : {consultation.patient?.prenom} {consultation.patient?.nom}
+                      {t('admin.prescriptionLegacy.patientColon', { name: `${consultation.patient?.prenom} ${consultation.patient?.nom}` })}
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
@@ -136,7 +113,7 @@ export default function PrescriptionModal({ consultation, onClose, onSaved }) {
                       className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-primary-500 hover:bg-primary-700 text-white font-semibold text-sm transition-colors disabled:opacity-50"
                     >
                       {downloading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
-                      {downloading ? 'Génération...' : 'Télécharger'}
+                      {downloading ? t('admin.prescriptionLegacy.downloading') : t('admin.prescriptionLegacy.download')}
                     </button>
                     <button onClick={onClose} className="p-2 rounded-xl hover:bg-red-50 hover:text-red-500 text-primary-400 transition-colors">
                       <X className="w-5 h-5" />
@@ -159,9 +136,9 @@ export default function PrescriptionModal({ consultation, onClose, onSaved }) {
               <>
                 <div className="flex items-center justify-between p-5 border-b border-primary-100 dark:border-white/5">
                   <div>
-                    <h3 className="font-semibold text-primary-900 dark:text-sable">Prescription médicale</h3>
+                    <h3 className="font-semibold text-primary-900 dark:text-sable">{t('admin.prescriptionLegacy.title')}</h3>
                     <p className="text-xs text-primary-300">
-                      Patient : {consultation.patient?.prenom} {consultation.patient?.nom}
+                      {t('admin.prescriptionLegacy.patientColon', { name: `${consultation.patient?.prenom} ${consultation.patient?.nom}` })}
                     </p>
                   </div>
                   <button onClick={onClose} disabled={saving} className="p-2 rounded-xl hover:bg-primary-100 dark:hover:bg-primary-700 text-primary-400 disabled:opacity-50">
@@ -171,11 +148,11 @@ export default function PrescriptionModal({ consultation, onClose, onSaved }) {
 
                 <form onSubmit={handleSubmit} className="p-5 space-y-5">
                   <div>
-                    <label className="block text-sm font-medium text-primary-700 dark:text-sable mb-1.5">Diagnostic</label>
+                    <label className="block text-sm font-medium text-primary-700 dark:text-sable mb-1.5">{t('admin.prescriptionLegacy.diagnostic')}</label>
                     <textarea
                       value={diagnostic}
                       onChange={(e) => setDiagnostic(e.target.value)}
-                      placeholder="Ex: Infection respiratoire aiguë..."
+                      placeholder={t('admin.prescriptionLegacy.diagnosticPlaceholder')}
                       rows={3}
                       disabled={saving}
                       className="w-full rounded-xl border border-primary-100 dark:border-white/10 bg-white dark:bg-primary-900 px-4 py-3 text-sm text-primary-900 dark:text-sable placeholder:text-primary-300 resize-none disabled:opacity-50"
@@ -185,14 +162,14 @@ export default function PrescriptionModal({ consultation, onClose, onSaved }) {
 
                   <div>
                     <div className="flex items-center justify-between mb-1.5">
-                      <label className="text-sm font-medium text-primary-700 dark:text-sable">Médicaments</label>
+                      <label className="text-sm font-medium text-primary-700 dark:text-sable">{t('admin.prescriptionLegacy.medicaments')}</label>
                       <button
                         type="button"
                         onClick={addMedicament}
                         disabled={saving}
                         className="flex items-center gap-1 text-xs font-semibold text-primary-500 hover:text-primary-700 disabled:opacity-50"
                       >
-                        <Plus className="w-3.5 h-3.5" /> Ajouter
+                        <Plus className="w-3.5 h-3.5" /> {t('admin.prescriptionLegacy.add')}
                       </button>
                     </div>
                     <div className="space-y-2">
@@ -201,21 +178,21 @@ export default function PrescriptionModal({ consultation, onClose, onSaved }) {
                           <input
                             value={med.nom}
                             onChange={(e) => updateMedicament(i, 'nom', e.target.value)}
-                            placeholder="Médicament"
+                            placeholder={t('admin.prescriptionLegacy.medicamentPlaceholder')}
                             disabled={saving}
                             className="flex-1 rounded-xl border border-primary-100 dark:border-white/10 bg-white dark:bg-primary-900 px-3 py-2 text-sm text-primary-900 dark:text-sable placeholder:text-primary-300 disabled:opacity-50"
                           />
                           <input
                             value={med.posologie}
                             onChange={(e) => updateMedicament(i, 'posologie', e.target.value)}
-                            placeholder="Posologie"
+                            placeholder={t('admin.prescriptionLegacy.posologiePlaceholder')}
                             disabled={saving}
                             className="w-28 rounded-xl border border-primary-100 dark:border-white/10 bg-white dark:bg-primary-900 px-3 py-2 text-sm text-primary-900 dark:text-sable placeholder:text-primary-300 disabled:opacity-50"
                           />
                           <input
                             value={med.duree}
                             onChange={(e) => updateMedicament(i, 'duree', e.target.value)}
-                            placeholder="Durée"
+                            placeholder={t('admin.prescriptionLegacy.dureePlaceholder')}
                             disabled={saving}
                             className="w-20 rounded-xl border border-primary-100 dark:border-white/10 bg-white dark:bg-primary-900 px-3 py-2 text-sm text-primary-900 dark:text-sable placeholder:text-primary-300 disabled:opacity-50"
                           />
@@ -235,11 +212,11 @@ export default function PrescriptionModal({ consultation, onClose, onSaved }) {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-primary-700 dark:text-sable mb-1.5">Recommandations</label>
+                    <label className="block text-sm font-medium text-primary-700 dark:text-sable mb-1.5">{t('admin.prescriptionLegacy.recommandations')}</label>
                     <textarea
                       value={recommandations}
                       onChange={(e) => setRecommandations(e.target.value)}
-                      placeholder="Repos, hydratation, consultation de suivi..."
+                      placeholder={t('admin.prescriptionLegacy.recommandationsPlaceholder')}
                       rows={2}
                       disabled={saving}
                       className="w-full rounded-xl border border-primary-100 dark:border-white/10 bg-white dark:bg-primary-900 px-4 py-3 text-sm text-primary-900 dark:text-sable placeholder:text-primary-300 resize-none disabled:opacity-50"
@@ -253,7 +230,7 @@ export default function PrescriptionModal({ consultation, onClose, onSaved }) {
                       className="px-5 py-2.5 rounded-xl flex items-center justify-center gap-2 text-sm font-semibold bg-primary-500 hover:bg-primary-700 text-white disabled:opacity-75 transition-all"
                     >
                       {saving && <Loader2 className="w-4 h-4 animate-spin" />}
-                      {saving ? 'Enregistrement...' : 'Enregistrer l\'ordonnance'}
+                      {saving ? t('admin.prescriptionLegacy.saving') : t('admin.prescriptionLegacy.save')}
                     </button>
                     <button
                       type="button"
@@ -261,7 +238,7 @@ export default function PrescriptionModal({ consultation, onClose, onSaved }) {
                       disabled={saving}
                       className="px-5 py-2.5 rounded-xl text-sm font-semibold border border-primary-100 dark:border-white/10 text-primary-700 dark:text-sable disabled:opacity-50"
                     >
-                      Annuler
+                      {t('admin.prescriptionLegacy.cancel')}
                     </button>
                   </div>
                 </form>

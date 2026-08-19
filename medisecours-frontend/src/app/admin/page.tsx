@@ -19,63 +19,66 @@ import {
   Users,
 } from 'lucide-react'
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts'
+import { useTranslation } from 'react-i18next'
 import { fetcher } from '../../lib/fetcher'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import { useToast } from '../../components/ui/Toast'
 
 const CHART_COLORS = ['#0f2418', '#2f6b45', '#66bb6a', '#b7dfb2', '#e7efe3']
 
-const QUICK_ACTIONS = [
-  {
-    href: '/admin/utilisateurs',
-    label: 'Utilisateurs',
-    description: 'Verifier les comptes actifs',
-    icon: Users,
-  },
-  {
-    href: '/admin/medecins',
-    label: 'Medecins',
-    description: 'Traiter les validations',
-    icon: ShieldCheck,
-  },
-  {
-    href: '/admin/centres',
-    label: 'Centres',
-    description: 'Mettre a jour le reseau',
-    icon: Building2,
-  },
-  {
-    href: '/admin/catalogue',
-    label: 'Catalogue',
-    description: 'Gerer le contenu medical',
-    icon: BookOpen,
-  },
-]
-
-const RECOMMENDATION_PRESETS = [
-  {
-    title: 'Valider les praticiens',
-    description: 'Prioriser les inscriptions medecins en attente.',
-    href: '/admin/medecins',
-    icon: ShieldCheck,
-  },
-  {
-    title: 'Verifier les avis',
-    description: 'Traiter les contenus signales et les retours sensibles.',
-    href: '/admin/avis',
-    icon: Star,
-  },
-  {
-    title: 'Mettre a jour le catalogue',
-    description: 'Completer les fiches maladies et les categories.',
-    href: '/admin/catalogue',
-    icon: FolderHeart,
-  },
-]
-
 export default function AdminOverview() {
+  const { t } = useTranslation()
   const [period, setPeriod] = useState('30d')
   const toast = useToast()
+
+  const QUICK_ACTIONS = [
+    {
+      href: '/admin/utilisateurs',
+      label: t('admin.dashboard.qaUtilisateurs'),
+      description: t('admin.dashboard.qaUtilisateursDesc'),
+      icon: Users,
+    },
+    {
+      href: '/admin/medecins',
+      label: t('admin.dashboard.qaMedecins'),
+      description: t('admin.dashboard.qaMedecinsDesc'),
+      icon: ShieldCheck,
+    },
+    {
+      href: '/admin/centres',
+      label: t('admin.dashboard.qaCentres'),
+      description: t('admin.dashboard.qaCentresDesc'),
+      icon: Building2,
+    },
+    {
+      href: '/admin/catalogue',
+      label: t('admin.dashboard.qaCatalogue'),
+      description: t('admin.dashboard.qaCatalogueDesc'),
+      icon: BookOpen,
+    },
+  ]
+
+  const RECOMMENDATION_PRESETS = [
+    {
+      title: t('admin.dashboard.recValiderPracticiens'),
+      description: t('admin.dashboard.recValiderPracticiensDesc'),
+      href: '/admin/medecins',
+      icon: ShieldCheck,
+    },
+    {
+      title: t('admin.dashboard.recVerifierAvis'),
+      description: t('admin.dashboard.recVerifierAvisDesc'),
+      href: '/admin/avis',
+      icon: Star,
+    },
+    {
+      title: t('admin.dashboard.recMettreAJourCatalogue'),
+      description: t('admin.dashboard.recMettreAJourCatalogueDesc'),
+      href: '/admin/catalogue',
+      icon: FolderHeart,
+    },
+  ]
+
   const { data: dashboardData, error, isLoading, isValidating, mutate } = useSWR(
     `/api/admin/dashboard?period=${period}`,
     fetcher,
@@ -87,18 +90,18 @@ export default function AdminOverview() {
 
     const stats = dashboardData.stats
     const rows = [
-      ['Indicateur', 'Valeur'],
-      ['Total utilisateurs', stats?.utilisateurs?.total ?? 0],
-      ['Patients', stats?.utilisateurs?.patients ?? 0],
-      ['Medecins valides', stats?.utilisateurs?.medecinsValides ?? 0],
-      ['Medecins en attente', stats?.utilisateurs?.medecinsEnAttente ?? 0],
-      ['Maladies', stats?.contenu?.maladies ?? 0],
-      ['Categories', stats?.contenu?.categories ?? 0],
-      ['Centres', stats?.contenu?.centres ?? 0],
-      ['Consultations', stats?.activite?.consultations ?? 0],
-      ['Messages', stats?.activite?.messages ?? 0],
-      ['Avis', stats?.activite?.avis ?? 0],
-      ['Avis signales', stats?.activite?.avisSignales ?? 0],
+      [t('admin.dashboard.csvIndicator'), t('admin.dashboard.csvValue')],
+      [t('admin.dashboard.csvTotalUtilisateurs'), stats?.utilisateurs?.total ?? 0],
+      [t('admin.dashboard.csvPatients'), stats?.utilisateurs?.patients ?? 0],
+      [t('admin.dashboard.csvMedecinsValides'), stats?.utilisateurs?.medecinsValides ?? 0],
+      [t('admin.dashboard.csvMedecinsEnAttente'), stats?.utilisateurs?.medecinsEnAttente ?? 0],
+      [t('admin.dashboard.csvMaladies'), stats?.contenu?.maladies ?? 0],
+      [t('admin.dashboard.csvCategories'), stats?.contenu?.categories ?? 0],
+      [t('admin.dashboard.csvCentres'), stats?.contenu?.centres ?? 0],
+      [t('admin.dashboard.csvConsultations'), stats?.activite?.consultations ?? 0],
+      [t('admin.dashboard.csvMessages'), stats?.activite?.messages ?? 0],
+      [t('admin.dashboard.csvAvis'), stats?.activite?.avis ?? 0],
+      [t('admin.dashboard.csvAvisSignales'), stats?.activite?.avisSignales ?? 0],
     ]
 
     const csv = rows.map((row) => row.map((value) => `"${value}"`).join(',')).join('\n')
@@ -109,8 +112,8 @@ export default function AdminOverview() {
     anchor.download = `medisecours-admin-${period}-${new Date().toISOString().slice(0, 10)}.csv`
     anchor.click()
     URL.revokeObjectURL(url)
-    toast.success('Export CSV telecharge.')
-  }, [dashboardData, period, toast])
+    toast.success(t('admin.dashboard.exportToast'))
+  }, [dashboardData, period, toast, t])
 
   const stats = dashboardData?.stats
   const alerts = dashboardData?.alerts ?? []
@@ -125,30 +128,30 @@ export default function AdminOverview() {
   const heroTrend = kpisByKey.patients?.deltaPercent ?? kpisByKey.medecins?.deltaPercent ?? 0
   const heroSecondary = [
     {
-      label: 'Patients',
+      label: t('admin.dashboard.patients'),
       value: stats?.utilisateurs?.patients ?? 0,
     },
     {
-      label: 'Medecins valides',
+      label: t('admin.dashboard.medecinsValides'),
       value: stats?.utilisateurs?.medecinsValides ?? 0,
     },
   ]
 
   const summaryCards = [
     {
-      label: 'Consultations',
+      label: t('admin.dashboard.summaryConsultations'),
       value: stats?.activite?.consultations ?? 0,
       delta: kpisByKey.consultations?.deltaPercent,
       tone: 'green',
     },
     {
-      label: 'Messages',
+      label: t('admin.dashboard.summaryMessages'),
       value: stats?.activite?.messages ?? 0,
       delta: kpisByKey.messages?.deltaPercent,
       tone: 'rose',
     },
     {
-      label: 'Centres actifs',
+      label: t('admin.dashboard.summaryCentresActifs'),
       value: stats?.contenu?.centres ?? 0,
       delta: kpisByKey.centres?.deltaPercent,
       tone: 'lime',
@@ -165,12 +168,12 @@ export default function AdminOverview() {
     }
 
     return [
-      { name: 'Patients', value: stats?.utilisateurs?.patients ?? 0 },
-      { name: 'Medecins', value: stats?.utilisateurs?.medecinsValides ?? 0 },
-      { name: 'Centres', value: stats?.contenu?.centres ?? 0 },
-      { name: 'Avis', value: stats?.activite?.avis ?? 0 },
+      { name: t('admin.dashboard.patients'), value: stats?.utilisateurs?.patients ?? 0 },
+      { name: t('admin.dashboard.medecinsValides'), value: stats?.utilisateurs?.medecinsValides ?? 0 },
+      { name: t('admin.dashboard.csvCentres'), value: stats?.contenu?.centres ?? 0 },
+      { name: t('admin.dashboard.csvAvis'), value: stats?.activite?.avis ?? 0 },
     ].filter((item: any) => item.value > 0)
-  }, [dashboardData?.gravite, stats])
+  }, [dashboardData?.gravite, stats, t])
 
   const distributionTotal = distributionData.reduce((sum: number, item: any) => sum + item.value, 0)
   const mainAlert = alerts[0]
@@ -179,8 +182,8 @@ export default function AdminOverview() {
       ...(alerts.slice(0, 2).map((alert: any) => ({
       title: alert.message,
       description: alert.severity === 'danger'
-        ? 'Action prioritaire recommandee.'
-        : 'Controle conseille sur ce signal.',
+        ? t('admin.dashboard.recDangerDesc')
+        : t('admin.dashboard.recControlDesc'),
       href: alert.href,
       icon: AlertTriangle,
     }))),
@@ -188,19 +191,19 @@ export default function AdminOverview() {
   ].slice(0, 3)
 
   if (isLoading && !dashboardData) {
-    return <LoadingSpinner label="Chargement du tableau de bord..." />
+    return <LoadingSpinner label={t('admin.dashboard.loading')} />
   }
 
   return (
     <div className="space-y-6">
       <section className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[#7d8778]">Admin overview</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[#7d8778]">{t('admin.dashboard.eyebrow')}</p>
           <h1 className="mt-2 font-display text-3xl font-extrabold tracking-tight text-[#152116]">
-            Dashboard de pilotage
+            {t('admin.dashboard.title')}
           </h1>
           <p className="mt-2 max-w-2xl text-sm text-[#6d786a]">
-            Une vue plus premium et plus lisible du back-office, avec la meme logique editoriale que la maquette fournie.
+            {t('admin.dashboard.description')}
           </p>
         </div>
 
@@ -223,11 +226,11 @@ export default function AdminOverview() {
           </div>
           <ToolbarButton onClick={() => mutate()} disabled={isValidating}>
             <RefreshCw className={`h-4 w-4 ${isValidating ? 'animate-spin' : ''}`} />
-            Actualiser
+            {t('admin.dashboard.refresh')}
           </ToolbarButton>
           <ToolbarButton onClick={exportCsv}>
             <Download className="h-4 w-4" />
-            Export CSV
+            {t('admin.dashboard.exportCsv')}
           </ToolbarButton>
         </div>
       </section>
@@ -243,8 +246,8 @@ export default function AdminOverview() {
         <SoftPanel className="p-5 sm:p-6">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <p className="text-lg font-bold text-[#152116]">Repartition de l activite</p>
-              <p className="mt-1 text-sm text-[#6f796c]">Lecture rapide des volumes principaux de la plateforme.</p>
+              <p className="text-lg font-bold text-[#152116]">{t('admin.dashboard.distributionTitle')}</p>
+              <p className="mt-1 text-sm text-[#6f796c]">{t('admin.dashboard.distributionSubtitle')}</p>
             </div>
             <span className="rounded-full border border-[#dfe5db] bg-[#f6f8f4] px-3 py-1 text-xs font-semibold text-[#5f6c5d]">
               {period.toUpperCase()}
@@ -284,11 +287,11 @@ export default function AdminOverview() {
 
               <div className="space-y-3">
                 <div className="rounded-[24px] bg-[#f4f6f1] p-4">
-                  <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#7d887a]">Volume global</p>
+                  <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#7d887a]">{t('admin.dashboard.volumeGlobal')}</p>
                   <p className="mt-2 font-display text-3xl font-extrabold text-[#132014]">
                     {formatNumber(distributionTotal)}
                   </p>
-                  <p className="mt-1 text-sm text-[#6f796c]">Elements suivis dans cette vue synthese.</p>
+                  <p className="mt-1 text-sm text-[#6f796c]">{t('admin.dashboard.volumeDescription')}</p>
                 </div>
                 {distributionData.map((item: any, index: number) => (
                   <LegendRow
@@ -302,7 +305,7 @@ export default function AdminOverview() {
               </div>
             </div>
           ) : (
-            <EmptyState label="Aucune donnee disponible pour la repartition." />
+            <EmptyState label={t('admin.dashboard.emptyDistribution')} />
           )}
         </SoftPanel>
 
@@ -311,8 +314,8 @@ export default function AdminOverview() {
           <SoftPanel className="p-5 sm:p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-lg font-bold text-[#152116]">Quick actions</p>
-                <p className="mt-1 text-sm text-[#6f796c]">Acces direct aux flux les plus utiles.</p>
+                <p className="text-lg font-bold text-[#152116]">{t('admin.dashboard.quickActionsTitle')}</p>
+                <p className="mt-1 text-sm text-[#6f796c]">{t('admin.dashboard.quickActionsSubtitle')}</p>
               </div>
             </div>
             <div className="mt-5 grid grid-cols-2 gap-3">
@@ -328,11 +331,11 @@ export default function AdminOverview() {
         <SoftPanel className="p-5 sm:p-6">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <p className="text-lg font-bold text-[#152116]">Recommandations admin</p>
-              <p className="mt-1 text-sm text-[#6f796c]">Actions courtes pour garder un dashboard propre et reactif.</p>
+              <p className="text-lg font-bold text-[#152116]">{t('admin.dashboard.recommendationsTitle')}</p>
+              <p className="mt-1 text-sm text-[#6f796c]">{t('admin.dashboard.recommendationsSubtitle')}</p>
             </div>
             <span className="rounded-full border border-[#dfe5db] bg-[#f6f8f4] px-3 py-1 text-xs font-semibold text-[#5f6c5d]">
-              3 priorites
+              {t('admin.dashboard.recommendationsPriority')}
             </span>
           </div>
           <div className="mt-5 grid gap-3 lg:grid-cols-3">
@@ -345,11 +348,11 @@ export default function AdminOverview() {
         <SoftPanel className="p-5 sm:p-6">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <p className="text-lg font-bold text-[#152116]">Activite recente</p>
-              <p className="mt-1 text-sm text-[#6f796c]">Derniers evenements importants de la plateforme.</p>
+              <p className="text-lg font-bold text-[#152116]">{t('admin.dashboard.activityTitle')}</p>
+              <p className="mt-1 text-sm text-[#6f796c]">{t('admin.dashboard.activitySubtitle')}</p>
             </div>
             <Link href="/admin/avis" className="text-sm font-semibold text-[#1f5a3a] hover:text-[#0f2418]">
-              Voir tout
+              {t('admin.dashboard.viewAll')}
             </Link>
           </div>
 
@@ -359,7 +362,7 @@ export default function AdminOverview() {
                 <ActivityRow key={`${item.at}-${index}`} item={item} />
               ))
             ) : (
-              <EmptyState label="Aucune activite recente a afficher." />
+              <EmptyState label={t('admin.dashboard.emptyActivity')} />
             )}
           </div>
         </SoftPanel>
@@ -390,21 +393,22 @@ function ToolbarButton({ children, onClick, disabled = false }: { children: Reac
 }
 
   function HeroCard({ heroValue, heroTrend, secondary = [] }: { heroValue?: number; heroTrend?: number; secondary?: { label: string; value: number }[] }) {
+    const { t } = useTranslation()
   return (
     <SoftPanel className="overflow-hidden bg-[linear-gradient(135deg,#09170f_0%,#0f2418_60%,#183626_100%)] p-5 text-white sm:p-6">
       <div className="flex h-full flex-col justify-between gap-6">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <p className="text-sm text-white/70">Plateforme supervisee</p>
+            <p className="text-sm text-white/70">{t('admin.dashboard.heroLabel')}</p>
             <p className="mt-3 font-display text-4xl font-extrabold tracking-tight sm:text-5xl">
               {formatNumber(heroValue)}
             </p>
             <p className="mt-2 max-w-md text-sm text-white/70">
-              Comptes, equipes et contenus administres depuis cette interface premium.
+              {t('admin.dashboard.heroDescription')}
             </p>
           </div>
           <span className="rounded-full border border-white/10 bg-white/8 px-3 py-1 text-xs font-semibold text-[#8de38d]">
-            {formatDelta(heroTrend)} vs periode precedente
+            {t('admin.dashboard.heroTrend', { delta: formatDelta(heroTrend, t) })}
           </span>
                 </div>
 
@@ -422,6 +426,7 @@ function ToolbarButton({ children, onClick, disabled = false }: { children: Reac
 }
 
 function SummaryCard({ label, value, delta, tone }: { label: string; value?: number; delta?: number; tone?: string }) {
+  const { t } = useTranslation()
   const toneClasses = {
     green: {
       dot: 'bg-[#b7efc3]',
@@ -453,7 +458,7 @@ function SummaryCard({ label, value, delta, tone }: { label: string; value?: num
       </p>
       <div className="mt-4">
         <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${ui.pill} ${ui.text}`}>
-          {formatDelta(delta)}
+          {formatDelta(delta, t)}
         </span>
       </div>
     </SoftPanel>
@@ -461,27 +466,28 @@ function SummaryCard({ label, value, delta, tone }: { label: string; value?: num
 }
 
 function InsightCard({ alert }: { alert?: any }) {
+  const { t } = useTranslation()
   const href = alert?.href || '/admin/medecins'
-  const message = alert?.message || 'Les flux administratifs sont stables. Vous pouvez quand meme verifier les validations en attente.'
+  const message = alert?.message || t('admin.dashboard.insightStableMessage')
   const count = alert?.count ?? 0
 
   return (
     <div className="rounded-[28px] bg-[linear-gradient(135deg,#09170f_0%,#0f2418_55%,#132c1f_100%)] p-5 text-white shadow-[0_18px_45px_rgba(15,36,24,0.16)] sm:p-6">
       <div className="flex items-center gap-2 text-sm font-semibold text-white/70">
         <Sparkles className="h-4 w-4 text-[#8ee18f]" />
-        Admin insight
+        {t('admin.dashboard.insightLabel')}
       </div>
       <p className="mt-4 text-2xl font-bold leading-tight">
         {message}
       </p>
       <p className="mt-3 text-sm text-white/70">
-        {count > 0 ? `${formatNumber(count)} elements necessitent votre attention.` : 'Aucune alerte critique detectee pour le moment.'}
+        {count > 0 ? t('admin.dashboard.insightCount', { count: formatNumber(count) }) : t('admin.dashboard.insightNoAlert')}
       </p>
       <Link
         href={href}
         className="mt-6 inline-flex items-center gap-2 rounded-full bg-[#57c66b] px-4 py-3 text-sm font-semibold text-[#0f2418] transition hover:bg-[#6cda80]"
       >
-        Voir les suggestions
+        {t('admin.dashboard.viewSuggestions')}
         <ArrowRight className="h-4 w-4" />
       </Link>
     </div>
@@ -504,6 +510,7 @@ function QuickActionCard({ href, label, description, icon: Icon }: { href: strin
 }
 
 function RecommendationCard({ title, description, href, icon: Icon }: { title: string; description: string; href: string; icon: any }) {
+  const { t } = useTranslation()
   return (
     <Link
       href={href}
@@ -515,7 +522,7 @@ function RecommendationCard({ title, description, href, icon: Icon }: { title: s
       <p className="mt-4 text-lg font-bold text-[#152116]">{title}</p>
       <p className="mt-2 text-sm leading-6 text-[#707b6d]">{description}</p>
       <div className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-[#1f5a3a]">
-        Ouvrir
+        {t('admin.dashboard.open')}
         <ArrowRight className="h-4 w-4 transition group-hover:translate-x-0.5" />
       </div>
     </Link>
@@ -523,6 +530,7 @@ function RecommendationCard({ title, description, href, icon: Icon }: { title: s
 }
 
 function ActivityRow({ item }: { item: any }) {
+  const { t, i18n } = useTranslation()
   const iconMap = {
     consultation: MessageSquare,
     medecin_inscription: Stethoscope,
@@ -537,7 +545,7 @@ function ActivityRow({ item }: { item: any }) {
       </div>
       <div className="min-w-0 flex-1">
         <p className="text-sm font-semibold text-[#182417]">{item.message}</p>
-        <p className="mt-1 text-xs text-[#768172]">{formatDateTime(item.at)}</p>
+        <p className="mt-1 text-xs text-[#768172]">{formatDateTime(item.at, i18n.language) ?? t('admin.dashboard.dateUnavailable')}</p>
       </div>
     </div>
   )
@@ -570,16 +578,16 @@ function formatNumber(value: any) {
   return new Intl.NumberFormat('fr-FR').format(Number(value || 0))
 }
 
-function formatDelta(value: any) {
-  if (value === null || value === undefined) return 'Stable'
+function formatDelta(value: any, t: any) {
+  if (value === null || value === undefined) return t('admin.dashboard.stable')
   const amount = Math.abs(Number(value))
   const sign = Number(value) > 0 ? '+' : Number(value) < 0 ? '-' : ''
   return `${sign}${amount}%`
 }
 
-function formatDateTime(value: any) {
-  if (!value) return 'Date indisponible'
-  return new Date(value).toLocaleString('fr-FR', {
+function formatDateTime(value: any, lang?: string) {
+  if (!value) return null
+  return new Date(value).toLocaleString(lang?.startsWith('en') ? 'en-US' : 'fr-FR', {
     day: 'numeric',
     month: 'short',
     hour: '2-digit',

@@ -47,7 +47,7 @@ class Consultation
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]
-    #[Groups(['consultation:read', 'message:read'])]
+    #[Groups(['consultation:read', 'message:read', 'prescription:read'])]
     private ?int $id = null;
 
     #[ORM\ManyToOne(targetEntity: Patient::class)]
@@ -67,7 +67,7 @@ class Consultation
         self::STATUT_TERMINEE,
         self::STATUT_ANNULEE,
     ])]
-    #[Groups(['consultation:read', 'consultation:write'])]
+    #[Groups(['consultation:read', 'consultation:write', 'prescription:read'])]
     private string $statut = self::STATUT_OUVERTE;
 
     #[ORM\Column(length: 255, nullable: true)]
@@ -76,7 +76,7 @@ class Consultation
     private ?string $motif = null;
 
     #[ORM\Column]
-    #[Groups(['consultation:read'])]
+    #[Groups(['consultation:read', 'prescription:read'])]
     private \DateTimeImmutable $createdAt;
 
     #[ORM\Column(nullable: true)]
@@ -84,7 +84,7 @@ class Consultation
     private ?\DateTimeImmutable $closedAt = null;
 
     #[ORM\Column(nullable: true)]
-    #[Groups(['consultation:read', 'consultation:write'])]
+    #[Groups(['consultation:read', 'consultation:write', 'prescription:read'])]
     private ?\DateTimeImmutable $dateConsultation = null;
 
     #[ORM\Column(length: 20, options: ['default' => 'NORMALE'])]

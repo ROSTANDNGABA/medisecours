@@ -54,6 +54,9 @@ class ProtocolePremiersGestes
     #[Groups(['protocole:read', 'protocole:write'])]
     private string $titre;
 
+    #[ORM\Column(length: 180, nullable: true)]
+    private ?string $titreEn = null;
+
     #[ORM\Column(length: 20)]
     #[Assert\Choice(choices: ['BROUILLON', 'EN_REVUE', 'PUBLIE', 'RETIRE'])]
     #[Groups(['protocole:read'])]
@@ -89,8 +92,14 @@ class ProtocolePremiersGestes
     private ?string $restrictionsPopulations = null;
 
     #[ORM\Column(type: 'text', nullable: true)]
+    private ?string $restrictionsPopulationsEn = null;
+
+    #[ORM\Column(type: 'text', nullable: true)]
     #[Groups(['protocole:read', 'protocole:write'])]
     private ?string $sourceClinique = null;
+
+    #[ORM\Column(type: 'text', nullable: true)]
+    private ?string $sourceCliniqueEn = null;
 
     /** @var Collection<int, ProtocoleEtape> */
     #[ORM\OneToMany(targetEntity: ProtocoleEtape::class, mappedBy: 'protocole', cascade: ['persist', 'remove'], orphanRemoval: true)]
@@ -108,6 +117,8 @@ class ProtocolePremiersGestes
     public function setSlug(string $slug): static { $this->slug = $slug; return $this; }
     public function getTitre(): string { return $this->titre; }
     public function setTitre(string $titre): static { $this->titre = $titre; return $this; }
+    public function getTitreEn(): ?string { return $this->titreEn; }
+    public function setTitreEn(?string $titreEn): static { $this->titreEn = $titreEn; return $this; }
     public function getStatut(): string { return $this->statut; }
     public function setStatut(string $statut): static { $this->statut = $statut; return $this; }
     public function getNiveauUrgence(): string { return $this->niveauUrgence; }
@@ -124,8 +135,12 @@ class ProtocolePremiersGestes
     public function setVariantKey(?string $variantKey): static { $this->variantKey = $variantKey; return $this; }
     public function getRestrictionsPopulations(): ?string { return $this->restrictionsPopulations; }
     public function setRestrictionsPopulations(?string $restrictions): static { $this->restrictionsPopulations = $restrictions; return $this; }
+    public function getRestrictionsPopulationsEn(): ?string { return $this->restrictionsPopulationsEn; }
+    public function setRestrictionsPopulationsEn(?string $restrictions): static { $this->restrictionsPopulationsEn = $restrictions; return $this; }
     public function getSourceClinique(): ?string { return $this->sourceClinique; }
     public function setSourceClinique(?string $source): static { $this->sourceClinique = $source; return $this; }
+    public function getSourceCliniqueEn(): ?string { return $this->sourceCliniqueEn; }
+    public function setSourceCliniqueEn(?string $source): static { $this->sourceCliniqueEn = $source; return $this; }
     /** @return Collection<int, ProtocoleEtape> */
     public function getEtapes(): Collection { return $this->etapes; }
     public function addEtape(ProtocoleEtape $etape): static { $this->etapes->add($etape); $etape->setProtocole($this); return $this; }
@@ -165,6 +180,7 @@ class ProtocolePremiersGestes
         $copy = (new self())
             ->setSlug($this->slug)
             ->setTitre($this->titre)
+            ->setTitreEn($this->titreEn)
             ->setNiveauUrgence($this->niveauUrgence)
             ->setPopulation($this->population)
             ->setVersion($this->nextVersion())
@@ -172,7 +188,9 @@ class ProtocolePremiersGestes
             ->setMasterSlug($this->masterSlug)
             ->setVariantKey($this->variantKey)
             ->setRestrictionsPopulations($this->restrictionsPopulations)
+            ->setRestrictionsPopulationsEn($this->restrictionsPopulationsEn)
             ->setSourceClinique($this->sourceClinique)
+            ->setSourceCliniqueEn($this->sourceCliniqueEn)
             ->setStatut(self::STATUT_BROUILLON);
 
         foreach ($this->etapes as $etape) {
@@ -181,7 +199,9 @@ class ProtocolePremiersGestes
                     ->setPosition($etape->getPosition())
                     ->setType($etape->getType())
                     ->setTitre($etape->getTitre())
+                    ->setTitreEn($etape->getTitreEn())
                     ->setInstruction($etape->getInstruction())
+                    ->setInstructionEn($etape->getInstructionEn())
             );
         }
 

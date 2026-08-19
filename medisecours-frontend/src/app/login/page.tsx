@@ -10,6 +10,7 @@ import { useAuth } from '../../hooks/useAuth'
 import { useToast } from '../../components/ui/Toast'
 import api from '../../api/axios'
 import { destinationForUser } from '../../lib/auth-routing'
+import { useTranslation } from 'react-i18next'
 
 type FieldErrors = {
   email?: string
@@ -33,6 +34,7 @@ function LoginForm() {
   const [needsVerification, setNeedsVerification] = useState(false)
   const [resendingVerification, setResendingVerification] = useState(false)
   const { login, loginWithGoogle, user, isAuthenticated, mounted } = useAuth()
+  const { t } = useTranslation()
   const toast = useToast()
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -51,10 +53,10 @@ function LoginForm() {
     const normalizedEmail = email.trim()
 
     if (!/^\S+@\S+\.\S+$/.test(normalizedEmail)) {
-      nextErrors.email = 'Saisissez une adresse e-mail valide.'
+      nextErrors.email = t('visitor.login.invalidEmail')
     }
     if (!password) {
-      nextErrors.password = 'Saisissez votre mot de passe.'
+      nextErrors.password = t('visitor.login.missingPassword')
     }
 
     setErrors(nextErrors)
@@ -69,7 +71,7 @@ function LoginForm() {
     setNeedsVerification(false)
     try {
       const loggedUser = await login(email.trim().toLowerCase(), password)
-      toast.success('Connexion réussie. Bienvenue !')
+      toast.success(t('visitor.login.successWelcome'))
       router.push(destinationForUser(loggedUser, from))
     } catch (error: any) {
       const status = error.response?.status
@@ -77,19 +79,19 @@ function LoginForm() {
 
       if (status === 401) {
         setErrors({
-          email: 'Vérifiez l’adresse e-mail utilisée lors de l’inscription.',
-          password: 'Vérifiez votre mot de passe ou utilisez « Mot de passe oublié ».',
+          email: t('visitor.login.emailCheck'),
+          password: t('visitor.login.passwordCheck'),
         })
-        toast.error('Adresse e-mail ou mot de passe incorrect.')
+        toast.error(t('visitor.login.badCredentials'))
       } else if (status === 403) {
         if (typeof serverMessage === 'string' && serverMessage.toLowerCase().includes('confirmez')) {
           setNeedsVerification(true)
         }
-        toast.error(serverMessage || 'Accès refusé. Vérifiez l’état de votre compte ou contactez le support.')
+        toast.error(serverMessage || t('visitor.login.accessDenied'))
       } else if (status === 429) {
-        toast.error(serverMessage || 'Trop de tentatives. Réessayez dans une minute.')
+        toast.error(serverMessage || t('visitor.login.tooManyAttempts'))
       } else {
-        toast.error(serverMessage || 'Le service de connexion est temporairement indisponible.')
+        toast.error(serverMessage || t('visitor.login.serviceUnavailable'))
       }
     } finally {
       setLoading(false)
@@ -98,7 +100,7 @@ function LoginForm() {
 
   const handleResendVerification = async () => {
     if (!/^\S+@\S+\.\S+$/.test(email.trim())) {
-      setErrors((current) => ({ ...current, email: 'Saisissez d’abord une adresse e-mail valide.' }))
+      setErrors((current) => ({ ...current, email: t('visitor.login.emailFirst') }))
       return
     }
 
@@ -107,9 +109,9 @@ function LoginForm() {
       const { data } = await api.post('/api/auth/resend-verification', {
         email: email.trim().toLowerCase(),
       })
-      toast.success(data?.message || 'Un nouvel email de confirmation a été demandé.')
+      toast.success(data?.message || t('visitor.login.resendRequested'))
     } catch (error: any) {
-      toast.error(error.response?.data?.error || 'Impossible de renvoyer l’email pour le moment.')
+      toast.error(error.response?.data?.error || t('visitor.login.resendFailed'))
     } finally {
       setResendingVerification(false)
     }
@@ -117,23 +119,23 @@ function LoginForm() {
 
   const handleGoogle = async (credentialResponse: { credential?: string }) => {
     if (!credentialResponse.credential) {
-      toast.error('Google n’a pas transmis de jeton de connexion.')
+      toast.error(t('visitor.login.googleNoToken'))
       return
     }
 
     setLoading(true)
     try {
       const loggedUser = await loginWithGoogle(credentialResponse.credential)
-      toast.success('Connexion Google réussie.')
+      toast.success(t('visitor.login.googleSuccess'))
       router.push(destinationForUser(loggedUser, from))
     } catch (error: any) {
       const status = error.response?.status
       const message = error.response?.data?.error || error.response?.data?.message
 
       if (status === 403 || status === 429) {
-        toast.error(message || 'Connexion Google refusée.')
+        toast.error(message || t('visitor.login.googleDenied'))
       } else {
-        toast.error(message || 'La connexion avec Google a échoué.')
+        toast.error(message || t('visitor.login.googleFailed'))
       }
     } finally {
       setLoading(false)
@@ -142,9 +144,9 @@ function LoginForm() {
 
   return (
     <AuthLayout
-      eyebrow="Espace sécurisé"
-      title="Bon retour"
-      description="Connectez-vous pour retrouver vos consultations, vos messages et vos informations de santé."
+      eyebrow={t('visitor.login.eyebrow')}
+      title={t('visitor.login.title')}
+      description={t('visitor.login.description')}
     >
       {registered && (
         <div
@@ -153,21 +155,21 @@ function LoginForm() {
         >
           <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
           <p>
-            Votre compte a été créé. Consultez également votre e-mail de confirmation, puis connectez-vous.
+            {t('visitor.login.accountCreated')}
           </p>
         </div>
       )}
 
       {needsVerification && (
         <div className="mb-5 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950 dark:border-amber-900/60 dark:bg-amber-950/35 dark:text-amber-100">
-          <p>Votre adresse e-mail doit être confirmée avant la connexion.</p>
+          <p>{t('visitor.login.emailMustConfirm')}</p>
           <button
             type="button"
             onClick={handleResendVerification}
             disabled={resendingVerification}
             className="mt-2 font-semibold text-amber-800 underline underline-offset-2 disabled:cursor-wait disabled:opacity-60 dark:text-amber-200"
           >
-            {resendingVerification ? 'Envoi en cours…' : 'Renvoyer l’e-mail de confirmation'}
+            {resendingVerification ? t('visitor.login.resending') : t('visitor.login.resendConfirmation')}
           </button>
         </div>
       )}
@@ -175,7 +177,7 @@ function LoginForm() {
       <form onSubmit={handleSubmit} className="space-y-5" noValidate>
         <div>
           <label htmlFor="login-email" className="text-sm font-semibold text-slate-700 dark:text-slate-200">
-            Adresse e-mail
+            {t('visitor.login.emailLabel')}
           </label>
           <div className="relative mt-2">
             <Mail className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
@@ -189,7 +191,7 @@ function LoginForm() {
               }}
               onBlur={() => {
                 if (!/^\S+@\S+\.\S+$/.test(email.trim())) {
-                  setErrors((current) => ({ ...current, email: 'Exemple attendu : nom@domaine.com.' }))
+                  setErrors((current) => ({ ...current, email: t('visitor.login.emailExample') }))
                 }
               }}
               autoComplete="email"
@@ -197,7 +199,7 @@ function LoginForm() {
               aria-invalid={Boolean(errors.email)}
               aria-describedby={errors.email ? 'login-email-error' : 'login-email-hint'}
               className="auth-field min-h-12 w-full rounded-lg border border-slate-200 bg-slate-50 py-3 pl-10 pr-4 text-sm text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/10 aria-invalid:border-red-500 aria-invalid:ring-4 aria-invalid:ring-red-500/10 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-blue-400 dark:focus:bg-slate-900 dark:aria-invalid:border-red-400"
-              placeholder="vous@exemple.com"
+              placeholder={t('visitor.login.emailPlaceholder')}
             />
           </div>
           {errors.email ? (
@@ -211,7 +213,7 @@ function LoginForm() {
             </p>
           ) : (
             <p id="login-email-hint" className="mt-1.5 text-[11px] leading-4 text-slate-400 dark:text-slate-500">
-              Utilisez l’adresse e-mail associée à votre compte patient ou médecin.
+              {t('visitor.login.emailHint')}
             </p>
           )}
         </div>
@@ -219,10 +221,10 @@ function LoginForm() {
         <div>
           <div className="flex items-center justify-between gap-4">
             <label htmlFor="login-password" className="text-sm font-semibold text-slate-700 dark:text-slate-200">
-              Mot de passe
+              {t('visitor.login.passwordLabel')}
             </label>
             <Link href="/forgot-password" className="text-xs font-semibold text-blue-600 hover:text-blue-800 dark:text-blue-400">
-              Mot de passe oublié ?
+              {t('visitor.login.forgotPassword')}
             </Link>
           </div>
           <div className="relative mt-2">
@@ -237,20 +239,20 @@ function LoginForm() {
               }}
               onBlur={() => {
                 if (!password) {
-                  setErrors((current) => ({ ...current, password: 'Saisissez le mot de passe de votre compte.' }))
+                  setErrors((current) => ({ ...current, password: t('visitor.login.passwordMissing') }))
                 }
               }}
               autoComplete="current-password"
               aria-invalid={Boolean(errors.password)}
               aria-describedby={errors.password ? 'login-password-error' : 'login-password-hint'}
               className="auth-field min-h-12 w-full rounded-lg border border-slate-200 bg-slate-50 py-3 pl-10 pr-12 text-sm text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/10 aria-invalid:border-red-500 aria-invalid:ring-4 aria-invalid:ring-red-500/10 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-blue-400 dark:focus:bg-slate-900 dark:aria-invalid:border-red-400"
-              placeholder="Votre mot de passe"
+              placeholder={t('visitor.login.passwordPlaceholder')}
             />
             <button
               type="button"
               onClick={() => setShowPassword((visible) => !visible)}
               className="absolute right-1.5 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-md text-slate-400 transition-colors hover:bg-slate-200 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-white"
-              aria-label={showPassword ? 'Masquer le mot de passe' : 'Afficher le mot de passe'}
+              aria-label={showPassword ? t('visitor.login.hidePasswordAria') : t('visitor.login.showPasswordAria')}
             >
               {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
             </button>
@@ -266,7 +268,7 @@ function LoginForm() {
             </p>
           ) : (
             <p id="login-password-hint" className="mt-1.5 text-[11px] leading-4 text-slate-400 dark:text-slate-500">
-              Le bouton en forme d’œil permet de vérifier votre saisie en toute confidentialité.
+              {t('visitor.login.passwordHint')}
             </p>
           )}
         </div>
@@ -277,20 +279,20 @@ function LoginForm() {
           className="flex min-h-12 w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-5 py-3 text-sm font-bold text-white shadow-[0_10px_24px_rgba(37,99,235,0.24)] transition hover:bg-blue-700 focus:outline-none focus:ring-4 focus:ring-blue-500/25 disabled:cursor-not-allowed disabled:opacity-60"
         >
           {loading && <LoaderCircle className="h-4 w-4 animate-spin" />}
-          {loading ? 'Connexion en cours…' : 'Se connecter'}
+          {loading ? t('visitor.login.loggingIn') : t('visitor.login.loginButton')}
         </button>
       </form>
 
       <div className="my-6 flex items-center gap-3">
         <div className="h-px flex-1 bg-slate-200 dark:bg-slate-800" />
-        <span className="text-xs font-medium text-slate-400">ou continuer avec</span>
+        <span className="text-xs font-medium text-slate-400">{t('visitor.login.orContinueWith')}</span>
         <div className="h-px flex-1 bg-slate-200 dark:bg-slate-800" />
       </div>
 
       <div className={`flex min-h-10 justify-center ${loading ? 'pointer-events-none opacity-60' : ''}`}>
         <GoogleLogin
           onSuccess={handleGoogle}
-          onError={() => toast.error('La connexion Google a échoué.')}
+          onError={() => toast.error(t('visitor.login.googleFailed'))}
           text="signin_with"
           shape="rectangular"
         />
@@ -298,13 +300,13 @@ function LoginForm() {
 
       <div className="mt-6 flex items-center justify-center gap-2 text-xs text-slate-400">
         <ShieldCheck className="h-4 w-4" />
-        <span>Connexion chiffrée et protégée contre les tentatives abusives.</span>
+        <span>{t('visitor.login.secureConnection')}</span>
       </div>
 
       <p className="mt-7 text-center text-sm text-slate-500 dark:text-slate-400">
-        Pas encore de compte ?{' '}
+        {t('visitor.login.noAccountYet')}{' '}
         <Link href="/register" className="font-bold text-blue-600 hover:text-blue-800 dark:text-blue-400">
-          Créer un compte
+          {t('visitor.login.createAccount')}
         </Link>
       </p>
     </AuthLayout>

@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Building2, MapPin, Phone, Mail, Globe, Clock, Stethoscope,
@@ -21,28 +22,10 @@ function imgUrl(img: any) {
   return path.startsWith('http') ? path : `${API_BASE}${path}`
 }
 
-const TYPE_LABELS: Record<string, string> = {
-  hopital_general: 'Hôpital général',
-  hopital_de_district: 'Hôpital de district',
-  chu: 'CHU',
-  cma: 'CMA',
-  csi: 'CSI',
-  clinique_privee: 'Clinique privée',
-  pharmacie: 'Pharmacie',
-  laboratoire: 'Laboratoire',
-  centre_specialise: 'Centre spécialisé',
-}
-
 const TYPE_ORDER = [
   'chu', 'hopital_general', 'hopital_de_district', 'cma', 'csi',
   'clinique_privee', 'pharmacie', 'laboratoire', 'centre_specialise',
 ]
-
-const STATUT_LABELS: Record<string, string> = {
-  public: 'Public',
-  prive: 'Privé',
-  associatif: 'Associatif',
-}
 
 const REGIONS = [
   'Adamaoua', 'Centre', 'Est', 'Extrême-Nord', 'Littoral',
@@ -64,13 +47,30 @@ function getTypeColor(type: string): string {
   return map[type] || '#6D786A'
 }
 
-function getTypeCount(total: number): string {
-  if (total === 0) return 'aucun établissement'
-  if (total === 1) return '1 établissement'
-  return `${total} établissements`
+function getTypeCount(total: number, t: any): string {
+  if (total === 0) return t('admin.centres.countZero')
+  if (total === 1) return t('admin.centres.countOne')
+  return t('admin.centres.countMany', { count: total })
 }
 
 export default function AdminCentresPage() {
+  const { t } = useTranslation()
+  const TYPE_LABELS: Record<string, string> = {
+    hopital_general: t('admin.centres.typeHopitalGeneral'),
+    hopital_de_district: t('admin.centres.typeHopitalDistrict'),
+    chu: t('admin.centres.typeChu'),
+    cma: t('admin.centres.typeCma'),
+    csi: t('admin.centres.typeCsi'),
+    clinique_privee: t('admin.centres.typeCliniquePrivee'),
+    pharmacie: t('admin.centres.typePharmacie'),
+    laboratoire: t('admin.centres.typeLaboratoire'),
+    centre_specialise: t('admin.centres.typeCentreSpecialise'),
+  }
+  const STATUT_LABELS: Record<string, string> = {
+    public: t('admin.centres.statutPublic'),
+    prive: t('admin.centres.statutPrive'),
+    associatif: t('admin.centres.statutAssociatif'),
+  }
   const [centres, setCentres] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [viewCentre, setViewCentre] = useState<any>(null)
@@ -90,9 +90,9 @@ export default function AdminCentresPage() {
         const data = res.data?.['hydra:member'] ?? res.data?.member ?? res.data ?? []
         setCentres(Array.isArray(data) ? data : [])
       })
-      .catch(() => toast.error('Impossible de charger les centres.'))
+      .catch(() => toast.error(t('admin.centres.toastLoadError')))
       .finally(() => setLoading(false))
-  }, [toast])
+  }, [toast, t])
 
   useEffect(() => { load() }, [load])
 
@@ -160,9 +160,9 @@ export default function AdminCentresPage() {
       setCentres((prev: any[]) => prev.map((c: any) => c.id === viewCentre.id ? { ...c, images: [...(c.images || []), ...newImages] } : c))
       setViewCentre((prev: any) => ({ ...prev, images: [...(prev.images || []), ...newImages] }))
       setSelectedFiles(null)
-      toast.success(`${newImages.length} image(s) ajoutée(s).`)
+      toast.success(t('admin.centres.toastUploadSuccess', { count: newImages.length }))
     } catch (err: any) {
-      const msg = err.response?.data?.error || "Erreur lors de l'upload."
+      const msg = err.response?.data?.error || t('admin.centres.toastUploadError')
       toast.error(msg)
     } finally {
       setIsUploading(false)
@@ -175,9 +175,9 @@ export default function AdminCentresPage() {
       setCentreImages((prev: any[]) => prev.filter((img: any) => img.id !== imageId))
       setCentres((prev: any[]) => prev.map((c: any) => c.id === viewCentre.id ? { ...c, images: (c.images || []).filter((img: any) => img.id !== imageId) } : c))
       setViewCentre((prev: any) => ({ ...prev, images: (prev.images || []).filter((img: any) => img.id !== imageId) }))
-      toast.success('Image supprimée.')
+      toast.success(t('admin.centres.toastDeleteImageSuccess'))
     } catch {
-      toast.error("Erreur lors de la suppression.")
+      toast.error(t('admin.centres.toastDeleteImageError'))
     }
   }
 
@@ -195,9 +195,9 @@ export default function AdminCentresPage() {
       setCentres((prev: any[]) => prev.map((c: any) => c.id === editCentre.id ? { ...c, ...payload } : c))
       setViewCentre((prev: any) => prev?.id === editCentre.id ? { ...prev, ...payload } : prev)
       setEditCentre(null)
-      toast.success('Centre mis à jour.')
+      toast.success(t('admin.centres.toastUpdateSuccess'))
     } catch {
-      toast.error('Erreur lors de la mise à jour.')
+      toast.error(t('admin.centres.toastUpdateError'))
     } finally {
       setSaving(false)
     }
@@ -209,24 +209,24 @@ export default function AdminCentresPage() {
       await deleteCentre(deleteConfirmId)
       setCentres((prev: any[]) => prev.filter((c: any) => c.id !== deleteConfirmId))
       if (viewCentre?.id === deleteConfirmId) setViewCentre(null)
-      toast.success('Centre supprimé.')
+      toast.success(t('admin.centres.toastDeleteSuccess'))
     } catch {
-      toast.error('Erreur lors de la suppression.')
+      toast.error(t('admin.centres.toastDeleteError'))
     } finally {
       setDeleteConfirmId(null)
     }
   }
 
-  if (loading) return <LoadingSpinner label="Chargement des centres…" />
+  if (loading) return <LoadingSpinner label={t('admin.centres.loading')} />
 
   return (
     <div className="max-w-7xl mx-auto space-y-6">
       {/* Header */}
       <section className="rounded-[28px] bg-[linear-gradient(135deg,#09170f_0%,#0f2418_60%,#183626_100%)] p-6 text-white shadow-[0_18px_45px_rgba(15,36,24,0.16)]">
-        <p className="text-xs font-semibold uppercase tracking-[0.24em] text-white/60">Reseau de soins</p>
-        <h1 className="mt-3 font-display text-3xl font-extrabold tracking-tight">Centres de sante</h1>
+        <p className="text-xs font-semibold uppercase tracking-[0.24em] text-white/60">{t('admin.centres.eyebrow')}</p>
+        <h1 className="mt-3 font-display text-3xl font-extrabold tracking-tight">{t('admin.centres.title')}</h1>
         <p className="mt-3 max-w-2xl text-sm leading-6 text-white/72">
-          Administre les etablissements, leurs coordonnees, horaires et images.
+          {t('admin.centres.description')}
         </p>
       </section>
 
@@ -236,7 +236,7 @@ export default function AdminCentresPage() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-primary-300" />
           <input
             type="text"
-            placeholder="Rechercher un centre, une ville…"
+            placeholder={t('admin.centres.searchPlaceholder')}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-white dark:bg-primary-800 border border-primary-100 dark:border-white/10 text-sm text-primary-900 dark:text-sable placeholder:text-primary-300 focus:outline-none focus:ring-2 focus:ring-mint-500/40 transition"
@@ -254,7 +254,7 @@ export default function AdminCentresPage() {
             onChange={(e) => setFilterRegion(e.target.value)}
             className="appearance-none pl-10 pr-8 py-2.5 rounded-xl bg-white dark:bg-primary-800 border border-primary-100 dark:border-white/10 text-sm text-primary-900 dark:text-sable focus:outline-none focus:ring-2 focus:ring-mint-500/40 transition cursor-pointer"
           >
-            <option value="">Toutes les régions</option>
+            <option value="">{t('admin.centres.allRegions')}</option>
             {REGIONS.map((r) => (
               <option key={r} value={r}>{r}</option>
             ))}
@@ -265,23 +265,23 @@ export default function AdminCentresPage() {
           href="/admin/centres/import"
           className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary-500 hover:bg-primary-700 text-white text-sm font-semibold shadow-sm transition"
         >
-          <Upload className="w-4 h-4" /> Importer
+          <Upload className="w-4 h-4" /> {t('admin.centres.importer')}
         </Link>
       </div>
 
       {/* Stats */}
       <div className="grid grid-cols-3 gap-4">
-        <StatCard label="Total" value={filteredCentres.length} color="#1E3A5F" icon={Building2} />
-        <StatCard label="Actifs" value={filteredCentres.filter((c: any) => c.estActif).length} color="#10B981" icon={CheckCircle} />
-        <StatCard label="Urgences 24h" value={filteredCentres.filter((c: any) => c.urgences24h).length} color="#EF4444" icon={AlertCircle} />
+        <StatCard label={t('admin.centres.statTotal')} value={filteredCentres.length} color="#1E3A5F" icon={Building2} />
+        <StatCard label={t('admin.centres.statActifs')} value={filteredCentres.filter((c: any) => c.estActif).length} color="#10B981" icon={CheckCircle} />
+        <StatCard label={t('admin.centres.statUrgences24h')} value={filteredCentres.filter((c: any) => c.urgences24h).length} color="#EF4444" icon={AlertCircle} />
       </div>
 
       {/* Groupes par type */}
       {filteredCentres.length === 0 ? (
         <EmptyState
           icon={Building2}
-          title="Aucun résultat"
-          description={searchQuery || filterRegion ? "Essaie de modifier tes filtres." : "Aucun centre de santé dans la base."}
+          title={t('admin.centres.emptyTitle')}
+          description={searchQuery || filterRegion ? t('admin.centres.emptyNoFilter') : t('admin.centres.emptyBase')}
         />
       ) : (
         <div className="space-y-4">
@@ -299,7 +299,7 @@ export default function AdminCentresPage() {
                     <span className="font-display font-bold text-lg text-primary-900 dark:text-sable">
                       {TYPE_LABELS[type] || type}
                     </span>
-                    <span className="text-sm text-primary-400 font-medium">{getTypeCount(items.length)}</span>
+                    <span className="text-sm text-primary-400 font-medium">{getTypeCount(items.length, t)}</span>
                   </div>
                   <ChevronDown
                     className={`w-5 h-5 text-primary-300 shrink-0 transition-transform ${isOpen ? 'rotate-180' : ''}`}
@@ -318,12 +318,12 @@ export default function AdminCentresPage() {
                         <table className="w-full text-sm">
                           <thead className="bg-primary-50/80 dark:bg-primary-900/40 text-primary-700 dark:text-sable">
                             <tr>
-                              <th className="text-left px-5 py-3 font-semibold">Centre</th>
-                              <th className="text-left px-5 py-3 font-semibold">Ville</th>
-                              <th className="text-left px-5 py-3 font-semibold">Région</th>
-                              <th className="text-left px-5 py-3 font-semibold">Contact</th>
-                              <th className="text-left px-5 py-3 font-semibold">Statut</th>
-                              <th className="px-5 py-3 text-right font-semibold">Actions</th>
+                              <th className="text-left px-5 py-3 font-semibold">{t('admin.centres.thCentre')}</th>
+                              <th className="text-left px-5 py-3 font-semibold">{t('admin.centres.thVille')}</th>
+                              <th className="text-left px-5 py-3 font-semibold">{t('admin.centres.thRegion')}</th>
+                              <th className="text-left px-5 py-3 font-semibold">{t('admin.centres.thContact')}</th>
+                              <th className="text-left px-5 py-3 font-semibold">{t('admin.centres.thStatut')}</th>
+                              <th className="px-5 py-3 text-right font-semibold">{t('admin.centres.thActions')}</th>
                             </tr>
                           </thead>
                           <tbody>
@@ -347,15 +347,15 @@ export default function AdminCentresPage() {
                                   <div className="flex items-center gap-2">
                                     {c.estActif ? (
                                       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-mint-100 text-mint-700">
-                                        <CheckCircle className="w-2.5 h-2.5" /> Actif
+                                        <CheckCircle className="w-2.5 h-2.5" /> {t('admin.centres.actif')}
                                       </span>
                                     ) : (
                                       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-700">
-                                        <AlertCircle className="w-2.5 h-2.5" /> Inactif
+                                        <AlertCircle className="w-2.5 h-2.5" /> {t('admin.centres.inactif')}
                                       </span>
                                     )}
                                     {c.urgences24h && (
-                                      <span className="text-xs text-urgence-500 font-semibold" title="Urgences 24h/24">24h</span>
+                                      <span className="text-xs text-urgence-500 font-semibold" title={t('admin.centres.urgences24h')}>24h</span>
                                     )}
                                   </div>
                                 </td>
@@ -364,21 +364,21 @@ export default function AdminCentresPage() {
                                     <button
                                       onClick={() => openModal(c)}
                                       className="p-2 rounded-lg hover:bg-primary-100 dark:hover:bg-primary-700 text-primary-500 transition"
-                                      title="Voir les détails"
+                                      title={t('admin.centres.viewDetails')}
                                     >
                                       <Eye className="w-4 h-4" />
                                     </button>
                                     <button
                                       onClick={() => setEditCentre({ ...c })}
                                       className="p-2 rounded-lg hover:bg-amber-100 dark:hover:bg-amber-900/30 text-amber-600 transition"
-                                      title="Modifier"
+                                      title={t('admin.centres.modifier')}
                                     >
                                       <Pencil className="w-4 h-4" />
                                     </button>
                                     <button
                                       onClick={() => setDeleteConfirmId(c.id)}
                                       className="p-2 rounded-lg hover:bg-urgence-100 dark:hover:bg-urgence-900/30 text-urgence-500 transition"
-                                      title="Supprimer"
+                                      title={t('admin.centres.supprimer')}
                                     >
                                       <Trash2 className="w-4 h-4" />
                                     </button>
@@ -420,7 +420,7 @@ export default function AdminCentresPage() {
                     <div className="relative w-full h-48 bg-primary-100 dark:bg-primary-900 rounded-t-xl flex items-center justify-center">
                       <div className="text-center">
                         <ImageIcon className="w-10 h-10 mx-auto text-primary-300 mb-2" />
-                        <p className="text-sm text-primary-400">Aucune image</p>
+                        <p className="text-sm text-primary-400">{t('admin.centres.aucuneImage')}</p>
                       </div>
                       <button onClick={() => setViewCentre(null)}
                         className="absolute top-3 right-3 p-2 rounded-full bg-black/20 text-primary-400 hover:bg-black/40 transition">
@@ -452,7 +452,7 @@ export default function AdminCentresPage() {
                       {curr?.id !== 'external' && (
                         <button onClick={(e) => { e.stopPropagation(); handleDeleteImage(curr.id) }}
                           className="absolute top-3 right-3 p-2 rounded-full bg-black/40 text-white hover:bg-urgence-500 transition"
-                          title="Supprimer cette image">
+                          title={t('admin.centres.supprimerImage')}>
                           <Trash2 className="w-4 h-4" />
                         </button>
                       )}
@@ -477,16 +477,16 @@ export default function AdminCentresPage() {
                     <div className="flex gap-2 shrink-0">
                       {viewCentre.estActif ? (
                         <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-mint-100 text-mint-700">
-                          <CheckCircle className="w-3 h-3" /> Actif
+                          <CheckCircle className="w-3 h-3" /> {t('admin.centres.actif')}
                         </span>
                       ) : (
                         <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-700">
-                          <AlertCircle className="w-3 h-3" /> Inactif
+                          <AlertCircle className="w-3 h-3" /> {t('admin.centres.inactif')}
                         </span>
                       )}
                       {viewCentre.urgences24h && (
                         <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-urgence-100 text-urgence-500">
-                          <AlertCircle className="w-3 h-3" /> Urgences 24h
+                          <AlertCircle className="w-3 h-3" /> {t('admin.centres.urgences24h')}
                         </span>
                       )}
                     </div>
@@ -495,13 +495,13 @@ export default function AdminCentresPage() {
                   {/* Grille infos 2 colonnes */}
                   <div className="grid grid-cols-2 gap-3">
                     {[
-                      { icon: MapPin, label: 'Adresse', value: [viewCentre.adresse, viewCentre.quartier, viewCentre.ville, viewCentre.region].filter(Boolean).join(', ') },
-                      { icon: Phone, label: 'Téléphone', value: viewCentre.telephone },
-                      { icon: Mail, label: 'Email', value: viewCentre.email },
-                      { icon: Globe, label: 'Site Web', value: viewCentre.siteWeb },
-                      { icon: Clock, label: 'Horaires', value: viewCentre.horaires },
-                      { icon: Star, label: 'Statut', value: STATUT_LABELS[viewCentre.statut as keyof typeof STATUT_LABELS] || viewCentre.statut },
-                      { icon: Building2, label: 'Coordonnées', value: `${viewCentre.latitude}, ${viewCentre.longitude}` },
+                      { icon: MapPin, label: t('admin.centres.detailAdresse'), value: [viewCentre.adresse, viewCentre.quartier, viewCentre.ville, viewCentre.region].filter(Boolean).join(', ') },
+                      { icon: Phone, label: t('admin.centres.detailTelephone'), value: viewCentre.telephone },
+                      { icon: Mail, label: t('admin.centres.detailEmail'), value: viewCentre.email },
+                      { icon: Globe, label: t('admin.centres.detailSiteWeb'), value: viewCentre.siteWeb },
+                      { icon: Clock, label: t('admin.centres.detailHoraires'), value: viewCentre.horaires },
+                      { icon: Star, label: t('admin.centres.detailStatut'), value: STATUT_LABELS[viewCentre.statut as keyof typeof STATUT_LABELS] || viewCentre.statut },
+                      { icon: Building2, label: t('admin.centres.detailCoordonnees'), value: `${viewCentre.latitude}, ${viewCentre.longitude}` },
                     ].filter((f: any) => f.value).map(({ icon: Icon, label, value }: { icon: any; label: string; value: string }) => (
                       <div key={label} className="flex items-start gap-3 p-3 rounded-lg bg-primary-50 dark:bg-primary-900/40">
                         <Icon className="w-4 h-4 text-primary-300 shrink-0 mt-0.5" />
@@ -518,7 +518,7 @@ export default function AdminCentresPage() {
                     <div className="flex items-start gap-3 p-3 rounded-lg bg-primary-50 dark:bg-primary-900/40 mt-3">
                       <Stethoscope className="w-4 h-4 text-primary-300 shrink-0 mt-0.5" />
                       <div>
-                        <p className="text-[10px] font-semibold text-primary-300 uppercase tracking-wide">Spécialités</p>
+                        <p className="text-[10px] font-semibold text-primary-300 uppercase tracking-wide">{t('admin.centres.detailSpecialites')}</p>
                         <div className="flex flex-wrap gap-1.5 mt-1">
                           {viewCentre.specialites.map((s: string) => (
                             <span key={s} className="px-2.5 py-0.5 rounded-full text-xs font-medium bg-mint-100 text-mint-700">
@@ -535,7 +535,7 @@ export default function AdminCentresPage() {
                     <div className="flex items-start gap-3 p-3 rounded-lg bg-primary-50 dark:bg-primary-900/40 mt-3">
                       <AlertCircle className="w-4 h-4 text-primary-300 shrink-0 mt-0.5" />
                       <div>
-                        <p className="text-[10px] font-semibold text-primary-300 uppercase tracking-wide">Description</p>
+                        <p className="text-[10px] font-semibold text-primary-300 uppercase tracking-wide">{t('admin.centres.detailDescription')}</p>
                         <p className="text-sm text-primary-900 dark:text-sable">{viewCentre.description}</p>
                       </div>
                     </div>
@@ -559,11 +559,11 @@ export default function AdminCentresPage() {
                         onClick={() => fileInputRef.current?.click()}
                         className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-lg border-2 border-dashed border-primary-200 dark:border-white/20 text-primary-500 hover:border-mint-500 hover:text-mint-500 transition text-sm font-semibold"
                       >
-                        <Upload className="w-4 h-4" /> Ajouter des images
+                        <Upload className="w-4 h-4" /> {t('admin.centres.ajouterImages')}
                       </button>
                     ) : (
                       <div className="space-y-2">
-                        <p className="text-xs text-primary-400">{selectedFiles.length} fichier(s) sélectionné(s)</p>
+                        <p className="text-xs text-primary-400">{t('admin.centres.selectedFiles', { count: selectedFiles.length })}</p>
                         <div className="flex gap-2">
                           <button
                             onClick={handleUpload}
@@ -571,7 +571,7 @@ export default function AdminCentresPage() {
                             className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-mint-500 hover:bg-mint-700 text-white text-sm font-semibold disabled:opacity-60 transition"
                           >
                             <Upload className="w-4 h-4" />
-                            {isUploading ? 'Upload…' : 'Uploader'}
+                            {isUploading ? t('admin.centres.uploading') : t('admin.centres.uploader')}
                           </button>
                           <button
                             onClick={() => { setSelectedFiles(null); if (fileInputRef.current) (fileInputRef.current as HTMLInputElement).value = '' }}
@@ -652,7 +652,7 @@ export default function AdminCentresPage() {
                 className="bg-white dark:bg-primary-800 rounded-xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto"
               >
                 <div className="flex items-center justify-between px-6 py-4 border-b border-primary-100 dark:border-white/5">
-                  <h3 className="font-display font-bold text-lg text-primary-900 dark:text-sable">Modifier le centre</h3>
+                  <h3 className="font-display font-bold text-lg text-primary-900 dark:text-sable">{t('admin.centres.editTitle')}</h3>
                   <button type="button" onClick={() => setEditCentre(null)}
                     className="p-1.5 rounded-lg hover:bg-primary-100 dark:hover:bg-primary-700 text-primary-400 transition">
                     <X className="w-4 h-4" />
@@ -660,9 +660,9 @@ export default function AdminCentresPage() {
                 </div>
                 <div className="p-6 space-y-4">
                   <div className="grid grid-cols-2 gap-4">
-                    <Field label="Nom" value={editCentre.nom} onChange={(v: string) => setEditCentre((p: any) => ({ ...p, nom: v }))} required />
+                    <Field label={t('admin.centres.fieldNom')} value={editCentre.nom} onChange={(v: string) => setEditCentre((p: any) => ({ ...p, nom: v }))} required />
                     <div>
-                      <label className="block text-xs font-semibold text-primary-300 uppercase tracking-wide mb-1">Type</label>
+                      <label className="block text-xs font-semibold text-primary-300 uppercase tracking-wide mb-1">{t('admin.centres.fieldType')}</label>
                       <select value={editCentre.type} onChange={(e) => setEditCentre((p: any) => ({ ...p, type: e.target.value }))}
                         className="w-full px-3 py-2 rounded-lg bg-primary-50 dark:bg-primary-900/40 border border-primary-100 dark:border-white/10 text-sm text-primary-900 dark:text-sable focus:outline-none focus:ring-2 focus:ring-mint-500/40">
                         {TYPE_ORDER.map((t) => (
@@ -671,11 +671,11 @@ export default function AdminCentresPage() {
                       </select>
                     </div>
                   </div>
-                  <Field label="Adresse" value={editCentre.adresse} onChange={(v: string) => setEditCentre((p: any) => ({ ...p, adresse: v }))} />
+                  <Field label={t('admin.centres.fieldAdresse')} value={editCentre.adresse} onChange={(v: string) => setEditCentre((p: any) => ({ ...p, adresse: v }))} />
                   <div className="grid grid-cols-2 gap-4">
-                    <Field label="Ville" value={editCentre.ville} onChange={(v: string) => setEditCentre((p: any) => ({ ...p, ville: v }))} />
+                    <Field label={t('admin.centres.fieldVille')} value={editCentre.ville} onChange={(v: string) => setEditCentre((p: any) => ({ ...p, ville: v }))} />
                     <div>
-                      <label className="block text-xs font-semibold text-primary-300 uppercase tracking-wide mb-1">Région</label>
+                      <label className="block text-xs font-semibold text-primary-300 uppercase tracking-wide mb-1">{t('admin.centres.fieldRegion')}</label>
                       <select value={editCentre.region} onChange={(e) => setEditCentre((p: any) => ({ ...p, region: e.target.value }))}
                         className="w-full px-3 py-2 rounded-lg bg-primary-50 dark:bg-primary-900/40 border border-primary-100 dark:border-white/10 text-sm text-primary-900 dark:text-sable focus:outline-none focus:ring-2 focus:ring-mint-500/40">
                         {REGIONS.map((r) => (
@@ -685,16 +685,16 @@ export default function AdminCentresPage() {
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-4">
-                    <Field label="Téléphone" value={editCentre.telephone || ''} onChange={(v: string) => setEditCentre((p: any) => ({ ...p, telephone: v || null }))} />
-                    <Field label="Email" value={editCentre.email || ''} onChange={(v: string) => setEditCentre((p: any) => ({ ...p, email: v || null }))} />
+                    <Field label={t('admin.centres.fieldTelephone')} value={editCentre.telephone || ''} onChange={(v: string) => setEditCentre((p: any) => ({ ...p, telephone: v || null }))} />
+                    <Field label={t('admin.centres.fieldEmail')} value={editCentre.email || ''} onChange={(v: string) => setEditCentre((p: any) => ({ ...p, email: v || null }))} />
                   </div>
                   <div className="grid grid-cols-2 gap-4">
-                    <Field label="Site Web" value={editCentre.siteWeb || ''} onChange={(v: string) => setEditCentre((p: any) => ({ ...p, siteWeb: v || null }))} />
-                    <Field label="Quartier" value={editCentre.quartier || ''} onChange={(v: string) => setEditCentre((p: any) => ({ ...p, quartier: v || null }))} />
+                    <Field label={t('admin.centres.fieldSiteWeb')} value={editCentre.siteWeb || ''} onChange={(v: string) => setEditCentre((p: any) => ({ ...p, siteWeb: v || null }))} />
+                    <Field label={t('admin.centres.fieldQuartier')} value={editCentre.quartier || ''} onChange={(v: string) => setEditCentre((p: any) => ({ ...p, quartier: v || null }))} />
                   </div>
-                  <Field label="Horaires" value={editCentre.horaires || ''} onChange={(v: string) => setEditCentre((p: any) => ({ ...p, horaires: v }))} />
+                  <Field label={t('admin.centres.fieldHoraires')} value={editCentre.horaires || ''} onChange={(v: string) => setEditCentre((p: any) => ({ ...p, horaires: v }))} />
                   <div>
-                    <label className="block text-xs font-semibold text-primary-300 uppercase tracking-wide mb-1">Statut</label>
+                    <label className="block text-xs font-semibold text-primary-300 uppercase tracking-wide mb-1">{t('admin.centres.fieldStatut')}</label>
                     <select value={editCentre.statut} onChange={(e) => setEditCentre((p: any) => ({ ...p, statut: e.target.value }))}
                       className="w-full px-3 py-2 rounded-lg bg-primary-50 dark:bg-primary-900/40 border border-primary-100 dark:border-white/10 text-sm text-primary-900 dark:text-sable focus:outline-none focus:ring-2 focus:ring-mint-500/40">
                       {Object.entries(STATUT_LABELS).map(([k, v]) => (
@@ -707,24 +707,24 @@ export default function AdminCentresPage() {
                       <input type="checkbox" checked={editCentre.estActif}
                         onChange={(e) => setEditCentre((p: any) => ({ ...p, estActif: e.target.checked }))}
                         className="w-4 h-4 rounded border-primary-300 text-mint-500 focus:ring-mint-500/40" />
-                      <span className="text-sm text-primary-900 dark:text-sable">Actif</span>
+                      <span className="text-sm text-primary-900 dark:text-sable">{t('admin.centres.activerCentre')}</span>
                     </label>
                     <label className="flex items-center gap-2 cursor-pointer">
                       <input type="checkbox" checked={editCentre.urgences24h}
                         onChange={(e) => setEditCentre((p: any) => ({ ...p, urgences24h: e.target.checked }))}
                         className="w-4 h-4 rounded border-primary-300 text-urgence-500 focus:ring-urgence-500/40" />
-                      <span className="text-sm text-primary-900 dark:text-sable">Urgences 24h</span>
+                      <span className="text-sm text-primary-900 dark:text-sable">{t('admin.centres.urgences24hCheck')}</span>
                     </label>
                   </div>
                 </div>
                 <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-primary-100 dark:border-white/5">
                   <button type="button" onClick={() => setEditCentre(null)}
                     className="px-4 py-2 rounded-lg border border-primary-100 dark:border-white/10 text-primary-500 hover:text-primary-700 transition text-sm">
-                    Annuler
+                    {t('admin.centres.cancel')}
                   </button>
                   <button type="submit" disabled={saving}
                     className="inline-flex items-center gap-2 px-5 py-2 rounded-lg bg-mint-500 hover:bg-mint-700 text-white text-sm font-semibold disabled:opacity-60 transition">
-                    <Save className="w-4 h-4" /> {saving ? 'Enregistrement…' : 'Enregistrer'}
+                    <Save className="w-4 h-4" /> {saving ? t('admin.centres.saving') : t('admin.centres.save')}
                   </button>
                 </div>
               </motion.form>
@@ -748,18 +748,18 @@ export default function AdminCentresPage() {
                 <div className="w-14 h-14 mx-auto mb-4 rounded-full bg-urgence-100 dark:bg-urgence-900/30 flex items-center justify-center">
                   <Trash2 className="w-6 h-6 text-urgence-500" />
                 </div>
-                <h3 className="font-display font-bold text-lg text-primary-900 dark:text-sable mb-2">Confirmer la suppression</h3>
+                <h3 className="font-display font-bold text-lg text-primary-900 dark:text-sable mb-2">{t('admin.centres.deleteConfirmTitle')}</h3>
                 <p className="text-sm text-primary-500 mb-6">
-                  Cette action est irréversible. Veux-tu vraiment supprimer ce centre de santé ?
+                  {t('admin.centres.deleteConfirmMessage')}
                 </p>
                 <div className="flex items-center justify-center gap-3">
                   <button onClick={() => setDeleteConfirmId(null)}
                     className="px-5 py-2.5 rounded-lg border border-primary-100 dark:border-white/10 text-primary-500 hover:text-primary-700 transition text-sm font-semibold">
-                    Annuler
+                    {t('admin.centres.cancel')}
                   </button>
                   <button onClick={handleDeleteConfirm}
                     className="px-5 py-2.5 rounded-lg bg-urgence-500 hover:bg-urgence-700 text-white text-sm font-semibold transition">
-                    Supprimer
+                    {t('admin.centres.delete')}
                   </button>
                 </div>
               </motion.div>

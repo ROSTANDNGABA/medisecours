@@ -3,6 +3,7 @@
 /* eslint-disable @next/next/no-img-element */
 
 import { useMemo, useState, useRef, type ReactNode } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Pencil, Plus, Save, Search, Trash2, AlertTriangle, ArrowUpDown, ArrowUp, ArrowDown, ChevronLeft, ChevronRight, Upload, X, Eye } from 'lucide-react'
 import useSWR from 'swr'
 import api from '../../api/axios'
@@ -52,8 +53,9 @@ function highlightText(text: any, query: string) {
 }
 
 function CellValue({ field, value, search, item }: { field: any; value: any; search: string; item: any }) {
+  const { t } = useTranslation()
   if (field.render) return field.render(value, item, search)
-  if (field.type === 'checkbox') return value ? 'Oui' : 'Non'
+  if (field.type === 'checkbox') return value ? t('common.yes') : t('common.no')
 
   if (field.type === 'color' && value) {
     return (
@@ -83,6 +85,7 @@ function CellValue({ field, value, search, item }: { field: any; value: any; sea
 }
 
 function FieldEditor({ field, value, onChange, error }: { field: any; value: any; onChange: (v: any) => void; error?: string }) {
+  const { t } = useTranslation()
   return (
     <div>
       <label className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.18em] text-[#7a8578]">
@@ -105,7 +108,7 @@ function FieldEditor({ field, value, onChange, error }: { field: any; value: any
             onChange={(e) => onChange(e.target.checked)}
             className="h-4 w-4 accent-[#2f6b45]"
           />
-          Activer ce champ
+          {t('admin.crudTable.activateField')}
         </label>
       ) : field.type === 'select' ? (
         <select
@@ -133,7 +136,7 @@ function FieldEditor({ field, value, onChange, error }: { field: any; value: any
             type="text"
             value={value || ''}
             onChange={(e) => onChange(e.target.value)}
-            placeholder="URL de l'image"
+            placeholder={t('admin.crudTable.imageUrlPlaceholder')}
             className={`flex-1 rounded-2xl border px-4 py-3 text-sm text-[#223023] outline-none transition focus:bg-white ${
               error ? 'border-[#d9534f] bg-[#fef2f2] focus:border-[#d9534f]' : 'border-[#dfe5db] bg-[#f8faf6] focus:border-[#bfd0bd]'
             }`}
@@ -160,6 +163,7 @@ function FieldEditor({ field, value, onChange, error }: { field: any; value: any
 
 function SelectApiField({ field, value, onChange, error }: { field: any; value: any; onChange: (v: any) => void; error?: string }) {
   const { data, isLoading } = useSWR(field.endpoint, fetcher, { revalidateOnFocus: false })
+  const { t } = useTranslation()
   const options = useMemo(() => (Array.isArray(data) ? data : []), [data])
   return (
     <select
@@ -169,7 +173,7 @@ function SelectApiField({ field, value, onChange, error }: { field: any; value: 
         error ? 'border-[#d9534f] bg-[#fef2f2] focus:border-[#d9534f]' : 'border-[#dfe5db] bg-[#f8faf6] focus:border-[#bfd0bd]'
       }`}
     >
-      <option value="">{isLoading ? 'Chargement...' : '-'}</option>
+      <option value="">{isLoading ? t('admin.crudTable.loading') : '-'}</option>
       {options.map((opt: any) => (
         <option key={opt['@id'] || opt.id} value={opt['@id'] || opt.id}>
           {field.displayKey ? opt[field.displayKey] : (opt.nom || opt.titre || opt['@id'])}
@@ -186,11 +190,12 @@ function CellIconField({ iconName, categoryName }: { iconName?: string; category
 }
 
 function IconPickerField({ value, onChange, error }: { value?: string; onChange: (v: string) => void; error?: string }) {
+  const { t } = useTranslation()
   return (
     <div className={`rounded-2xl border p-3 ${error ? 'border-[#d9534f] bg-[#fef2f2]' : 'border-[#dfe5db] bg-[#f8faf6]'}`}>
       <div className="mb-2 flex items-center gap-2">
-        <span className="text-sm text-[#7a8578]">Selectionnee :</span>
-        {value ? <CategoryIcon iconName={value} size="md" /> : <span className="text-xs text-[#aab3a8]">aucune</span>}
+        <span className="text-sm text-[#7a8578]">{t('admin.crudTable.iconSelected')}</span>
+        {value ? <CategoryIcon iconName={value} size="md" /> : <span className="text-xs text-[#aab3a8]">{t('admin.crudTable.iconNone')}</span>}
       </div>
       <div className="flex max-h-64 flex-wrap gap-2 overflow-y-auto py-1">
         {availableIcons.map((name: string) => (
@@ -243,6 +248,7 @@ function ImageGallery({ endpoint, entityId, images, onMutate, entityType = 'mala
   const [deletingId, setDeletingId] = useState<number | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
   const toast = useToast()
+  const { t } = useTranslation()
 
   const imageList = useMemo(() => (Array.isArray(images) ? images : []), [images])
 
@@ -255,9 +261,9 @@ function ImageGallery({ endpoint, entityId, images, onMutate, entityType = 'mala
       Array.from(files).forEach((f: File) => form.append('files[]', f))
       await api.post(`/api/admin/${entityType}/${entityId}/images`, form)
       onMutate()
-      toast.success('Image(s) uploadee(s).')
+      toast.success(t('admin.crudTable.toastUploadSuccess'))
     } catch (err: any) {
-      toast.error(err?.response?.data?.error || "Echec de l'upload.")
+      toast.error(err?.response?.data?.error || t('admin.crudTable.toastUploadError'))
     } finally {
       setUploading(false)
       if (fileRef.current) fileRef.current.value = ''
@@ -269,9 +275,9 @@ function ImageGallery({ endpoint, entityId, images, onMutate, entityType = 'mala
     try {
       await api.delete(`/api/admin/${entityType}/${entityId}/images/${imageId}`)
       onMutate()
-      toast.success('Image supprimee.')
+      toast.success(t('admin.maladieDetail.toastDeleteImageSuccess'))
     } catch (err: any) {
-      toast.error(err?.response?.data?.error || 'Echec de la suppression.')
+      toast.error(err?.response?.data?.error || t('admin.maladieDetail.toastDeleteImageError'))
     } finally {
       setDeletingId(null)
     }
@@ -280,7 +286,7 @@ function ImageGallery({ endpoint, entityId, images, onMutate, entityType = 'mala
   return (
     <div className="rounded-2xl border border-[#dfe5db] bg-[#f8faf6] p-4">
       <label className="mb-3 block text-xs font-semibold uppercase tracking-[0.18em] text-[#7a8578]">
-        Images / Icones
+        {t('admin.crudTable.imagesIcones')}
       </label>
       {imageList.length > 0 && (
         <div className="mb-3 flex flex-wrap gap-2">
@@ -317,7 +323,7 @@ function ImageGallery({ endpoint, entityId, images, onMutate, entityType = 'mala
           className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-[#dfe5db] bg-white px-4 py-2 text-sm font-semibold text-[#566355] transition hover:bg-[#edf2ea]"
         >
           <Upload className="h-4 w-4" />
-          {uploading ? 'Upload...' : 'Ajouter des images'}
+          {uploading ? t('admin.crudTable.uploading') : t('admin.crudTable.addImages')}
         </label>
       </div>
     </div>
@@ -329,7 +335,7 @@ export default function CrudTable({
   fields,
   title,
   description = '',
-  createLabel = 'Ajouter',
+  createLabel = undefined,
   previewKeys,
   searchEndpoint = undefined,
   imageUploadEndpoint = undefined,
@@ -360,6 +366,7 @@ export default function CrudTable({
   const [sortKey, setSortKey] = useState<string | null>(null)
   const [sortOrder, setSortOrder] = useState('asc')
   const toast = useToast()
+  const { t } = useTranslation()
 
   const apiUrl = useMemo(() => {
     const params = new URLSearchParams()
@@ -412,9 +419,9 @@ export default function CrudTable({
     try {
       await api.delete(`${endpoint}/${confirmModal.itemId}`)
       mutate()
-      toast.success('Element supprime.')
+      toast.success(t('admin.crudTable.toastDeleted'))
     } catch (err: any) {
-      toast.error(err?.response?.data?.detail || err?.response?.data?.error || 'Echec de la suppression.')
+      toast.error(err?.response?.data?.detail || err?.response?.data?.error || t('admin.crudTable.toastDeleteError'))
     } finally {
       setDeleteLoading(false)
       setConfirmModal({ isOpen: false, itemId: null })
@@ -438,12 +445,12 @@ export default function CrudTable({
           headers: { 'Content-Type': 'application/merge-patch+json' },
         })
         mutate()
-        toast.success('Element mis a jour.')
+        toast.success(t('admin.crudTable.toastUpdated'))
         setEditing(null)
       } else {
         await api.post(endpoint, payload)
         mutate()
-        toast.success('Element cree.')
+        toast.success(t('admin.crudTable.toastCreated'))
         setEditing(null)
       }
     } catch (err: any) {
@@ -452,9 +459,9 @@ export default function CrudTable({
         const map: Record<string, string> = {}
         violations.forEach((v: any) => { map[v.propertyPath] = v.message })
         setFieldErrors(map)
-        toast.error('Erreurs de validation.')
+        toast.error(t('admin.crudTable.toastValidationError'))
       } else {
-        toast.error(err?.response?.data?.detail || err?.response?.data?.error || "Echec de l'enregistrement.")
+        toast.error(err?.response?.data?.detail || err?.response?.data?.error || t('admin.crudTable.toastSaveError'))
       }
     } finally {
       setSaving(false)
@@ -469,9 +476,9 @@ export default function CrudTable({
         onConfirm={handleDelete}
         isLoading={deleteLoading}
         type="danger"
-        title="Supprimer cet element ?"
-        message="Voulez-vous vraiment supprimer cet element ? Cette action est irreversible."
-        confirmText="Supprimer"
+        title={t('admin.crudTable.deleteConfirmTitle')}
+        message={t('admin.crudTable.deleteConfirmMessage')}
+        confirmText={t('admin.crudTable.deleteConfirm')}
       />
 
       <section className="rounded-[28px] border border-[#e3e7df] bg-white p-5 shadow-[0_18px_45px_rgba(15,36,24,0.05)] sm:p-6">
@@ -479,7 +486,7 @@ export default function CrudTable({
           <div>
             <p className="text-lg font-bold text-[#152116]">{title}</p>
             <p className="mt-1 text-sm text-[#6f796c]">
-              {description || `Gestion centralisee des elements pour ${title.toLowerCase()}.`}
+              {description || t('admin.crudTable.descriptionFallback', { title })}
             </p>
           </div>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -488,21 +495,21 @@ export default function CrudTable({
               <input
                 value={search}
                 onChange={(e) => { setSearch(e.target.value); setPage(1) }}
-                placeholder={`Rechercher dans ${title.toLowerCase()}...`}
+                placeholder={t('admin.crudTable.searchIn', { name: title.toLowerCase() })}
                 className="w-full rounded-full border border-[#dfe5db] bg-[#f8faf6] py-3 pl-11 pr-4 text-sm text-[#233024] outline-none transition focus:border-[#bfd0bd] focus:bg-white"
               />
             </div>
             <Button onClick={startCreate} variant="primary">
-              <Plus className="h-4 w-4" /> {createLabel}
+              <Plus className="h-4 w-4" /> {createLabel || t('admin.crudTable.actionAdd')}
             </Button>
           </div>
         </div>
       </section>
 
       <section className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <MetricCard label="Total" value={totalItems} />
-        <MetricCard label="Cette page" value={items.length} tone="green" />
-        <MetricCard label="Pages" value={totalPages} tone="blue" />
+        <MetricCard label={t('admin.crudTable.metricTotal')} value={totalItems} />
+        <MetricCard label={t('admin.crudTable.metricThisPage')} value={items.length} tone="green" />
+        <MetricCard label={t('admin.crudTable.metricPages')} value={totalPages} tone="blue" />
       </section>
 
       <section className="rounded-[28px] border border-[#e3e7df] bg-white p-2 shadow-[0_18px_45px_rgba(15,36,24,0.05)] sm:p-3">
@@ -512,7 +519,7 @@ export default function CrudTable({
           </div>
         ) : items.length === 0 ? (
           <div className="p-6">
-            <EmptyState title="Aucun element" description={search ? 'Aucun resultat pour cette recherche.' : `Ajoutez le premier element pour ${title}.`} />
+            <EmptyState title={t('admin.crudTable.emptyTitle')} description={search ? t('admin.crudTable.emptySearch') : t('admin.crudTable.emptyAdd', { name: title })} />
           </div>
         ) : (
           <div className="overflow-x-auto rounded-[24px]">
@@ -530,7 +537,7 @@ export default function CrudTable({
                       </button>
                     </th>
                   ))}
-                  <th className="px-5 py-4 text-right font-semibold">Actions</th>
+                  <th className="px-5 py-4 text-right font-semibold">{t('common.actions')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -569,7 +576,7 @@ export default function CrudTable({
         {totalPages > 1 && (
           <div className="flex items-center justify-between border-t border-[#edf1eb] px-4 py-3">
             <p className="text-xs text-[#6f796c]">
-              Page {page} sur {totalPages} ({totalItems} elements)
+              {t('admin.crudTable.pageInfo', { page, totalPages, totalItems })}
             </p>
             <div className="flex items-center gap-2">
               <button
@@ -621,7 +628,7 @@ export default function CrudTable({
         onSave: handleSave,
         onClose: () => setEditing(null),
       }) : (
-        <Modal isOpen onClose={() => setEditing(null)} title={`${editing.id ? 'Modifier' : 'Ajouter'} - ${title}`}>
+        <Modal isOpen onClose={() => setEditing(null)} title={t('admin.crudTable.editAddTitle', { action: editing.id ? t('admin.crudTable.actionEdit') : t('admin.crudTable.actionAdd'), title })}>
           <div className="space-y-4">
             {fields.map((field: any) => (
               <FieldEditor
@@ -646,10 +653,10 @@ export default function CrudTable({
           </div>
           <div className="mt-6 flex justify-end gap-2">
             <Button variant="secondary" onClick={() => setEditing(null)}>
-              Annuler
+              {t('admin.crudTable.cancel')}
             </Button>
             <Button onClick={handleSave} variant="primary" isLoading={saving}>
-              <Save className="h-4 w-4" /> {saving ? 'Enregistrement...' : 'Enregistrer'}
+              <Save className="h-4 w-4" /> {saving ? t('admin.crudTable.saving') : t('admin.crudTable.save')}
             </Button>
           </div>
         </Modal>

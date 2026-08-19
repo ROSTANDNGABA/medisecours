@@ -25,16 +25,28 @@ class ProtocoleEtape
     #[ORM\Column(length: 160, nullable: true)]
     #[Groups(['protocole:read'])]
     private ?string $titre = null;
+
+    #[ORM\Column(length: 160, nullable: true)]
+    private ?string $titreEn = null;
+
     #[ORM\Column(type: 'text')]
     #[Groups(['protocole:read'])]
     private string $instruction;
+
+    #[ORM\Column(type: 'text', nullable: true)]
+    private ?string $instructionEn = null;
+
     public function setProtocole(ProtocolePremiersGestes $protocole): static { $this->protocole = $protocole; return $this; }
     public function setPosition(int $position): static { $this->position = $position; return $this; }
     public function setType(string $type): static { $this->type = $type; return $this; }
     public function setTitre(?string $titre): static { $this->titre = $titre; return $this; }
+    public function setTitreEn(?string $titreEn): static { $this->titreEn = $titreEn; return $this; }
     public function setInstruction(string $instruction): static { $this->instruction = $instruction; return $this; }
+    public function setInstructionEn(?string $instructionEn): static { $this->instructionEn = $instructionEn; return $this; }
     public function getPosition(): int { return $this->position; }
     public function getType(): string { return $this->type; }
     public function getTitre(): ?string { return $this->titre; }
+    public function getTitreEn(): ?string { return $this->titreEn; }
     public function getInstruction(): string { return $this->instruction; }
+    public function getInstructionEn(): ?string { return $this->instructionEn; }
 }

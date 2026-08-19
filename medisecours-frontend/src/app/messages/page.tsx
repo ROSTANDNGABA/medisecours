@@ -22,6 +22,7 @@ import { useSearchParams, useRouter } from 'next/navigation'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import EmptyState from '../../components/ui/EmptyState'
 import { useToast } from '../../components/ui/Toast'
+import { useTranslation } from 'react-i18next'
 
 function iri(prefix, id) { return `/api/${prefix}/${id}` }
 
@@ -51,11 +52,11 @@ function msgMediaUrl(m) {
   return mediaUrl(path)
 }
 
-function formatFileSize(bytes) {
+function formatFileSize(bytes, t) {
   if (!bytes) return ''
-  if (bytes < 1024) return bytes + ' o'
-  if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' Ko'
-  return (bytes / 1048576).toFixed(1) + ' Mo'
+  if (bytes < 1024) return t('visitor.messages.sizeBytes', { size: bytes })
+  if (bytes < 1048576) return t('visitor.messages.sizeKB', { size: (bytes / 1024).toFixed(1) })
+  return t('visitor.messages.sizeMB', { size: (bytes / 1048576).toFixed(1) })
 }
 
 function formatDuration(sec) {
@@ -90,6 +91,7 @@ function msgMediaKind(m) {
 }
 
 export default function MessagesPage() {
+  const { t } = useTranslation()
   const { user, mounted } = useAuth()
   const {
     setActiveConversationId,
@@ -153,7 +155,7 @@ export default function MessagesPage() {
         const { data: consultation } = await api.get(`/api/consultations/${consultationId}`)
         const medecinId = consultation.medecin?.id
         if (!medecinId) {
-          toast.error('Aucun médecin assigné à cette consultation.')
+          toast.error(t('visitor.messages.errorNoDoctorAssigned'))
           return
         }
         const convs = Array.isArray(convData) ? convData : convData?.['hydra:member'] || []
@@ -177,10 +179,10 @@ export default function MessagesPage() {
         }, { revalidate: true })
         setActiveId(String(conv.id))
       } catch {
-        toast.error('Impossible de charger la conversation.')
+        toast.error(t('visitor.messages.errorLoadConversation'))
       }
     })()
-  }, [preselectConsultation, convLoading, convData, user, toast, mutateConvs])
+  }, [preselectConsultation, convLoading, convData, user, toast, mutateConvs, t])
 
   useEffect(() => {
     if (!preselectMedecin || convLoading || !user || preselectMedecinStarted.current) return
@@ -214,10 +216,10 @@ export default function MessagesPage() {
         setActiveId(String(conversation.id))
       } catch {
         preselectMedecinStarted.current = false
-        toast.error('Impossible d’ouvrir la conversation avec ce médecin.')
+        toast.error(t('visitor.messages.errorOpenWithDoctor'))
       }
     })()
-  }, [preselectMedecin, convLoading, convData, user, toast, mutateConvs])
+  }, [preselectMedecin, convLoading, convData, user, toast, mutateConvs, t])
 
   const activeIdNum = activeId ? Number(activeId) : null
   const MSGS_PER_PAGE = 30
@@ -615,7 +617,7 @@ export default function MessagesPage() {
     if (medecins.length === 0) {
       api.get('/api/medecins-publics')
         .then((res) => setMedecins(extractArray(res)))
-        .catch(() => toast.error('Impossible de charger la liste des médecins.'))
+        .catch(() => toast.error(t('visitor.messages.errorLoadDoctors')))
     }
   }
 
@@ -632,7 +634,7 @@ export default function MessagesPage() {
     e.target.value = ''
     for (const f of files) {
       if (f.size > MAX_MESSAGE_MEDIA_SIZE) {
-        toast.error(`${f.name} dépasse la limite de 25 Mo.`)
+        toast.error(t('visitor.messages.fileSizeTooBig', { name: f.name }))
         continue
       }
       const preview = (isImageMime(f.type) || isVideoMime(f.type) || isAudioMime(f.type)) ? URL.createObjectURL(f) : null
@@ -649,7 +651,7 @@ export default function MessagesPage() {
   }
 
   function startRecording() {
-    if (!navigator.mediaDevices?.getUserMedia) { toast.error('Enregistrement vocal non supporté.'); return }
+    if (!navigator.mediaDevices?.getUserMedia) { toast.error(t('visitor.messages.voiceNotSupported')); return }
     setShowAttachMenu(false)
     navigator.mediaDevices.getUserMedia({ audio: true }).then((stream) => {
       streamRef.current = stream
@@ -667,7 +669,7 @@ export default function MessagesPage() {
       setRecording(true)
       setRecordTimer(0)
       recordTimerRef.current = setInterval(() => setRecordTimer((t) => t + 1), 1000)
-    }).catch(() => toast.error('Microphone non accessible.'))
+    }).catch(() => toast.error(t('visitor.messages.micNotAccessible')))
   }
 
   function stopRecording() {
@@ -729,7 +731,7 @@ export default function MessagesPage() {
         setAllLoadedMsgs(prev => [...prev, optimistic])
       }
       // Optimistic sidebar: show file preview instantly
-      optimisticConvMutate(caption || '📎 Fichier')
+      optimisticConvMutate(caption || t('visitor.messages.previewFile'))
       setAttachments([])
       try {
         const uploads = await Promise.all(pending.map((att) => uploadFile(att.file)))
@@ -769,7 +771,7 @@ export default function MessagesPage() {
         }, { revalidate: false })
         mutateConvs()
       } catch (error) {
-        toast.error(error?.response?.data?.error || error?.response?.data?.detail || "Échec de l'envoi du média.")
+        toast.error(error?.response?.data?.error || error?.response?.data?.detail || t('visitor.messages.errorSendMedia'))
         const tempIds = new Set(pending.map(a => a.tempId))
         setAllLoadedMsgs(prev => prev.filter(m => !tempIds.has(m.id)))
       } finally {
@@ -824,14 +826,14 @@ export default function MessagesPage() {
       mutateConvs()
     } catch {
       setAllLoadedMsgs(prev => prev.filter(m => m.id !== tempId))
-      toast.error("Échec de l'envoi du message.")
+      toast.error(t('visitor.messages.errorSendMessage'))
     } finally {
       setSending(false)
     }
   }
 
-  if (!mounted) return <LoadingSpinner label="Chargement…" />
-  if (convLoading) return <LoadingSpinner label="Chargement de la messagerie…" />
+  if (!mounted) return <LoadingSpinner label={t('visitor.messages.loadingPage')} />
+  if (convLoading) return <LoadingSpinner label={t('visitor.messages.loadingMessaging')} />
 
   return (
     <div className={`max-w-6xl mx-auto w-full p-0 lg:px-6 lg:py-10 flex flex-col overflow-hidden relative ${activeId ? 'h-[100dvh] xl:h-[calc(100dvh_-_96px)]' : 'flex-1 min-h-0'}`}>
@@ -839,12 +841,12 @@ export default function MessagesPage() {
 
         <div className={`lg:col-span-1 min-h-0 border-r border-primary-100 dark:border-white/10 bg-white/70 dark:bg-primary-700/40 flex flex-col ${activeId ? 'hidden lg:flex' : 'flex'}`}>
           <div className="flex items-center justify-between p-4 border-b border-primary-100 dark:border-white/10">
-            <h2 className="font-display font-bold text-primary-900 dark:text-sable">Messages</h2>
+            <h2 className="font-display font-bold text-primary-900 dark:text-sable">{t('visitor.messages.title')}</h2>
             <button onClick={openNewConversation} className="p-2 rounded-xl bg-mint-500 text-white"><Plus className="w-4 h-4" /></button>
           </div>
           <div className="flex-1 overflow-y-auto min-h-0">
             {sortedConvs.length === 0 ? (
-              <EmptyState title="Aucune conversation" description="Démarrez une conversation avec un médecin." />
+              <EmptyState title={t('visitor.messages.emptyTitle')} description={t('visitor.messages.emptyDesc')} />
             ) : sortedConvs.map((c) => (
               <button
                 key={c.id}
@@ -858,10 +860,10 @@ export default function MessagesPage() {
                 <div className="flex-1 min-w-0">
                   <p className="font-semibold text-sm text-primary-900 dark:text-sable truncate">{c.info?.prenom} {c.info?.nom}</p>
                   <p className="text-xs text-primary-300 truncate">
-                    {c.dernierMessage?.typeMessage === 'IMAGE' && <>📷 Image</>}
-                    {c.dernierMessage?.typeMessage === 'VIDEO' && <>🎥 Vidéo</>}
-                    {c.dernierMessage?.typeMessage === 'VOIX' && <>🎤 Message vocal</>}
-                    {c.dernierMessage?.typeMessage === 'FICHIER' && <>📎 {c.dernierMessage?.media?.originalName || 'Fichier'}</>}
+                    {c.dernierMessage?.typeMessage === 'IMAGE' && <>📷 {t('visitor.messages.previewImage')}</>}
+                    {c.dernierMessage?.typeMessage === 'VIDEO' && <>🎥 {t('visitor.messages.previewVideo')}</>}
+                    {c.dernierMessage?.typeMessage === 'VOIX' && <>🎤 {t('visitor.messages.previewVoice')}</>}
+                    {c.dernierMessage?.typeMessage === 'FICHIER' && <>📎 {c.dernierMessage?.media?.originalName || t('visitor.messages.previewFile')}</>}
                     {(!c.dernierMessage?.typeMessage || c.dernierMessage?.typeMessage === 'TEXTE') && (c.dernierMessage?.contenu || '')}
                   </p>
                 </div>
@@ -875,7 +877,7 @@ export default function MessagesPage() {
           {active ? (
             <>
               <div className="sticky top-0 z-30 flex-none h-16 flex items-center gap-3 p-4 border-b border-primary-100 dark:border-white/10 bg-white/70 dark:bg-primary-700/40">
-                <button className="lg:hidden" onClick={() => setActiveId(null)} aria-label="Retour"><ArrowLeft className="w-5 h-5 text-primary-500" /></button>
+                <button className="lg:hidden" onClick={() => setActiveId(null)} aria-label={t('visitor.messages.back')}><ArrowLeft className="w-5 h-5 text-primary-500" /></button>
                 <div className="w-9 h-9 rounded-full bg-primary-500 text-white flex items-center justify-center font-bold text-xs shrink-0 overflow-hidden">
                   {active.info?.photoProfil ? <img src={mediaUrl(active.info.photoProfil)} alt="" className="w-full h-full object-cover" onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex' }} /> : null}
                   <span style={active.info?.photoProfil ? { display: 'none' } : undefined} className="flex items-center justify-center w-full h-full">{(active.info?.prenom?.[0] || '') + (active.info?.nom?.[0] || '')}</span>
@@ -917,8 +919,8 @@ export default function MessagesPage() {
                           <a href={msgMediaUrl(m)} target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 p-3 hover:opacity-80">
                             <FileText className="w-6 h-6 shrink-0" />
                             <div className="min-w-0">
-                              <p className="text-sm font-medium truncate">{m.media.originalName || 'Fichier'}</p>
-                              <p className="text-[10px] opacity-60">{formatFileSize(m.media.size)}</p>
+                              <p className="text-sm font-medium truncate">{m.media.originalName || t('visitor.messages.previewFile')}</p>
+                              <p className="text-[10px] opacity-60">{formatFileSize(m.media.size, t)}</p>
                             </div>
                           </a>
                         )}
@@ -994,16 +996,16 @@ export default function MessagesPage() {
                     {showAttachMenu && (
                       <div className="absolute bottom-full left-0 mb-2 bg-white dark:bg-primary-800 rounded-2xl shadow-glass border border-primary-100 dark:border-white/5 p-2 flex gap-1 z-10">
                         <button onClick={() => handleAttach('camera')} className="flex flex-col items-center gap-1 px-3 py-2 rounded-xl hover:bg-primary-50 dark:hover:bg-primary-900/40 text-primary-500">
-                          <Camera className="w-5 h-5" /><span className="text-[10px]">Appareil</span>
+                          <Camera className="w-5 h-5" /><span className="text-[10px]">{t('visitor.messages.attachCamera')}</span>
                         </button>
                         <button onClick={() => handleAttach('gallery')} className="flex flex-col items-center gap-1 px-3 py-2 rounded-xl hover:bg-primary-50 dark:hover:bg-primary-900/40 text-primary-500">
-                          <ImageIcon className="w-5 h-5" /><span className="text-[10px]">Photos</span>
+                          <ImageIcon className="w-5 h-5" /><span className="text-[10px]">{t('visitor.messages.attachPhotos')}</span>
                         </button>
                         <button onClick={() => handleAttach('doc')} className="flex flex-col items-center gap-1 px-3 py-2 rounded-xl hover:bg-primary-50 dark:hover:bg-primary-900/40 text-primary-500">
-                          <FileText className="w-5 h-5" /><span className="text-[10px]">Document</span>
+                          <FileText className="w-5 h-5" /><span className="text-[10px]">{t('visitor.messages.attachDocument')}</span>
                         </button>
                         <button onClick={() => handleAttach('voice')} className="flex flex-col items-center gap-1 px-3 py-2 rounded-xl hover:bg-primary-50 dark:hover:bg-primary-900/40 text-primary-500">
-                          <Mic className="w-5 h-5" /><span className="text-[10px]">Vocal</span>
+                          <Mic className="w-5 h-5" /><span className="text-[10px]">{t('visitor.messages.attachVoice')}</span>
                         </button>
                       </div>
                     )}
@@ -1012,12 +1014,12 @@ export default function MessagesPage() {
                     value={draft}
                     onChange={(e) => setDraft(e.target.value)}
                     onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend() } }}
-                    placeholder={recording ? 'Enregistrement en cours…' : uploadingMedia ? 'Téléchargement…' : 'Écrire un message…'}
+                    placeholder={recording ? t('visitor.messages.recordingPlaceholder') : uploadingMedia ? t('visitor.messages.uploadingPlaceholder') : t('visitor.messages.inputPlaceholder')}
                     disabled={recording || uploadingMedia}
-                    aria-label="Zone de saisie du message"
+                    aria-label={t('visitor.messages.inputAria')}
                     className="flex-1 px-4 py-2.5 rounded-2xl border border-primary-100 dark:border-white/10 bg-white dark:bg-primary-900/60 focus:outline-none focus:ring-2 focus:ring-mint-500 disabled:opacity-40"
                   />
-                  <button type="button" onClick={handleSend} disabled={sending || (!draft.trim() && attachments.length === 0) || recording} aria-label="Envoyer" className="p-3 rounded-2xl bg-mint-500 hover:bg-mint-700 text-white disabled:opacity-50 transition">
+                  <button type="button" onClick={handleSend} disabled={sending || (!draft.trim() && attachments.length === 0) || recording} aria-label={t('visitor.messages.send')} className="p-3 rounded-2xl bg-mint-500 hover:bg-mint-700 text-white disabled:opacity-50 transition">
                     {uploadingMedia ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                   </button>
                 </div>
@@ -1029,8 +1031,8 @@ export default function MessagesPage() {
           ) : (
             <EmptyState
               icon={Stethoscope}
-              title="Sélectionnez une conversation"
-              description="Choisissez un médecin pour démarrer la discussion."
+              title={t('visitor.messages.noActiveTitle')}
+              description={t('visitor.messages.noActiveDesc')}
             />
           )}
         </div>
@@ -1045,14 +1047,14 @@ export default function MessagesPage() {
         >
           <div onClick={(e) => e.stopPropagation()} className="bg-white dark:bg-primary-700 rounded-2xl shadow-glass w-full max-w-sm p-5">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="font-display font-bold text-primary-900 dark:text-sable">Nouvelle conversation</h3>
-              <button onClick={() => setShowNew(false)} aria-label="Fermer">
+              <h3 className="font-display font-bold text-primary-900 dark:text-sable">{t('visitor.messages.newConversation')}</h3>
+              <button onClick={() => setShowNew(false)} aria-label={t('visitor.messages.close')}>
                 <X className="w-5 h-5 text-primary-300" />
               </button>
             </div>
             <div className="space-y-1 max-h-72 overflow-y-auto">
               {medecins.length === 0 ? (
-                <LoadingSpinner size="sm" label="Chargement des médecins…" />
+                <LoadingSpinner size="sm" label={t('visitor.messages.loadingDoctors')} />
               ) : medecins.map((med) => (
                 <button
                   key={med.id}
@@ -1062,7 +1064,7 @@ export default function MessagesPage() {
                       const convId = await findOrCreateConv(med.id)
                       setActiveId(convId)
                     } catch {
-                      toast.error("Impossible de créer la conversation.")
+                      toast.error(t('visitor.messages.errorCreateConversation'))
                     }
                   }}
                   className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-primary-100 dark:hover:bg-primary-900/40 text-left transition"

@@ -58,7 +58,7 @@ abstract class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[ORM\Column(type: 'uuid', unique: true)]
     #[ORM\GeneratedValue(strategy: 'CUSTOM')]
     #[ORM\CustomIdGenerator(class: 'doctrine.uuid_generator')]
-    #[Groups(['user:read', 'user:search', 'consultation:read', 'message:read', 'conversation:read'])]
+    #[Groups(['user:read', 'user:search', 'consultation:read', 'message:read', 'conversation:read', 'prescription:read'])]
     private ?Uuid $id = null;
 
     #[ORM\Column(length: 180)]
@@ -118,13 +118,13 @@ abstract class User implements UserInterface, PasswordAuthenticatedUserInterface
 
     #[ORM\Column(length: 255, nullable: true)]
     #[Assert\Length(min: 2, max: 255, minMessage: 'Le nom doit contenir au moins {{ limit }} caractères', maxMessage: 'Le nom ne peut pas dépasser {{ limit }} caractères')]
-    #[Groups(['user:read', 'user:search', 'user:write', 'consultation:read', 'message:read', 'conversation:read', 'avis:read'])]
+    #[Groups(['user:read', 'user:search', 'user:write', 'consultation:read', 'message:read', 'conversation:read', 'avis:read', 'prescription:read'])]
     #[Gedmo\Versioned]
     private ?string $nom = null;
 
     #[ORM\Column(length: 255, nullable: true)]
     #[Assert\Length(min: 2, max: 255, minMessage: 'Le prénom doit contenir au moins {{ limit }} caractères', maxMessage: 'Le prénom ne peut pas dépasser {{ limit }} caractères')]
-    #[Groups(['user:read', 'user:search', 'user:write', 'consultation:read', 'message:read', 'conversation:read', 'avis:read'])]
+    #[Groups(['user:read', 'user:search', 'user:write', 'consultation:read', 'message:read', 'conversation:read', 'avis:read', 'prescription:read'])]
     #[Gedmo\Versioned]
     private ?string $prenom = null;
 
@@ -138,11 +138,11 @@ abstract class User implements UserInterface, PasswordAuthenticatedUserInterface
 
     #[ORM\Column(length: 255, nullable: true)]
     #[Assert\Length(max: 255, maxMessage: 'Le quartier ne peut pas dépasser {{ limit }} caractères')]
-    #[Groups(['user:read', 'user:write'])]
+    #[Groups(['user:read', 'user:write', 'prescription:read'])]
     private ?string $quartier = null;
 
     #[ORM\Column(length: 255, nullable: true)]
-    #[Groups(['user:read', 'user:search', 'consultation:read', 'conversation:read'])]
+    #[Groups(['user:read', 'user:search', 'consultation:read', 'conversation:read', 'prescription:read'])]
     private ?string $photoProfil = null;
 
     #[ORM\Column]

@@ -7,6 +7,7 @@ import { motion } from 'framer-motion'
 import { CheckCircle, XCircle, Loader2, HeartPulse } from 'lucide-react'
 import api from '../../api/axios'
 import { useAuth } from '../../hooks/useAuth'
+import { useTranslation } from 'react-i18next'
 
 /**
  * Page de vérification d'email.
@@ -24,6 +25,7 @@ export default function VerifyEmailPage() {
 function VerifyEmailContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
+  const { t } = useTranslation()
   const { updateUser, user } = useAuth()
   const token = searchParams.get('token')
 
@@ -39,28 +41,28 @@ function VerifyEmailContent() {
           updateUser({ ...user, ...res.data.user, emailVerified: true })
         }
         setStatus('success')
-        setMessage('Votre adresse email a été confirmée avec succès.')
+        setMessage(t('visitor.verifyEmail.successMessage'))
         setTimeout(() => router.push('/'), 3000)
       })
       .catch((err: any) => {
         if (err.response?.status === 404) {
-          setMessage('Ce lien de vérification est invalide ou a déjà été utilisé.')
+          setMessage(t('visitor.verifyEmail.invalidToken'))
         } else {
-          setMessage('Une erreur est survenue. Veuillez réessayer.')
+          setMessage(t('visitor.verifyEmail.genericError'))
         }
         setStatus('error')
       })
-  }, [token, router, updateUser]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [token, router, updateUser, t]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Token absent — afficher l'erreur directement au rendu sans setState
   if (!token && status === 'loading') {
     return (
       <StatusCard>
         <XCircle className="w-14 h-14 text-urgence-500 mx-auto mb-4" />
-        <h1 className="font-display font-bold text-2xl text-primary-900 dark:text-sable mb-2">Lien invalide</h1>
-        <p className="text-primary-400 mb-6">Token de vérification manquant.</p>
+        <h1 className="font-display font-bold text-2xl text-primary-900 dark:text-sable mb-2">{t('visitor.verifyEmail.invalidTitle')}</h1>
+        <p className="text-primary-400 mb-6">{t('visitor.verifyEmail.missingToken')}</p>
         <Link href="/login" className="inline-block px-6 py-2.5 rounded-xl bg-primary-500 hover:bg-primary-700 text-white font-semibold text-sm transition">
-          Se connecter
+          {t('visitor.verifyEmail.login')}
         </Link>
       </StatusCard>
     )
@@ -82,11 +84,11 @@ function VerifyEmailContent() {
         {status === 'success' && (
           <>
             <CheckCircle className="w-14 h-14 text-mint-500 mx-auto mb-4" />
-            <h1 className="font-display font-bold text-2xl text-primary-900 dark:text-sable mb-2">Email vérifié !</h1>
+            <h1 className="font-display font-bold text-2xl text-primary-900 dark:text-sable mb-2">{t('visitor.verifyEmail.successTitle')}</h1>
             <p className="text-primary-400 mb-6">{message}</p>
-            <p className="text-sm text-primary-300 mb-4">Redirection automatique dans 3 secondes…</p>
+            <p className="text-sm text-primary-300 mb-4">{t('visitor.verifyEmail.redirecting')}</p>
             <Link href="/" className="inline-block px-6 py-2.5 rounded-xl bg-mint-500 hover:bg-mint-700 text-white font-semibold text-sm transition">
-              Aller à l&apos;accueil
+              {t('visitor.verifyEmail.goHome')}
             </Link>
           </>
         )}
@@ -94,14 +96,14 @@ function VerifyEmailContent() {
         {status === 'error' && (
           <>
             <XCircle className="w-14 h-14 text-urgence-500 mx-auto mb-4" />
-            <h1 className="font-display font-bold text-2xl text-primary-900 dark:text-sable mb-2">Lien invalide</h1>
+            <h1 className="font-display font-bold text-2xl text-primary-900 dark:text-sable mb-2">{t('visitor.verifyEmail.invalidTitle')}</h1>
             <p className="text-primary-400 mb-6">{message}</p>
             <div className="flex flex-col gap-2">
               <Link href="/login" className="inline-block px-6 py-2.5 rounded-xl bg-primary-500 hover:bg-primary-700 text-white font-semibold text-sm transition">
-                Se connecter
+                {t('visitor.verifyEmail.login')}
               </Link>
               <Link href="/" className="inline-block px-6 py-2 rounded-xl text-primary-400 hover:text-primary-700 text-sm">
-                Retour à l&apos;accueil
+                {t('visitor.verifyEmail.backHome')}
               </Link>
             </div>
           </>
@@ -126,10 +128,11 @@ function StatusCard({ children }: { children: React.ReactNode }) {
 }
 
 function LoadingState() {
+  const { t } = useTranslation()
   return (
     <div className="flex flex-col items-center gap-3">
       <Loader2 className="w-10 h-10 text-mint-500 animate-spin" />
-      <p className="text-primary-400">Vérification en cours…</p>
+      <p className="text-primary-400">{t('visitor.verifyEmail.loading')}</p>
     </div>
   )
 }

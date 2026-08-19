@@ -1,6 +1,7 @@
 'use client'
 
 import { useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
 import type { DashboardStatusCounts, StatutConsultation } from '../../../types/api'
 import { STATUT_CONSULTATION } from '../../../types/api'
 
@@ -11,11 +12,11 @@ const STATUS_ORDER: StatutConsultation[] = [
   STATUT_CONSULTATION.ANNULEE,
 ]
 
-const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
-  OUVERTE: { label: 'Ouverte', color: '#3B6EF8' },
-  EN_COURS: { label: 'En cours', color: '#F59E0B' },
-  TERMINEE: { label: 'Terminée', color: '#10B981' },
-  ANNULEE: { label: 'Annulée', color: '#EF4444' },
+const STATUS_CONFIG: Record<string, { labelKey: string; color: string }> = {
+  OUVERTE: { labelKey: 'medecin.dashboard.status.open', color: '#3B6EF8' },
+  EN_COURS: { labelKey: 'medecin.dashboard.status.inProgress', color: '#F59E0B' },
+  TERMINEE: { labelKey: 'medecin.dashboard.status.finished', color: '#10B981' },
+  ANNULEE: { labelKey: 'medecin.dashboard.status.cancelled', color: '#EF4444' },
 }
 
 /**
@@ -25,6 +26,8 @@ const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
  * et reflètent l'ensemble de l'historique du médecin — pas un échantillon.
  */
 export default function DashboardFunnel({ statusCounts }: { statusCounts?: DashboardStatusCounts }) {
+  const { t } = useTranslation()
+
   const chartData = useMemo(() => {
     const counts = statusCounts ?? {
       [STATUT_CONSULTATION.OUVERTE]: 0,
@@ -36,21 +39,21 @@ export default function DashboardFunnel({ statusCounts }: { statusCounts?: Dashb
     const total = Object.values(counts).reduce((s, v) => s + v, 0) || 1
 
     return STATUS_ORDER.map((key) => ({
-      name: STATUS_CONFIG[key]?.label ?? key,
+      name: t(STATUS_CONFIG[key]?.labelKey ?? key),
       value: counts[key] ?? 0,
       pct: +(((counts[key] ?? 0) / total) * 100).toFixed(1),
       fill: STATUS_CONFIG[key]?.color ?? '#9CA3AF',
     }))
-  }, [statusCounts])
+  }, [statusCounts, t])
 
   const total = chartData.reduce((s, d) => s + d.value, 0)
 
   if (total === 0) {
     return (
       <div className="rounded-2xl bg-white p-5 shadow-[0_2px_12px_rgba(0,0,0,0.06)]">
-        <h3 className="text-sm font-bold text-[#0F2C52] mb-1">Répartition par statut</h3>
+        <h3 className="text-sm font-bold text-[#0F2C52] mb-1">{t('medecin.dashboard.funnel.title')}</h3>
         <div className="flex h-[240px] items-center justify-center">
-          <p className="text-sm text-[#9CA3AF]">Aucune donnée</p>
+          <p className="text-sm text-[#9CA3AF]">{t('medecin.dashboard.funnel.noData')}</p>
         </div>
       </div>
     )
@@ -58,8 +61,8 @@ export default function DashboardFunnel({ statusCounts }: { statusCounts?: Dashb
 
   return (
     <div className="rounded-2xl bg-white p-5 shadow-[0_2px_12px_rgba(0,0,0,0.06)]">
-      <h3 className="text-sm font-bold text-[#0F2C52] mb-1">Répartition par statut</h3>
-      <p className="text-xs text-[#6B7280] mb-4">{total} consultation{total > 1 ? 's' : ''} au total</p>
+      <h3 className="text-sm font-bold text-[#0F2C52] mb-1">{t('medecin.dashboard.funnel.title')}</h3>
+      <p className="text-xs text-[#6B7280] mb-4">{t('medecin.dashboard.funnel.total', { count: total })}</p>
 
       <div className="space-y-2">
         {chartData.map((d) => (

@@ -2,6 +2,7 @@
 'use client'
 
 import { useState, useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Dialog } from '@headlessui/react'
 import { motion } from 'framer-motion'
 import { Upload, X, FileSpreadsheet, AlertCircle, CheckCircle, Download, AlertTriangle, RefreshCw } from 'lucide-react'
@@ -16,6 +17,7 @@ export function ImportCentresModal({ isOpen, onClose, onSuccess }) {
   const [updateExisting, setUpdateExisting] = useState(false)
   const fileInputRef = useRef(null)
   const toast = useToast()
+  const { t } = useTranslation()
 
   const handleFileDrop = (e) => {
     e.preventDefault()
@@ -31,11 +33,11 @@ export function ImportCentresModal({ isOpen, onClose, onSuccess }) {
   const validateAndSetFile = (f) => {
     const ext = f.name.split('.').pop()?.toLowerCase()
     if (!['csv', 'xlsx', 'xls'].includes(ext)) {
-      toast.error('Format non supporté. Utilisez CSV ou Excel (.xlsx, .xls).')
+      toast.error(t('admin.import.formatError'))
       return
     }
     if (f.size > 10 * 1024 * 1024) {
-      toast.error('Fichier trop volumineux (max 10 MB).')
+      toast.error(t('admin.import.max10'))
       return
     }
     setFile(f)
@@ -43,7 +45,7 @@ export function ImportCentresModal({ isOpen, onClose, onSuccess }) {
   }
 
   const handleImport = async () => {
-    if (!file) { toast.error('Veuillez sélectionner un fichier.'); return }
+    if (!file) { toast.error(t('admin.import.selectFile')); return }
 
     setIsUploading(true)
     setProgress(0)
@@ -61,17 +63,19 @@ export function ImportCentresModal({ isOpen, onClose, onSuccess }) {
       setResults(data)
 
       const { imported, updated, errors } = data
-      let msg = `${imported} centre(s) importé(s)`
-      if (updated > 0) msg += `, ${updated} mis à jour`
-      if (errors > 0) msg += `, ${errors} erreur(s)`
+      let msg = t('admin.import.importedCentres', { count: imported })
+      if (updated > 0) msg += t('admin.import.updatedCount', { count: updated })
+      if (errors > 0) msg += t('admin.import.errorCount', { count: errors })
 
-      errors === 0 ? toast.success(msg) : toast.success(`${msg}. Consultez le rapport.`)
+      errors === 0
+        ? toast.success(msg)
+        : toast.success(t('admin.import.importSuccessCentres', { imported, updated, errors }))
 
       if (imported > 0 || updated > 0) {
         setTimeout(() => { onSuccess?.(); onClose() }, 3000)
       }
     } catch (err) {
-      toast.error(err.response?.data?.error || "Erreur lors de l'import.")
+      toast.error(err.response?.data?.error || t('admin.import.importError'))
     } finally {
       setIsUploading(false)
     }
@@ -86,7 +90,7 @@ export function ImportCentresModal({ isOpen, onClose, onSuccess }) {
       a.href = url; a.download = 'template_import_centres.csv'; a.click()
       URL.revokeObjectURL(url)
     } catch {
-      toast.error('Erreur lors du téléchargement du template.')
+      toast.error(t('admin.import.templateError'))
     }
   }
 
@@ -127,7 +131,7 @@ export function ImportCentresModal({ isOpen, onClose, onSuccess }) {
           {/* Header */}
           <div className="flex items-center justify-between mb-5">
             <Dialog.Title className="font-display font-bold text-xl text-primary-900 dark:text-sable">
-              Importer des centres de santé
+              {t('admin.import.titleCentres')}
             </Dialog.Title>
             <button onClick={handleClose} className="text-primary-300 hover:text-primary-700">
               <X className="w-6 h-6" />
@@ -150,10 +154,10 @@ export function ImportCentresModal({ isOpen, onClose, onSuccess }) {
                 <>
                   <Upload className="w-10 h-10 mx-auto text-primary-300 mb-3" />
                   <p className="text-sm font-semibold text-primary-700 dark:text-sable">
-                    Glissez-déposez votre fichier ici
+                    {t('admin.import.dropHere')}
                   </p>
                   <p className="text-xs text-primary-300 mt-1">
-                    ou cliquez pour parcourir
+                    {t('admin.import.clickBrowse')}
                   </p>
                   <input
                     ref={fileInputRef}
@@ -163,7 +167,7 @@ export function ImportCentresModal({ isOpen, onClose, onSuccess }) {
                     className="hidden"
                   />
                   <p className="text-xs text-primary-300 mt-3">
-                    CSV, Excel (.xlsx, .xls) — Max 10 MB
+                    {t('admin.import.formats')}
                   </p>
                 </>
               ) : (
@@ -193,7 +197,7 @@ export function ImportCentresModal({ isOpen, onClose, onSuccess }) {
                   className="rounded text-mint-500 focus:ring-mint-500"
                 />
                 <span className="text-sm text-primary-700 dark:text-sable">
-                  Mettre à jour les centres existants (nom + ville)
+                  {t('admin.import.updateExistingCentres')}
                 </span>
               </label>
             </div>
@@ -207,7 +211,7 @@ export function ImportCentresModal({ isOpen, onClose, onSuccess }) {
                     style={{ width: `${progress}%` }}
                   />
                 </div>
-                <p className="text-xs text-primary-300 text-center">Import en cours… {progress}%</p>
+                <p className="text-xs text-primary-300 text-center">{t('admin.import.importing', { progress })}</p>
               </div>
             )}
 
@@ -218,26 +222,26 @@ export function ImportCentresModal({ isOpen, onClose, onSuccess }) {
                   {statusIcon()}
                   <div className="flex-1 min-w-0">
                     <p className="font-semibold text-primary-900 dark:text-sable text-sm">
-                      {results.imported} centre(s) importé(s)
-                      {results.updated > 0 && `, ${results.updated} mis à jour`}
-                      {results.errors > 0 && `, ${results.errors} erreur(s)`}
-                      {` (${results.total} ligne(s) traitée(s))`}
+                      {t('admin.import.importedCentres', { count: results.imported })}
+                      {results.updated > 0 && t('admin.import.updatedCount', { count: results.updated })}
+                      {results.errors > 0 && t('admin.import.errorCount', { count: results.errors })}
+                      {t('admin.import.linesProcessed', { count: results.total })}
                     </p>
 
                     {(results.errorLog?.length > 0 || results.warnings?.length > 0) && (
                       <details className="mt-2">
                         <summary className="text-xs text-urgence-500 cursor-pointer font-semibold">
-                          Voir les détails ({results.errorLog?.length || 0} erreur(s), {results.warnings?.length || 0} avertissement(s))
+                          {t('admin.import.details', { count: results.errorLog?.length || 0, count2: results.warnings?.length || 0 })}
                         </summary>
                         <div className="mt-2 max-h-60 overflow-y-auto space-y-1">
                           {results.errorLog?.map((err, i) => (
                             <div key={i} className="text-xs text-urgence-600 bg-urgence-50 px-2 py-1 rounded">
-                              Ligne {err.row} : {err.error}
+                              {t('admin.import.rowError', { row: err.row, error: err.error })}
                             </div>
                           ))}
                           {results.warnings?.map((w, i) => (
                             <div key={i} className="text-xs text-yellow-700 bg-yellow-50 px-2 py-1 rounded">
-                              Ligne {w.row} : {w.message}
+                              {t('admin.import.rowError', { row: w.row, error: w.message })}
                             </div>
                           ))}
                         </div>
@@ -254,7 +258,7 @@ export function ImportCentresModal({ isOpen, onClose, onSuccess }) {
             {/* Colonnes attendues */}
             <div className="rounded-xl bg-primary-50 dark:bg-primary-900/40 p-3">
               <p className="text-xs font-semibold text-primary-500 dark:text-sable mb-1">
-                Colonnes du fichier :
+                {t('admin.import.colonnesFichier')}
               </p>
               <p className="text-xs text-primary-400 font-mono">
                 nom, type, region, ville, quartier, adresse, telephone, email, siteWeb, latitude, longitude, horaires, description, statut, estActif, specialites
@@ -267,14 +271,14 @@ export function ImportCentresModal({ isOpen, onClose, onSuccess }) {
                 onClick={handleDownloadTemplate}
                 className="inline-flex items-center gap-1.5 text-sm text-mint-500 hover:text-mint-700 font-semibold"
               >
-                <Download className="w-4 h-4" /> Template CSV
+                <Download className="w-4 h-4" /> {t('admin.import.templateCsv')}
               </button>
               <div className="flex gap-3">
                 <button
                   onClick={handleClose}
                   className="px-4 py-2 text-sm text-primary-500 dark:text-sable hover:text-primary-700 font-medium"
                 >
-                  Annuler
+                  {t('admin.import.cancel')}
                 </button>
                 <button
                   onClick={handleImport}
@@ -282,7 +286,7 @@ export function ImportCentresModal({ isOpen, onClose, onSuccess }) {
                   className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-mint-500 hover:bg-mint-700 text-white text-sm font-semibold disabled:opacity-60 transition"
                 >
                   <Upload className="w-4 h-4" />
-                  {isUploading ? 'Import en cours…' : 'Importer'}
+                  {isUploading ? t('admin.import.importingDots') : t('admin.import.importer')}
                 </button>
               </div>
             </div>

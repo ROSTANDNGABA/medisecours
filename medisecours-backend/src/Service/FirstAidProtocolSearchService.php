@@ -30,6 +30,21 @@ final class FirstAidProtocolSearchService
         'pediatrie' => 'Urgences pédiatriques',
     ];
 
+    public const CATEGORIES_EN = [
+        'respiration' => 'Breathing and choking',
+        'inconscience' => 'Unconsciousness and seizures',
+        'cardiovasculaire' => 'Heart and circulation',
+        'saignements' => 'Bleeding and wounds',
+        'brulures' => 'Burns',
+        'intoxications' => 'Poisoning',
+        'traumatismes' => 'Injuries',
+        'allergies' => 'Allergic reactions',
+        'fievre' => 'Fever and dehydration',
+        'environnement' => 'Heat, cold and environment',
+        'maternite' => 'Pregnancy and maternity',
+        'pediatrie' => 'Pediatric emergencies',
+    ];
+
     /**
      * Formulations courantes et locales (dont les recherches typiques)
      * associées aux slugs de protocoles. Les mots-clés sont normalisés

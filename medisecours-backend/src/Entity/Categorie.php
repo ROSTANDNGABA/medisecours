@@ -46,10 +46,16 @@ class Categorie
     #[Groups(['categorie:read', 'categorie:write', 'maladie:read'])]
     private ?string $nom = null;
 
+    #[ORM\Column(length: 255, nullable: true)]
+    private ?string $nomEn = null;
+
     #[ORM\Column(type: Types::TEXT, nullable: true)]
     #[Assert\Length(max: 5000)]
     #[Groups(['categorie:read', 'categorie:write'])]
     private ?string $description = null;
+
+    #[ORM\Column(type: Types::TEXT, nullable: true)]
+    private ?string $descriptionEn = null;
 
     #[ORM\Column(length: 7, nullable: true)]
     #[Assert\Regex(pattern: '/^#[0-9A-Fa-f]{6}$/')]
@@ -108,6 +114,18 @@ class Categorie
         return $this;
     }
 
+    public function getNomEn(): ?string
+    {
+        return $this->nomEn;
+    }
+
+    public function setNomEn(?string $nomEn): static
+    {
+        $this->nomEn = $nomEn;
+
+        return $this;
+    }
+
     public function getDescription(): ?string
     {
         return $this->description;
@@ -116,6 +134,18 @@ class Categorie
     public function setDescription(?string $description): static
     {
         $this->description = $description;
+
+        return $this;
+    }
+
+    public function getDescriptionEn(): ?string
+    {
+        return $this->descriptionEn;
+    }
+
+    public function setDescriptionEn(?string $descriptionEn): static
+    {
+        $this->descriptionEn = $descriptionEn;
 
         return $this;
     }

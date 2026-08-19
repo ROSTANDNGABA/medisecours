@@ -2,6 +2,7 @@
 'use client'
 
 import { useState, useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Upload } from 'lucide-react'
 import useSWR from 'swr'
 import CrudTable from '../../../components/admin/CrudTable'
@@ -15,10 +16,15 @@ import { ImportPremiersSoinsModal } from '@/components/admin/ImportPremiersSoins
 
 const GRAVITES = ['LÉGÈRE', 'MODÉRÉE', 'SÉVÈRE', 'CRITIQUE', 'VARIABLE']
 const URGENCES = ['FAIBLE', 'MOYEN', 'ÉLEVÉ', 'CRITIQUE']
-const TABS = ['Catégories', 'Maladies', 'Premiers Soins']
 
 export default function AdminCataloguePage() {
-  const [tab, setTab] = useState('Catégories')
+  const { t } = useTranslation()
+  const TABS = [
+    { key: 'categories',    label: t('admin.catalogue.tabCategories') },
+    { key: 'maladies',      label: t('admin.catalogue.tabMaladies') },
+    { key: 'premiersSoins', label: t('admin.catalogue.tabPremiersSoins') },
+  ]
+  const [tab, setTab] = useState('categories')
   const [showImportModal, setShowImportModal] = useState(false)
   const [refreshKey, setRefreshKey] = useState(0)
 
@@ -30,56 +36,56 @@ export default function AdminCataloguePage() {
   return (
     <div className="space-y-6">
       <section className="rounded-[28px] bg-[linear-gradient(135deg,#09170f_0%,#0f2418_60%,#183626_100%)] p-6 text-white shadow-[0_18px_45px_rgba(15,36,24,0.16)]">
-        <p className="text-xs font-semibold uppercase tracking-[0.24em] text-white/60">Base medicale</p>
-        <h1 className="mt-3 font-display text-3xl font-extrabold tracking-tight">Catalogue medical</h1>
+        <p className="text-xs font-semibold uppercase tracking-[0.24em] text-white/60">{t('admin.catalogue.eyebrow')}</p>
+        <h1 className="mt-3 font-display text-3xl font-extrabold tracking-tight">{t('admin.catalogue.title')}</h1>
         <p className="mt-3 max-w-2xl text-sm leading-6 text-white/72">
-          Structure les categories, les maladies et les fiches de premiers soins dans une interface unifiee.
+          {t('admin.catalogue.description')}
         </p>
       </section>
 
       <div className="flex flex-wrap gap-2">
-        {TABS.map((t) => (
+        {TABS.map((tabDef) => (
           <button
-            key={t}
-            onClick={() => setTab(t)}
+            key={tabDef.key}
+            onClick={() => setTab(tabDef.key)}
             className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
-              tab === t
+              tab === tabDef.key
                 ? 'bg-[#0f2418] text-white'
                 : 'border border-[#dfe5db] bg-white text-[#5f6c5d] hover:bg-[#edf2ea]'
             }`}
           >
-            {t}
+            {tabDef.label}
           </button>
         ))}
       </div>
 
-      {tab === 'Catégories' && (
+      {tab === 'categories' && (
         <CrudTable
           endpoint="/api/categories"
-          title="Catégories"
-          description="Classement visuel et editorial des contenus medicaux."
-          createLabel="Ajouter une categorie"
+          title={t('admin.catalogue.categoriesTitle')}
+          description={t('admin.catalogue.categoriesDesc')}
+          createLabel={t('admin.catalogue.createCategorie')}
           previewKeys={['icone', 'nom']}
           fields={[
-            { key: 'icone', label: 'Icône', type: 'icon-picker' },
-            { key: 'nom', label: 'Nom', type: 'text' },
-            { key: 'couleur', label: 'Couleur', type: 'color' },
-            { key: 'description', label: 'Description', type: 'textarea' },
+            { key: 'icone', label: t('admin.catalogue.fieldIcone'), type: 'icon-picker' },
+            { key: 'nom', label: t('admin.catalogue.fieldNom'), type: 'text' },
+            { key: 'couleur', label: t('admin.catalogue.fieldCouleur'), type: 'color' },
+            { key: 'description', label: t('admin.catalogue.fieldDescription'), type: 'textarea' },
           ]}
           editModal={(props) => <CategoryEditModal {...props} />}
         />
       )}
 
-      {tab === 'Maladies' && (
+      {tab === 'maladies' && (
         <div className="space-y-4">
           <div className="flex justify-between items-center">
-            <h2 className="text-lg font-semibold">Gestion des Maladies</h2>
+            <h2 className="text-lg font-semibold">{t('admin.catalogue.gestionMaladies')}</h2>
             <button
               onClick={() => setShowImportModal(true)}
               className="px-4 py-2 bg-mint-500 text-white rounded-md hover:bg-mint-600 inline-flex items-center gap-2"
             >
               <Upload className="h-4 w-4" />
-              Importer des maladies
+              {t('admin.catalogue.importerMaladies')}
             </button>
           </div>
 
@@ -92,25 +98,25 @@ export default function AdminCataloguePage() {
           <CrudTable
             key={refreshKey}
             endpoint="/api/maladies"
-            title="Maladies"
-            description="Base de connaissances medicales avec gravite, symptomes et traitements."
-            createLabel="Ajouter une maladie"
+            title={t('admin.catalogue.maladiesTitle')}
+            description={t('admin.catalogue.maladiesDesc')}
+            createLabel={t('admin.catalogue.createMaladie')}
             previewKeys={['imageUrl', 'nom', 'niveauGravite', 'categorie']}
             searchEndpoint="/api/maladies/search"
             fields={[
-              { key: 'nom', label: 'Nom', type: 'text' },
-              { key: 'niveauGravite', label: 'Gravité', type: 'select', options: GRAVITES },
-              { key: 'imageUrl', label: 'Image URL', type: 'image' },
-              { key: 'categorie', label: 'Catégorie', type: 'select-api', endpoint: '/api/categories', displayKey: 'nom' },
-              { key: 'urgence', label: 'Urgence', type: 'checkbox' },
-              { key: 'contagieux', label: 'Contagieux', type: 'checkbox' },
-              { key: 'isAccident', label: 'Accident', type: 'checkbox' },
-              { key: 'typeAccident', label: "Type d'accident", type: 'text' },
-              { key: 'description', label: 'Description', type: 'textarea' },
-              { key: 'symptomes', label: 'Symptômes', type: 'textarea' },
-              { key: 'causes', label: 'Causes', type: 'textarea' },
-              { key: 'precautions', label: 'Précautions', type: 'textarea' },
-              { key: 'traitement', label: 'Traitement', type: 'textarea' },
+              { key: 'nom', label: t('admin.catalogue.fieldNom'), type: 'text' },
+              { key: 'niveauGravite', label: t('admin.catalogue.fieldNiveauGravite'), type: 'select', options: GRAVITES },
+              { key: 'imageUrl', label: t('admin.catalogue.fieldImageUrl'), type: 'image' },
+              { key: 'categorie', label: t('admin.catalogue.fieldCategorie'), type: 'select-api', endpoint: '/api/categories', displayKey: 'nom' },
+              { key: 'urgence', label: t('admin.catalogue.fieldUrgence'), type: 'checkbox' },
+              { key: 'contagieux', label: t('admin.catalogue.fieldContagieux'), type: 'checkbox' },
+              { key: 'isAccident', label: t('admin.catalogue.fieldAccident'), type: 'checkbox' },
+              { key: 'typeAccident', label: t('admin.catalogue.fieldTypeAccident'), type: 'text' },
+              { key: 'description', label: t('admin.catalogue.fieldDescription'), type: 'textarea' },
+              { key: 'symptomes', label: t('admin.catalogue.fieldSymptomes'), type: 'textarea' },
+              { key: 'causes', label: t('admin.catalogue.fieldCauses'), type: 'textarea' },
+              { key: 'precautions', label: t('admin.catalogue.fieldPrecautions'), type: 'textarea' },
+              { key: 'traitement', label: t('admin.catalogue.fieldTraitement'), type: 'textarea' },
             ]}
             editModal={(props) => <DiseaseEditModal {...props} />}
             detailModal={({ item, onClose, onMutate }) => <DiseaseDetailModal maladie={item} onClose={onClose} onMutate={onMutate} />}
@@ -118,12 +124,13 @@ export default function AdminCataloguePage() {
         </div>
       )}
 
-      {tab === 'Premiers Soins' && <PremierSoinsTab />}
+      {tab === 'premiersSoins' && <PremierSoinsTab />}
     </div>
   )
 }
 
 function PremierSoinsTab() {
+  const { t } = useTranslation()
   const [showImportPSModal, setShowImportPSModal] = useState(false)
   const [refreshKeyPS, setRefreshKeyPS] = useState(0)
   const { data: maladies = [] } = useSWR('/api/maladies', fetcher, { revalidateOnFocus: false })
@@ -141,13 +148,13 @@ function PremierSoinsTab() {
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
-        <h2 className="text-lg font-semibold">Gestion des Premiers Soins</h2>
+        <h2 className="text-lg font-semibold">{t('admin.catalogue.gestionPremiersSoins')}</h2>
         <button
           onClick={() => setShowImportPSModal(true)}
           className="px-4 py-2 bg-mint-500 text-white rounded-md hover:bg-mint-600 inline-flex items-center gap-2"
         >
           <Upload className="h-4 w-4" />
-          Importer des premiers soins
+          {t('admin.catalogue.importerPremiersSoins')}
         </button>
       </div>
 
@@ -160,17 +167,17 @@ function PremierSoinsTab() {
       <CrudTable
         key={refreshKeyPS}
         endpoint="/api/premier_soins"
-        title="Premiers Soins"
-        description="Guides de premiers gestes et protocoles d urgence."
-        createLabel="Ajouter une fiche"
+        title={t('admin.catalogue.premiersSoinsTitle')}
+        description={t('admin.catalogue.premiersSoinsDesc')}
+        createLabel={t('admin.catalogue.createFiche')}
         previewKeys={['titre', 'niveauUrgence', 'maladie']}
         fields={[
-          { key: 'titre', label: 'Titre', type: 'text' },
-          { key: 'niveauUrgence', label: 'Urgence', type: 'select', options: URGENCES },
-          { key: 'maladie', label: 'Maladie', type: 'select-api', endpoint: '/api/maladies', displayKey: 'nom',
+          { key: 'titre', label: t('admin.catalogue.fieldTitre'), type: 'text' },
+          { key: 'niveauUrgence', label: t('admin.catalogue.fieldNiveauUrgence'), type: 'select', options: URGENCES },
+          { key: 'maladie', label: t('admin.catalogue.fieldMaladie'), type: 'select-api', endpoint: '/api/maladies', displayKey: 'nom',
             render: (value) => typeof value === 'string' ? (maladieMap[value] || value.split('/').pop()) : String(value ?? '-') },
-          { key: 'description', label: 'Description', type: 'textarea' },
-          { key: 'symptomes', label: 'Symptômes', type: 'textarea' },
+          { key: 'description', label: t('admin.catalogue.fieldDescription'), type: 'textarea' },
+          { key: 'symptomes', label: t('admin.catalogue.fieldSymptomes'), type: 'textarea' },
         ]}
         editModal={(props) => <PremierSoinEditModal {...props} />}
       />

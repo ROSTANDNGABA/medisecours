@@ -10,6 +10,10 @@ use App\Entity\ProtocolePremiersGestes;
 /** Serialisation publique minimale, sans donnees administratives internes. */
 final class FirstAidProtocolPublicSerializer
 {
+    public function __construct(private readonly ContentLocalizer $localizer)
+    {
+    }
+
     /**
      * @return array<string, mixed>
      */
@@ -17,21 +21,21 @@ final class FirstAidProtocolPublicSerializer
     {
         return [
             'slug' => $protocol->getSlug(),
-            'titre' => $protocol->getTitre(),
+            'titre' => $this->localizer->pick($protocol->getTitre(), $protocol->getTitreEn()),
             'categorie' => $protocol->getCategorie(),
             'masterSlug' => $protocol->getMasterSlug(),
             'variantKey' => $protocol->getVariantKey(),
             'niveauUrgence' => $protocol->getNiveauUrgence(),
             'population' => $protocol->getPopulation(),
             'version' => $protocol->getVersion(),
-            'sourceClinique' => $protocol->getSourceClinique(),
-            'restrictionsPopulations' => $protocol->getRestrictionsPopulations(),
+            'sourceClinique' => $this->localizer->pickNullable($protocol->getSourceClinique(), $protocol->getSourceCliniqueEn()),
+            'restrictionsPopulations' => $this->localizer->pickNullable($protocol->getRestrictionsPopulations(), $protocol->getRestrictionsPopulationsEn()),
             'etapes' => array_map(
-                static fn (ProtocoleEtape $step): array => [
+                fn (ProtocoleEtape $step): array => [
                     'position' => $step->getPosition(),
                     'type' => $step->getType(),
-                    'titre' => $step->getTitre(),
-                    'instruction' => $step->getInstruction(),
+                    'titre' => $this->localizer->pickNullable($step->getTitre(), $step->getTitreEn()),
+                    'instruction' => $this->localizer->pick($step->getInstruction(), $step->getInstructionEn()),
                 ],
                 $protocol->getEtapes()->toArray()
             ),

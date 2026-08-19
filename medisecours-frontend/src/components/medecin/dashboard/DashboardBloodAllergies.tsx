@@ -2,6 +2,7 @@
 
 import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts'
 import { FlaskConical } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import type { DashboardAllergie } from '../../../types/api'
 
 const BLOOD_COLORS: Record<string, string> = {
@@ -22,6 +23,7 @@ export default function DashboardBloodAllergies({
   bloodDistribution: Record<string, number>
   allergies?: DashboardAllergie[]
 }) {
+  const { t } = useTranslation()
   const bloodData = Object.entries(bloodDistribution)
     .map(([name, value]) => ({ name, value, color: BLOOD_COLORS[name] || '#9CA3AF' }))
     .sort((a, b) => b.value - a.value)
@@ -33,9 +35,9 @@ export default function DashboardBloodAllergies({
   if (!hasAny) {
     return (
       <div className="rounded-2xl bg-white p-5 shadow-[0_2px_12px_rgba(0,0,0,0.06)]">
-        <h3 className="text-sm font-bold text-[#0F2C52] mb-1">Patients</h3>
+        <h3 className="text-sm font-bold text-[#0F2C52] mb-1">{t('medecin.dashboard.blood.patients')}</h3>
         <div className="flex h-[200px] items-center justify-center">
-          <p className="text-sm text-[#9CA3AF]">Aucune donnée patient</p>
+          <p className="text-sm text-[#9CA3AF]">{t('medecin.dashboard.blood.noPatientData')}</p>
         </div>
       </div>
     )
@@ -43,8 +45,8 @@ export default function DashboardBloodAllergies({
 
   return (
     <div className="rounded-2xl bg-white p-5 shadow-[0_2px_12px_rgba(0,0,0,0.06)]">
-      <h3 className="text-sm font-bold text-[#0F2C52] mb-1">Patients</h3>
-      <p className="text-xs text-[#6B7280] mb-3">Groupes sanguins & allergies</p>
+      <h3 className="text-sm font-bold text-[#0F2C52] mb-1">{t('medecin.dashboard.blood.patients')}</h3>
+      <p className="text-xs text-[#6B7280] mb-3">{t('medecin.dashboard.blood.subtitle')}</p>
 
       {hasBloodData && (
         <>
@@ -83,14 +85,14 @@ export default function DashboardBloodAllergies({
       {hasAllergies && (
         <div>
           <p className="flex items-center gap-1 text-[10px] font-semibold text-[#6B7280] mb-1.5">
-            <FlaskConical className="h-3 w-3" /> Allergies fréquentes
+            <FlaskConical className="h-3 w-3" /> {t('medecin.dashboard.blood.frequentAllergies')}
           </p>
           <div className="flex flex-wrap gap-1">
             {allergies!.slice(0, 4).map((a) => (
               <span
                 key={a.name}
                 className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-700"
-                title={`${a.count} patient(s)`}
+                title={t('medecin.dashboard.blood.patientCount', { count: a.count })}
               >
                 {a.name}
                 <span className="text-[9px] text-amber-500">{a.count}</span>

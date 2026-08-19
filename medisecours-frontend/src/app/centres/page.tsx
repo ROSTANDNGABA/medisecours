@@ -25,17 +25,23 @@ import EmptyState from '../../components/ui/EmptyState'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import Modal from '../../components/ui/Modal'
 import { useToast } from '../../components/ui/Toast'
+import { useTranslation } from 'react-i18next'
 import { useGeolocation } from '../../hooks/useGeolocation'
 import { useWayfinding } from '../../hooks/useWayfinding'
 import { imgUrl } from '../../lib/config'
 
+function CentresMapLoading() {
+  const { t } = useTranslation()
+  return (
+    <div className="flex h-full w-full items-center justify-center">
+      <LoadingSpinner label={t('visitor.centres.mapLoading')} />
+    </div>
+  )
+}
+
 const CentresMap = dynamic(() => import('../../components/CentresMap'), {
   ssr: false,
-  loading: () => (
-    <div className="flex h-full w-full items-center justify-center">
-      <LoadingSpinner label="Chargement de la carte…" />
-    </div>
-  ),
+  loading: () => <CentresMapLoading />,
 })
 
 type TravelMode = 'driving' | 'walking'
@@ -115,6 +121,7 @@ function getCentrePhotos(centre: Centre) {
 }
 
 export default function CentresPage() {
+  const { t } = useTranslation()
   const [centres, setCentres] = useState<Centre[]>([])
   const [loading, setLoading] = useState(true)
   const [selected, setSelected] = useState<number | null>(null)
@@ -165,12 +172,12 @@ export default function CentresPage() {
       .then((response) => setCentres(extractArray(response)))
       .catch((requestError) => {
         if (requestError.name !== 'CanceledError' && requestError.message !== 'canceled') {
-          toast.error('Impossible de charger les centres de santé.')
+          toast.error(t('visitor.centres.loadError'))
         }
       })
       .finally(() => setLoading(false))
     return controller
-  }, [toast])
+  }, [toast, t])
 
   const fetchNearbyCentres = useCallback((coordinates: { lat: number; lng: number }) => {
     const controller = new AbortController()
@@ -184,11 +191,11 @@ export default function CentresPage() {
       })
       .catch((requestError) => {
         if (requestError.name !== 'CanceledError' && requestError.message !== 'canceled') {
-          toast.error('Impossible de récupérer les centres proches.')
+          toast.error(t('visitor.centres.nearbyError'))
         }
       })
     return controller
-  }, [toast])
+  }, [toast, t])
 
   useEffect(() => {
     const controller = fetchAllCentres()
@@ -306,7 +313,7 @@ export default function CentresPage() {
         {sidebarOpen && (
           <motion.button
             type="button"
-            aria-label="Fermer le panneau des centres"
+            aria-label={t('visitor.centres.closePanel')}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -317,7 +324,7 @@ export default function CentresPage() {
       </AnimatePresence>
 
       <aside
-        aria-label="Recherche et liste des centres de santé"
+        aria-label={t('visitor.centres.title')}
         className={`absolute inset-y-0 left-0 z-[700] flex w-[min(90vw,410px)] flex-col border-r border-slate-200/90 bg-white/96 shadow-[14px_0_40px_rgba(15,23,42,0.18)] backdrop-blur-xl transition-transform duration-300 ease-out lg:w-[410px] dark:border-white/10 dark:bg-slate-950/96 ${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
@@ -326,34 +333,34 @@ export default function CentresPage() {
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0">
               <p className="text-xs font-bold uppercase tracking-[0.16em] text-mint-600 dark:text-mint-400">
-                À proximité
+                {t('visitor.centres.eyebrow')}
               </p>
               <h1 className="mt-1 font-display text-2xl font-bold text-slate-950 dark:text-white">
-                Centres de santé
+                {t('visitor.centres.title')}
               </h1>
               <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">
-                Recherchez un établissement, puis sélectionnez-le pour afficher l’itinéraire.
+                {t('visitor.centres.subtitle')}
               </p>
             </div>
             <button
               type="button"
               onClick={() => setSidebarOpen(false)}
               className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:bg-slate-100 dark:border-white/10 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
-              aria-label="Réduire le panneau"
-              title="Réduire le panneau"
+              aria-label={t('visitor.centres.closePanel')}
+              title={t('visitor.centres.closePanel')}
             >
               <PanelLeftClose className="h-5 w-5" />
             </button>
           </div>
 
           <label className="relative mt-4 block">
-            <span className="sr-only">Rechercher un centre de santé</span>
+            <span className="sr-only">{t('visitor.centres.searchSrOnly')}</span>
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             <input
               value={searchQuery}
               onChange={(event) => setSearchQuery(event.target.value)}
               type="search"
-              placeholder="Nom, ville, quartier ou type"
+              placeholder={t('visitor.centres.searchPlaceholder')}
               className="h-11 w-full rounded-lg border border-slate-200 bg-slate-50 pl-10 pr-9 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-primary-500 focus:ring-4 focus:ring-primary-500/10 dark:border-white/10 dark:bg-slate-900 dark:text-white dark:placeholder:text-slate-500"
             />
             {searchQuery && (
@@ -361,7 +368,7 @@ export default function CentresPage() {
                 type="button"
                 onClick={() => setSearchQuery('')}
                 className="absolute right-1.5 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-md text-slate-400 transition hover:bg-slate-200 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-white"
-                aria-label="Effacer la recherche"
+                aria-label={t('visitor.centres.clearSearch')}
               >
                 <X className="h-4 w-4" />
               </button>
@@ -379,7 +386,7 @@ export default function CentresPage() {
               ? <Loader2 className="h-4 w-4 animate-spin" />
               : <LocateFixed className="h-4 w-4" />
             }
-            {locating ? 'Localisation…' : (isWatching ? 'Suivi GPS en cours' : 'Me localiser')}
+            {locating ? t('visitor.centres.locating') : (isWatching ? t('visitor.centres.tracking') : t('visitor.centres.locateMe'))}
           </button>
 
           {error && (
@@ -390,7 +397,7 @@ export default function CentresPage() {
           )}
 
           {position && selected && (
-            <div className="mt-3 flex items-center gap-2" aria-label="Mode de déplacement">
+            <div className="mt-3 flex items-center gap-2" aria-label={t('visitor.centres.travelMode')}>
               {(['driving', 'walking'] as TravelMode[]).map((travelMode) => (
                 <button
                   key={travelMode}
@@ -404,8 +411,8 @@ export default function CentresPage() {
                   }`}
                 >
                   {travelMode === 'driving'
-                    ? <><Car className="h-4 w-4" /> En voiture</>
-                    : <><Footprints className="h-4 w-4" /> À pied</>
+                    ? <><Car className="h-4 w-4" /> {t('visitor.centres.driving')}</>
+                    : <><Footprints className="h-4 w-4" /> {t('visitor.centres.walking')}</>
                   }
                 </button>
               ))}
@@ -422,12 +429,12 @@ export default function CentresPage() {
               >
                 <div
                   className="rounded-lg border border-primary-200 bg-primary-50 p-3 dark:border-primary-700 dark:bg-primary-900/40"
-                  aria-label={`Itinéraire vers ${destination.nom}`}
+                  aria-label={t('visitor.centres.routeTo', { name: destination.nom })}
                 >
                   {routeLoading ? (
                     <p className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
                       <Loader2 className="h-4 w-4 animate-spin" />
-                      Calcul de l’itinéraire…
+                      {t('visitor.centres.routeCalculating')}
                     </p>
                   ) : routeError && !route ? (
                     <p className="flex items-start gap-2 text-xs text-red-600 dark:text-red-300">
@@ -445,7 +452,7 @@ export default function CentresPage() {
                           type="button"
                           onClick={clearAll}
                           className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-slate-500 transition hover:bg-white hover:text-red-600 dark:hover:bg-white/10 dark:hover:text-red-300"
-                          aria-label="Effacer l’itinéraire"
+                          aria-label={t('visitor.centres.clearRoute')}
                         >
                           <X className="h-4 w-4" />
                         </button>
@@ -461,7 +468,7 @@ export default function CentresPage() {
                         </span>
                         {isFallback && (
                           <span className="rounded-full bg-amber-100 px-2 py-1 text-[10px] text-amber-800 dark:bg-amber-500/15 dark:text-amber-300">
-                            Trajet approximatif
+                            {t('visitor.centres.approximateRoute')}
                           </span>
                         )}
                       </div>
@@ -477,13 +484,13 @@ export default function CentresPage() {
           <div className="flex shrink-0 items-center justify-between border-b border-slate-100 px-4 py-3 dark:border-white/10 sm:px-5">
             <p className="text-sm font-bold text-slate-800 dark:text-slate-100">
               {loading
-                ? 'Recherche des centres…'
-                : `${visibleCentres.length} centre${visibleCentres.length > 1 ? 's' : ''}`
+                ? t('visitor.centres.searching')
+                : t('visitor.centres.centresCount', { count: visibleCentres.length })
               }
             </p>
             {position && (
               <span className="text-[11px] font-semibold text-mint-700 dark:text-mint-400">
-                Par distance
+                {t('visitor.centres.byDistance')}
               </span>
             )}
           </div>
@@ -494,15 +501,15 @@ export default function CentresPage() {
           >
             {loading ? (
               <div className="py-10">
-                <LoadingSpinner label="Chargement des centres…" />
+                <LoadingSpinner label={t('visitor.centres.loadingCentres')} />
               </div>
             ) : visibleCentres.length === 0 ? (
               <div className="py-8">
                 <EmptyState
-                  title={searchQuery ? 'Aucun résultat' : 'Aucun centre disponible'}
+                  title={searchQuery ? t('visitor.centres.noResultTitle') : t('visitor.centres.noCentreTitle')}
                   description={searchQuery
-                    ? 'Modifiez votre recherche pour afficher d’autres centres.'
-                    : 'Le réseau de centres de santé est en cours de mise à jour.'
+                    ? t('visitor.centres.noResultDesc')
+                    : t('visitor.centres.noCentreDesc')
                   }
                 />
               </div>
@@ -545,7 +552,7 @@ export default function CentresPage() {
                         </h2>
                         <p className="mt-1 flex items-start gap-1.5 text-xs leading-5 text-slate-500 dark:text-slate-400">
                           <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                          <span>{centre.adresse || centre.ville || 'Adresse non renseignée'}</span>
+                          <span>{centre.adresse || centre.ville || t('visitor.centres.addressUnknown')}</span>
                         </p>
                       </div>
                       {centreDistance != null && (
@@ -565,15 +572,15 @@ export default function CentresPage() {
                         className="inline-flex min-h-9 flex-1 items-center justify-center gap-1.5 rounded-md border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 transition hover:bg-slate-100 dark:border-white/10 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
                       >
                         <Eye className="h-3.5 w-3.5" />
-                        Détails
+                        {t('common.details')}
                       </button>
                       {centre.telephone && (
                         <a
                           href={`tel:${centre.telephone}`}
                           onClick={(event) => event.stopPropagation()}
                           className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-slate-200 bg-white text-mint-700 transition hover:bg-mint-50 dark:border-white/10 dark:bg-slate-800 dark:text-mint-400 dark:hover:bg-slate-700"
-                          aria-label={`Appeler ${centre.nom}`}
-                          title="Appeler"
+                          aria-label={t('visitor.centres.callAria', { name: centre.nom })}
+                          title={t('visitor.centres.callTitle')}
                         >
                           <Phone className="h-4 w-4" />
                         </a>
@@ -590,8 +597,8 @@ export default function CentresPage() {
                               ? 'border-mint-600 bg-mint-600 text-white'
                               : 'border-slate-200 bg-white text-primary-600 hover:bg-primary-50 dark:border-white/10 dark:bg-slate-800 dark:text-primary-300 dark:hover:bg-slate-700'
                           }`}
-                          aria-label={isSelected ? 'Itinéraire actif' : `Itinéraire vers ${centre.nom}`}
-                          title={isSelected ? 'Itinéraire actif' : 'Afficher l’itinéraire'}
+                          aria-label={isSelected ? t('visitor.centres.routeActive') : t('visitor.centres.routeTo', { name: centre.nom })}
+                          title={isSelected ? t('visitor.centres.routeActive') : t('visitor.centres.routeTitle')}
                         >
                           <Navigation className="h-4 w-4" />
                         </button>
@@ -610,10 +617,10 @@ export default function CentresPage() {
           type="button"
           onClick={() => setSidebarOpen(true)}
           className="absolute left-3 top-3 z-[600] inline-flex min-h-11 items-center gap-2 rounded-lg border border-white/80 bg-white/95 px-4 text-sm font-bold text-slate-800 shadow-xl backdrop-blur-md transition hover:bg-white dark:border-white/15 dark:bg-slate-950/95 dark:text-white dark:hover:bg-slate-900 lg:left-5 lg:top-5"
-          aria-label="Ouvrir la liste des centres"
+          aria-label={t('visitor.centres.openList')}
         >
           <PanelLeftOpen className="h-5 w-5" />
-          <span>Centres</span>
+          <span>{t('visitor.nav.centres')}</span>
           {!loading && (
             <span className="rounded-full bg-primary-100 px-2 py-0.5 text-[10px] text-primary-700 dark:bg-primary-500/20 dark:text-primary-200">
               {visibleCentres.length}
@@ -633,14 +640,14 @@ export default function CentresPage() {
           }`}
         >
           <LocateFixed className={`h-4 w-4 ${isTracking ? 'animate-pulse' : ''}`} />
-          {isTracking ? 'Arrêter le suivi' : 'Suivre ma position'}
+          {isTracking ? t('visitor.centres.stopTracking') : t('visitor.centres.trackPosition')}
         </button>
       )}
 
       <Modal
         isOpen={Boolean(previewCentre)}
         onClose={() => setPreviewCentre(null)}
-        title="Détails du centre"
+        title={t('visitor.centres.modalTitle')}
       >
         {previewCentre && (
           <div className="space-y-4">
@@ -659,7 +666,7 @@ export default function CentresPage() {
                 {previewCentre.nom}
               </h2>
               <p className="mt-1 text-sm font-semibold text-primary-600 dark:text-primary-300">
-                {previewCentre.type_centre || 'Centre de santé'}
+                {previewCentre.type_centre || t('visitor.centres.typeDefault')}
               </p>
             </div>
 
@@ -667,9 +674,9 @@ export default function CentresPage() {
               <div className="flex items-start gap-3">
                 <MapPin className="mt-0.5 h-5 w-5 shrink-0 text-primary-500" />
                 <div>
-                  <p className="text-sm font-bold text-slate-800 dark:text-slate-100">Adresse</p>
+                  <p className="text-sm font-bold text-slate-800 dark:text-slate-100">{t('visitor.centres.addressLabel')}</p>
                   <p className="text-sm text-slate-600 dark:text-slate-300">
-                    {previewCentre.adresse || 'Non renseignée'}
+                    {previewCentre.adresse || t('visitor.centres.addressMissing')}
                     {(previewCentre.ville || previewCentre.region) && (
                       <>
                         <br />
@@ -684,7 +691,7 @@ export default function CentresPage() {
                 <div className="flex items-start gap-3">
                   <Phone className="mt-0.5 h-5 w-5 shrink-0 text-primary-500" />
                   <div>
-                    <p className="text-sm font-bold text-slate-800 dark:text-slate-100">Téléphone</p>
+                    <p className="text-sm font-bold text-slate-800 dark:text-slate-100">{t('visitor.centres.phoneLabel')}</p>
                     <a
                       href={`tel:${previewCentre.telephone}`}
                       className="text-sm font-semibold text-mint-700 hover:underline dark:text-mint-400"
@@ -699,7 +706,7 @@ export default function CentresPage() {
                 <div className="flex items-start gap-3">
                   <Clock className="mt-0.5 h-5 w-5 shrink-0 text-primary-500" />
                   <div>
-                    <p className="text-sm font-bold text-slate-800 dark:text-slate-100">Horaires</p>
+                    <p className="text-sm font-bold text-slate-800 dark:text-slate-100">{t('visitor.centres.hoursLabel')}</p>
                     <p className="text-sm text-slate-600 dark:text-slate-300">{previewCentre.horaires}</p>
                   </div>
                 </div>
@@ -708,7 +715,7 @@ export default function CentresPage() {
 
             {previewCentre.capacite_lits != null && (
               <div className="flex items-center justify-between rounded-lg border border-slate-200 px-4 py-3 dark:border-white/10">
-                <span className="text-sm text-slate-600 dark:text-slate-300">Capacité en lits</span>
+                <span className="text-sm text-slate-600 dark:text-slate-300">{t('visitor.centres.bedCapacity')}</span>
                 <span className="font-bold text-slate-950 dark:text-white">{previewCentre.capacite_lits}</span>
               </div>
             )}
@@ -716,7 +723,7 @@ export default function CentresPage() {
             {previewCentre.services && (
               <div>
                 <p className="mb-2 text-sm font-bold text-slate-800 dark:text-slate-100">
-                  Services disponibles
+                  {t('visitor.centres.servicesLabel')}
                 </p>
                 <div className="flex flex-wrap gap-2">
                   {(Array.isArray(previewCentre.services)
@@ -737,14 +744,14 @@ export default function CentresPage() {
             {getCentrePhotos(previewCentre).length > 1 && (
               <div>
                 <p className="mb-2 text-sm font-bold text-slate-800 dark:text-slate-100">
-                  Photos du centre
+                  {t('visitor.centres.photosLabel')}
                 </p>
                 <div className="flex snap-x gap-3 overflow-x-auto pb-2">
                   {getCentrePhotos(previewCentre).map((photo, index) => (
                     <img
                       key={`${photo}-${index}`}
                       src={imgUrl(photo) || photo}
-                      alt={`Photo ${index + 1} de ${previewCentre.nom}`}
+                      alt={t('visitor.centres.photoAlt', { number: index + 1, name: previewCentre.nom })}
                       className="h-32 w-48 shrink-0 snap-start rounded-lg border border-slate-200 object-cover dark:border-white/10"
                     />
                   ))}

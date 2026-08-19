@@ -1,6 +1,8 @@
 'use client'
 
 import { useEffect, useRef, useCallback, useSyncExternalStore } from 'react'
+import { changeLanguage, type AppLocale } from '../i18n'
+import { mutate as globalMutate } from 'swr'
 
 function resolveWebSocketUrl(configuredUrl?: string): string {
   const fallbackUrl = 'ws://127.0.0.1:8081/ws'
@@ -24,6 +26,17 @@ const PONG_TIMEOUT = 10000
 const connectedSockets = new Set<WebSocket>()
 const wsStatusListeners = new Set<() => void>()
 let wsConnected = false
+
+export function broadcastLanguageChange(locale: string) {
+  if (locale !== 'fr' && locale !== 'en') return
+
+  for (const ws of connectedSockets) {
+    if (ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ type: 'language_change', locale }))
+      break
+    }
+  }
+}
 
 function emitWsStatus() {
   for (const listener of wsStatusListeners) listener()
@@ -50,6 +63,7 @@ export function useWebSocket(userId: string, token: string, handlers: {
   onConsultationAccepted?: (data: any) => void
   onConsultationClosed?: (data: any) => void
   onProfilePhotoChanged?: (data: any) => void
+  onLanguageChanged?: (data: any) => void
 }, role?: string) {
   const wsRef = useRef<WebSocket | null>(null)
   const attemptRef = useRef(0)
@@ -142,6 +156,14 @@ export function useWebSocket(userId: string, token: string, handlers: {
           if (evt === 'consultation_accepted' && h.onConsultationAccepted) h.onConsultationAccepted(payload)
           if (evt === 'consultation_closed' && h.onConsultationClosed) h.onConsultationClosed(payload)
           if (evt === 'profile_photo_changed' && h.onProfilePhotoChanged) h.onProfilePhotoChanged(payload)
+          if (evt === 'language_changed') {
+            const locale = payload?.locale
+            if (locale === 'fr' || locale === 'en') {
+              changeLanguage(locale as AppLocale)
+              globalMutate()
+            }
+            if (h.onLanguageChanged) h.onLanguageChanged(payload)
+          }
         } catch { /* ignore */ }
       }
 

@@ -2,6 +2,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Camera, Save, ShieldCheck, Star, ClipboardList, MessageSquare, Plus, Trash2 } from 'lucide-react'
 import { mutate as globalMutate } from 'swr'
 import api from '../../../api/axios'
@@ -13,19 +14,12 @@ import CertifiedBadge from '../../../components/ui/CertifiedBadge'
 import LoadingSpinner from '../../../components/ui/LoadingSpinner'
 import { CONVERSATIONS_KEY } from '../../../lib/keys'
 
-const DAYS = [
-  { key: 'lundi', label: 'Lun' },
-  { key: 'mardi', label: 'Mar' },
-  { key: 'mercredi', label: 'Mer' },
-  { key: 'jeudi', label: 'Jeu' },
-  { key: 'vendredi', label: 'Ven' },
-  { key: 'samedi', label: 'Sam' },
-  { key: 'dimanche', label: 'Dim' },
-]
+const DAYS = ['lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi', 'dimanche']
 
 export default function MedecinProfilPage() {
   const { user, updateUser } = useAuth()
   const toast = useToast()
+  const { t } = useTranslation()
   const fileRef = useRef(null)
   const initializedProfileId = useRef(null)
   const [saving, setSaving] = useState(false)
@@ -112,7 +106,7 @@ export default function MedecinProfilPage() {
   const handleSave = async () => {
     const invalidSlot = dispo.find((slot) => !slot.debut || !slot.fin || slot.debut >= slot.fin)
     if (invalidSlot) {
-      toast.error(`Vérifiez les horaires du ${invalidSlot.jour} : l’heure de fin doit suivre l’heure de début.`)
+      toast.error(t('medecin.profil.verifyScheduleError', { day: t(`medecin.dayFull.${invalidSlot.jour}`) }))
       return
     }
 
@@ -123,14 +117,14 @@ export default function MedecinProfilPage() {
       const { data } = await api.patch(`/api/users/${user.id}`, { ...profilePayload, disponibilites: dispo }, { headers: { 'Content-Type': 'application/merge-patch+json' } })
       updateUser({ ...user, ...data })
       globalMutate((key) => typeof key === 'string' && key.startsWith('/api/medecins-publics'))
-      toast.success('Profil mis à jour.')
+      toast.success(t('medecin.profil.saved'))
     } catch (error) {
       const serverMessage = error?.response?.data?.detail || error?.response?.data?.message
       if (serverMessage) {
         toast.error(serverMessage)
         return
       }
-      toast.error('Échec de la mise à jour du profil.')
+      toast.error(t('medecin.profil.saveError'))
     } finally {
       setSaving(false)
     }
@@ -140,12 +134,12 @@ export default function MedecinProfilPage() {
     const file = e.target.files?.[0]
     if (!file) return
     if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
-      toast.error('Format non autorise. Utilisez une image JPEG, PNG ou WebP.')
+      toast.error(t('medecin.profil.formatError'))
       e.target.value = ''
       return
     }
     if (file.size > 5 * 1024 * 1024) {
-      toast.error('La photo ne doit pas depasser 5 Mo.')
+      toast.error(t('medecin.profil.sizeError'))
       e.target.value = ''
       return
     }
@@ -158,13 +152,13 @@ export default function MedecinProfilPage() {
       updateUser(nextUser)
       globalMutate(CONVERSATIONS_KEY)
       globalMutate((key) => typeof key === 'string' && key.startsWith('/api/medecins-publics'))
-      toast.success('Photo de profil mise à jour.')
+      toast.success(t('medecin.profil.photoUpdated'))
     } catch (err: any) {
       console.error('Upload error:', err?.response?.data || err)
       toast.error(
         err?.response?.data?.error
         || err?.response?.data?.detail
-        || "Échec de l'envoi de la photo.",
+        || t('medecin.profil.photoError'),
       )
     } finally {
       setUploading(false)
@@ -203,30 +197,30 @@ export default function MedecinProfilPage() {
 
             <div className="mb-4">
               <span className={`inline-flex items-center gap-1 text-xs font-semibold px-3 py-1 rounded-full ${user.estValide ? 'bg-mint-100 text-mint-700' : 'bg-amber-100 text-amber-700'}`}>
-                <ShieldCheck className="w-3.5 h-3.5" /> {user.estValide ? 'Compte validé' : 'En attente de validation'}
+                <ShieldCheck className="w-3.5 h-3.5" /> {user.estValide ? t('medecin.profil.accountValidated') : t('medecin.profil.pendingValidation')}
               </span>
             </div>
 
-            <p className="text-xs text-primary-300 mb-4">N° Ordre : {user.numeroOrdre}</p>
+            <p className="text-xs text-primary-300 mb-4">{t('medecin.profil.ordreNumber', { number: user.numeroOrdre })}</p>
 
             <div className="flex items-center justify-center gap-1 mb-1">
               {[1, 2, 3, 4, 5].map((i) => (
                 <Star key={i} className={`w-4 h-4 ${i <= Math.round(noteMoyenne) ? 'text-amber-400' : 'text-gray-200 dark:text-primary-700'}`} fill="currentColor" />
               ))}
             </div>
-            <p className="text-xs text-primary-300 mb-4">{noteMoyenne}/5 · {avis.length} avis</p>
+            <p className="text-xs text-primary-300 mb-4">{noteMoyenne}/5 · {t('medecin.profil.reviewsCount', { count: avis.length })}</p>
 
             {loadingStats ? <LoadingSpinner size="sm" /> : (
               <div className="grid grid-cols-2 gap-2 text-left">
                 <div className="rounded-xl bg-primary-50 dark:bg-primary-900/40 p-3">
                   <ClipboardList className="w-4 h-4 text-primary-500 mb-1" />
                   <p className="font-display font-bold text-primary-900 dark:text-sable">{consultationsCount}</p>
-                  <p className="text-[10px] text-primary-300">Consultations</p>
+                  <p className="text-[10px] text-primary-300">{t('medecin.profil.consultations')}</p>
                 </div>
                 <div className="rounded-xl bg-primary-50 dark:bg-primary-900/40 p-3">
                   <MessageSquare className="w-4 h-4 text-primary-500 mb-1" />
                   <p className="font-display font-bold text-primary-900 dark:text-sable">{messagesCount}</p>
-                  <p className="text-[10px] text-primary-300">Messages</p>
+                  <p className="text-[10px] text-primary-300">{t('medecin.profil.messages')}</p>
                 </div>
               </div>
             )}
@@ -236,33 +230,33 @@ export default function MedecinProfilPage() {
         {/* Right form */}
         <div className="lg:col-span-2 space-y-6">
           <div className="rounded-2xl bg-white dark:bg-primary-800 border border-primary-100 dark:border-white/5 p-6">
-            <h3 className="font-display font-bold text-lg text-primary-900 dark:text-sable mb-4">Informations personnelles</h3>
+            <h3 className="font-display font-bold text-lg text-primary-900 dark:text-sable mb-4">{t('medecin.profil.personalInfo')}</h3>
             <div className="grid grid-cols-2 gap-4">
-              <Field label="Prénom" value={form.prenom} onChange={set('prenom')} />
-              <Field label="Nom" value={form.nom} onChange={set('nom')} />
-              <Field label="Email" value={form.email} onChange={set('email')} readOnly />
-              <Field label="Téléphone" value={form.telephone} onChange={set('telephone')} />
+              <Field label={t('medecin.profil.firstName')} value={form.prenom} onChange={set('prenom')} />
+              <Field label={t('medecin.profil.lastName')} value={form.nom} onChange={set('nom')} />
+              <Field label={t('medecin.profil.email')} value={form.email} onChange={set('email')} readOnly />
+              <Field label={t('medecin.profil.phone')} value={form.telephone} onChange={set('telephone')} />
             </div>
           </div>
 
           <div className="rounded-2xl bg-white dark:bg-primary-800 border border-primary-100 dark:border-white/5 p-6">
-            <h3 className="font-display font-bold text-lg text-primary-900 dark:text-sable mb-4">Informations professionnelles</h3>
+            <h3 className="font-display font-bold text-lg text-primary-900 dark:text-sable mb-4">{t('medecin.profil.professionalInfo')}</h3>
             <div className="grid grid-cols-2 gap-4 mb-6">
-              <Field label="Spécialité" value={form.specialite} onChange={set('specialite')} />
-              <Field label="N° Ordre" value={user.numeroOrdre} readOnly />
+              <Field label={t('medecin.profil.specialty')} value={form.specialite} onChange={set('specialite')} />
+              <Field label={t('medecin.profil.ordreLabel')} value={user.numeroOrdre} readOnly />
             </div>
 
-            <p className="text-sm font-semibold text-primary-900 dark:text-sable mb-3">Disponibilités hebdomadaires</p>
+            <p className="text-sm font-semibold text-primary-900 dark:text-sable mb-3">{t('medecin.profil.weeklyAvailability')}</p>
             <div className="flex flex-wrap gap-2 mb-4">
-              {DAYS.map((d) => {
-                const active = dispo.some((s) => s.jour === d.key)
+              {DAYS.map((dayKey) => {
+                const active = dispo.some((s) => s.jour === dayKey)
                 return (
                   <button
-                    key={d.key}
-                    onClick={() => toggleDay(d.key)}
+                    key={dayKey}
+                    onClick={() => toggleDay(dayKey)}
                     className={`w-12 h-10 rounded-xl text-xs font-bold transition ${active ? 'bg-mint-500 text-white' : 'bg-primary-100 dark:bg-primary-900/40 text-primary-700 dark:text-sable hover:bg-primary-200'}`}
                   >
-                    {d.label}
+                    {t(`medecin.dayShort.${dayKey}`)}
                   </button>
                 )
               })}
@@ -270,25 +264,25 @@ export default function MedecinProfilPage() {
 
             {dispo.length > 0 && (
               <div className="space-y-2">
-                {DAYS.filter((d) => dispo.some((s) => s.jour === d.key)).map((d) => {
-                  const slot = dispo.find((s) => s.jour === d.key)
+                {DAYS.filter((d) => dispo.some((s) => s.jour === d)).map((d) => {
+                  const slot = dispo.find((s) => s.jour === d)
                   return (
-                    <div key={d.key} className="flex items-center gap-2 p-2.5 rounded-xl bg-primary-50 dark:bg-primary-900/40">
-                      <span className="text-xs font-semibold text-primary-700 dark:text-sable capitalize w-20">{d.key}</span>
+                    <div key={d} className="flex items-center gap-2 p-2.5 rounded-xl bg-primary-50 dark:bg-primary-900/40">
+                      <span className="text-xs font-semibold text-primary-700 dark:text-sable capitalize w-20">{t(`medecin.dayFull.${d}`)}</span>
                       <input
                         type="time"
                         value={slot.debut}
-                        onChange={(e) => updateSlot(d.key, 'debut', e.target.value)}
+                        onChange={(e) => updateSlot(d, 'debut', e.target.value)}
                         className="px-2 py-1 rounded-lg border border-primary-100 dark:border-white/10 bg-white dark:bg-primary-900 text-sm"
                       />
-                      <span className="text-primary-300 text-xs">à</span>
+                      <span className="text-primary-300 text-xs">{t('medecin.profil.to')}</span>
                       <input
                         type="time"
                         value={slot.fin}
-                        onChange={(e) => updateSlot(d.key, 'fin', e.target.value)}
+                        onChange={(e) => updateSlot(d, 'fin', e.target.value)}
                         className="px-2 py-1 rounded-lg border border-primary-100 dark:border-white/10 bg-white dark:bg-primary-900 text-sm"
                       />
-                      <button onClick={() => toggleDay(d.key)} className="ml-auto p-1.5 rounded-lg text-urgence-500 hover:bg-urgence-100"><Trash2 className="w-3.5 h-3.5" /></button>
+                      <button onClick={() => toggleDay(d)} className="ml-auto p-1.5 rounded-lg text-urgence-500 hover:bg-urgence-100"><Trash2 className="w-3.5 h-3.5" /></button>
                     </div>
                   )
                 })}
@@ -301,7 +295,7 @@ export default function MedecinProfilPage() {
             disabled={saving}
             className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-mint-500 hover:bg-mint-700 text-white font-semibold shadow-lg transition disabled:opacity-60"
           >
-            <Save className="w-4 h-4" /> {saving ? 'Enregistrement…' : 'Enregistrer les modifications'}
+            <Save className="w-4 h-4" /> {saving ? t('medecin.profil.saving') : t('medecin.profil.saveChanges')}
           </button>
         </div>
       </div>

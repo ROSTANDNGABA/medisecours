@@ -26,6 +26,7 @@ import { emergencyCallHref, EMERGENCY_NUMBER, EMERGENCY_NUMBER_LABEL } from '@/c
 import { useAuth } from '@/hooks/useAuth'
 import { useDebounce } from '@/hooks/useDebounce'
 import { resolveImgPath } from '@/lib/config'
+import { useTranslation } from 'react-i18next'
 import CertifiedBadge from '@/components/ui/CertifiedBadge'
 import type { PublicMedecin, PublicMedecinListResponse } from '@/types/api'
 
@@ -40,8 +41,9 @@ function doctorName(medecin: PublicMedecin): string {
 }
 
 function Rating({ value, total }: { value: number; total: number }) {
+  const { t } = useTranslation()
   return (
-    <div className="flex flex-wrap items-center gap-2" aria-label={total > 0 ? `Note ${value} sur 5` : 'Aucun avis'}>
+    <div className="flex flex-wrap items-center gap-2" aria-label={total > 0 ? t('visitor.doctors.ratingAria', { value: value.toFixed(1) }) : t('visitor.doctors.noReviewAria')}>
       <span className="flex items-center gap-0.5" aria-hidden="true">
         {[1, 2, 3, 4, 5].map((star) => (
           <Star
@@ -53,7 +55,7 @@ function Rating({ value, total }: { value: number; total: number }) {
         ))}
       </span>
       <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">
-        {total > 0 ? `${value.toFixed(1)} (${total} avis)` : 'Aucun avis publié'}
+        {total > 0 ? `${value.toFixed(1)} (${t('visitor.doctors.reviewsCount', { count: total })})` : t('visitor.doctors.noReviewPublished')}
       </span>
     </div>
   )
@@ -68,6 +70,7 @@ function DoctorCard({
   contactHref: string
   contactLabel: string
 }) {
+  const { t } = useTranslation()
   const photo = medecin.photoProfil ? resolveImgPath(medecin.photoProfil) : null
 
   return (
@@ -77,7 +80,7 @@ function DoctorCard({
           {photo ? (
             <Image
               src={photo}
-              alt={`Photo de ${doctorName(medecin)}`}
+              alt={t('visitor.doctors.photoAlt', { name: doctorName(medecin) })}
               width={64}
               height={64}
               unoptimized
@@ -98,7 +101,7 @@ function DoctorCard({
                 {medecin.estValide && <CertifiedBadge className="h-5 w-5" />}
               </div>
               <p className="mt-1 break-words text-sm font-semibold text-emerald-700 dark:text-emerald-300">
-                {medecin.specialite || 'Médecine générale'}
+                {medecin.specialite || t('visitor.doctors.generalMedicine')}
               </p>
             </div>
             <span
@@ -114,7 +117,7 @@ function DoctorCard({
                 }`}
                 aria-hidden="true"
               />
-              {medecin.isDisponibleMaintenant ? 'Disponible' : 'Selon horaires'}
+              {medecin.isDisponibleMaintenant ? t('visitor.doctors.available') : t('visitor.doctors.bySchedule')}
             </span>
           </div>
 
@@ -127,7 +130,7 @@ function DoctorCard({
       <div className="mt-5 flex items-start gap-2 border-t border-slate-100 pt-4 text-sm text-slate-600 dark:border-white/10 dark:text-slate-300">
         <Clock3 className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" aria-hidden="true" />
         <p className="line-clamp-2 leading-6">
-          {medecin.disponibilitesLabel || medecin.disponibilitesTexte || 'Horaires non renseignés'}
+          {medecin.disponibilitesLabel || medecin.disponibilitesTexte || t('visitor.doctors.hoursUnknown')}
         </p>
       </div>
 
@@ -136,7 +139,7 @@ function DoctorCard({
           href={`/medecins/${medecin.id}`}
           className="inline-flex min-h-11 items-center justify-center gap-2 border border-slate-300 px-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50 dark:border-white/15 dark:text-white dark:hover:bg-white/5"
         >
-          Voir le profil
+          {t('visitor.doctors.viewProfile')}
           <ArrowRight className="h-4 w-4" aria-hidden="true" />
         </Link>
         <Link
@@ -153,6 +156,7 @@ function DoctorCard({
 
 export default function MedecinsPage() {
   const { mounted, isAuthenticated, isMedecin } = useAuth()
+  const { t } = useTranslation()
   const [search, setSearch] = useState('')
   const [specialite, setSpecialite] = useState('')
   const [availableOnly, setAvailableOnly] = useState(false)
@@ -213,10 +217,10 @@ export default function MedecinsPage() {
   }
 
   const contactLabel = !mounted || !isAuthenticated
-    ? 'Se connecter'
+    ? t('visitor.doctors.login')
     : isMedecin
-      ? 'Mon espace'
-      : 'Écrire'
+      ? t('visitor.doctors.mySpace')
+      : t('visitor.doctors.write')
 
   return (
     <main
@@ -227,14 +231,13 @@ export default function MedecinsPage() {
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-end">
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.16em] text-emerald-700 dark:text-emerald-300">
-              Mise en relation médicale
+              {t('visitor.doctors.eyebrow')}
             </p>
             <h1 className="mt-2 font-display text-3xl font-bold text-slate-950 dark:text-white sm:text-4xl">
-              Trouver un médecin
+              {t('visitor.doctors.title')}
             </h1>
             <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600 dark:text-slate-300">
-              Recherchez un professionnel par nom, spécialité ou disponibilité. Consultez son profil avant
-              d&apos;ouvrir une conversation pour demander un avis ou organiser une consultation.
+              {t('visitor.doctors.intro')}
             </p>
           </div>
 
@@ -242,16 +245,16 @@ export default function MedecinsPage() {
             <div className="flex gap-3">
               <CircleAlert className="mt-0.5 h-5 w-5 shrink-0" aria-hidden="true" />
               <div>
-                <p className="text-sm font-bold">Danger immédiat</p>
+                <p className="text-sm font-bold">{t('visitor.doctors.dangerTitle')}</p>
                 <p className="mt-1 text-xs leading-5">
-                  Ne perdez pas de temps à chercher une consultation en ligne. Contactez les urgences.
+                  {t('visitor.doctors.dangerDesc')}
                 </p>
                 <a
                   href={emergencyCallHref()}
                   className="mt-3 inline-flex min-h-10 items-center gap-2 bg-red-600 px-3 text-xs font-bold text-white hover:bg-red-500"
                 >
                   <PhoneCall className="h-4 w-4" aria-hidden="true" />
-                  {EMERGENCY_NUMBER_LABEL} : {EMERGENCY_NUMBER}
+                  {t('visitor.doctors.callEmergency', { label: EMERGENCY_NUMBER_LABEL, number: EMERGENCY_NUMBER })}
                 </a>
               </div>
             </div>
@@ -263,20 +266,20 @@ export default function MedecinsPage() {
         <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_260px_auto]">
           <label className="flex min-h-12 items-center gap-3 border border-slate-300 bg-white px-4 dark:border-white/10 dark:bg-slate-900">
             <Search className="h-5 w-5 shrink-0 text-slate-400" aria-hidden="true" />
-            <span className="sr-only">Rechercher un médecin</span>
+            <span className="sr-only">{t('visitor.doctors.searchSrOnly')}</span>
             <input
               value={search}
               onChange={(event) => {
                 setSearch(event.target.value)
                 setPage(1)
               }}
-              placeholder="Nom du médecin ou spécialité"
+              placeholder={t('visitor.doctors.searchPlaceholder')}
               className="min-w-0 flex-1 bg-transparent text-sm text-slate-950 outline-none placeholder:text-slate-400 dark:text-white"
             />
           </label>
 
           <label className="min-w-0">
-            <span className="sr-only">Filtrer par spécialité</span>
+            <span className="sr-only">{t('visitor.doctors.filterSpecialitySrOnly')}</span>
             <select
               value={specialite}
               onChange={(event) => {
@@ -285,7 +288,7 @@ export default function MedecinsPage() {
               }}
               className="min-h-12 w-full border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 outline-none focus:border-emerald-500 dark:border-white/10 dark:bg-slate-900 dark:text-white"
             >
-              <option value="">Toutes les spécialités</option>
+              <option value="">{t('visitor.doctors.allSpecialities')}</option>
               {specialites.map((item) => (
                 <option key={item} value={item}>{item}</option>
               ))}
@@ -303,7 +306,7 @@ export default function MedecinsPage() {
               className="h-4 w-4 accent-emerald-700"
             />
             <span className="whitespace-nowrap text-sm font-bold text-slate-700 dark:text-white">
-              Disponible maintenant
+              {t('visitor.doctors.availableNow')}
             </span>
           </label>
         </div>
@@ -311,8 +314,8 @@ export default function MedecinsPage() {
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
           <p className="text-sm text-slate-600 dark:text-slate-300" role="status">
             {isLoading && !data
-              ? 'Recherche des médecins...'
-              : `${total} professionnel${total > 1 ? 's' : ''} trouvé${total > 1 ? 's' : ''}`}
+              ? t('visitor.doctors.searching')
+              : t('visitor.doctors.professionalsFound', { count: total })}
           </p>
           {hasFilters && (
             <button
@@ -321,7 +324,7 @@ export default function MedecinsPage() {
               className="inline-flex min-h-10 items-center gap-2 px-2 text-sm font-bold text-emerald-700 hover:text-emerald-600 dark:text-emerald-300"
             >
               <RotateCcw className="h-4 w-4" aria-hidden="true" />
-              Réinitialiser les filtres
+              {t('visitor.doctors.resetFilters')}
             </button>
           )}
         </div>
@@ -330,29 +333,29 @@ export default function MedecinsPage() {
       {isLoading && !data ? (
         <div className="flex min-h-[340px] items-center justify-center text-sm text-slate-500" role="status">
           <LoaderCircle className="mr-3 h-5 w-5 animate-spin" aria-hidden="true" />
-          Chargement des médecins
+          {t('visitor.doctors.loadingDoctors')}
         </div>
       ) : error ? (
         <div className="mt-6 border border-red-200 bg-red-50 p-5 text-sm text-red-900" role="alert">
-          <p className="font-bold">Impossible de charger l’annuaire médical.</p>
-          <p className="mt-1">Vérifiez votre connexion, puis réessayez.</p>
+          <p className="font-bold">{t('visitor.doctors.loadErrorTitle')}</p>
+          <p className="mt-1">{t('visitor.doctors.loadErrorDesc')}</p>
           <button
             type="button"
             onClick={() => mutate()}
             className="mt-4 inline-flex min-h-10 items-center gap-2 bg-red-700 px-4 font-bold text-white hover:bg-red-600"
           >
             <RotateCcw className="h-4 w-4" aria-hidden="true" />
-            Réessayer
+            {t('visitor.doctors.retry')}
           </button>
         </div>
       ) : medecins.length === 0 ? (
         <div className="mt-6 border border-slate-200 bg-white px-5 py-12 text-center dark:border-white/10 dark:bg-slate-900">
           <UserRoundSearch className="mx-auto h-10 w-10 text-slate-400" aria-hidden="true" />
           <h2 className="mt-4 font-display text-xl font-bold text-slate-950 dark:text-white">
-            Aucun médecin ne correspond à ces critères
+            {t('visitor.doctors.emptyTitle')}
           </h2>
           <p className="mx-auto mt-2 max-w-lg text-sm leading-6 text-slate-500 dark:text-slate-400">
-            Retirez un filtre ou recherchez une spécialité plus générale.
+            {t('visitor.doctors.emptyDesc')}
           </p>
           {hasFilters && (
             <button
@@ -361,7 +364,7 @@ export default function MedecinsPage() {
               className="mt-5 inline-flex min-h-11 items-center gap-2 bg-slate-950 px-4 text-sm font-bold text-white dark:bg-white dark:text-slate-950"
             >
               <RotateCcw className="h-4 w-4" aria-hidden="true" />
-              Afficher tous les médecins
+              {t('visitor.doctors.showAll')}
             </button>
           )}
         </div>
@@ -370,15 +373,15 @@ export default function MedecinsPage() {
           <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
             <div>
               <h2 id="doctor-results-title" className="font-display text-xl font-bold text-slate-950 dark:text-white">
-                Professionnels disponibles sur MediSecours
+                {t('visitor.doctors.resultsTitle')}
               </h2>
               <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">
-                Les horaires affichés sont indicatifs. Le médecin confirme la prise en charge dans la messagerie.
+                {t('visitor.doctors.resultsDesc')}
               </p>
             </div>
             <span className="inline-flex items-center gap-2 text-xs font-semibold text-slate-500 dark:text-slate-400">
               <CheckCircle2 className="h-4 w-4 text-[#1DA1F2]" aria-hidden="true" />
-              Profils médecins certifiés
+              {t('visitor.doctors.certifiedProfiles')}
             </span>
           </div>
 
@@ -394,7 +397,7 @@ export default function MedecinsPage() {
           </div>
 
           {totalPages > 1 && (
-            <nav className="mt-7 flex flex-wrap items-center justify-center gap-2" aria-label="Pagination des médecins">
+            <nav className="mt-7 flex flex-wrap items-center justify-center gap-2" aria-label={t('visitor.doctors.paginationAria')}>
               <button
                 type="button"
                 onClick={() => changePage(Math.max(1, page - 1))}
@@ -402,10 +405,10 @@ export default function MedecinsPage() {
                 className="inline-flex min-h-11 items-center gap-2 border border-slate-300 bg-white px-4 text-sm font-bold text-slate-700 disabled:cursor-not-allowed disabled:opacity-40 dark:border-white/10 dark:bg-slate-900 dark:text-white"
               >
                 <ChevronLeft className="h-4 w-4" aria-hidden="true" />
-                Précédent
+                {t('visitor.doctors.previous')}
               </button>
               <span className="px-3 text-sm font-semibold text-slate-600 dark:text-slate-300">
-                Page {data?.page ?? page} sur {totalPages}
+                {t('visitor.doctors.pageOf', { page: data?.page ?? page, total: totalPages })}
               </span>
               <button
                 type="button"
@@ -413,7 +416,7 @@ export default function MedecinsPage() {
                 disabled={page >= totalPages}
                 className="inline-flex min-h-11 items-center gap-2 border border-slate-300 bg-white px-4 text-sm font-bold text-slate-700 disabled:cursor-not-allowed disabled:opacity-40 dark:border-white/10 dark:bg-slate-900 dark:text-white"
               >
-                Suivant
+                {t('visitor.doctors.next')}
                 <ChevronRight className="h-4 w-4" aria-hidden="true" />
               </button>
             </nav>
@@ -425,27 +428,27 @@ export default function MedecinsPage() {
         <div className="flex gap-3">
           <Stethoscope className="h-5 w-5 shrink-0 text-emerald-700 dark:text-emerald-300" aria-hidden="true" />
           <div>
-            <h2 className="text-sm font-bold text-slate-950 dark:text-white">Consultez le profil</h2>
+            <h2 className="text-sm font-bold text-slate-950 dark:text-white">{t('visitor.doctors.stepProfileTitle')}</h2>
             <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">
-              Vérifiez la spécialité, les horaires et les avis avant de prendre contact.
+              {t('visitor.doctors.stepProfileDesc')}
             </p>
           </div>
         </div>
         <div className="flex gap-3">
           <MessageSquareText className="h-5 w-5 shrink-0 text-blue-700 dark:text-blue-300" aria-hidden="true" />
           <div>
-            <h2 className="text-sm font-bold text-slate-950 dark:text-white">Expliquez votre demande</h2>
+            <h2 className="text-sm font-bold text-slate-950 dark:text-white">{t('visitor.doctors.stepRequestTitle')}</h2>
             <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">
-              Décrivez vos symptômes, leur durée et le motif de votre prise de contact.
+              {t('visitor.doctors.stepRequestDesc')}
             </p>
           </div>
         </div>
         <div className="flex gap-3">
           <CalendarDays className="h-5 w-5 shrink-0 text-violet-700 dark:text-violet-300" aria-hidden="true" />
           <div>
-            <h2 className="text-sm font-bold text-slate-950 dark:text-white">Organisez la suite</h2>
+            <h2 className="text-sm font-bold text-slate-950 dark:text-white">{t('visitor.doctors.stepOrganizeTitle')}</h2>
             <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">
-              Le rendez-vous, le rappel ou l’orientation vers un centre sont confirmés avec le professionnel.
+              {t('visitor.doctors.stepOrganizeDesc')}
             </p>
           </div>
         </div>

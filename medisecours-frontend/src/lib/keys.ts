@@ -20,6 +20,9 @@ export const CONSULTATIONS_PENDING_KEY = '/api/consultations?itemsPerPage=1&stat
 /** Clé pour la liste des patients (filtrée par CurrentUserExtension). */
 export const PATIENTS_KEY = '/api/patients'
 
+/** Clé pour la liste des prescriptions (filtrée par CurrentUserExtension). */
+export const PRESCRIPTIONS_KEY = '/api/prescriptions'
+
 /** Clé pour la liste publique des médecins. */
 export const MEDECINS_KEY = '/api/medecins-publics'
 

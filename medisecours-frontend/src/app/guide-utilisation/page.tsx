@@ -1,4 +1,5 @@
-import type { Metadata } from 'next'
+'use client'
+
 import Link from 'next/link'
 import {
   ArrowRight,
@@ -18,188 +19,164 @@ import {
   UserCheck,
   UserRound,
 } from 'lucide-react'
-
-export const metadata: Metadata = {
-  title: 'Guide d’utilisation | MediSecours',
-  description: 'Guide public pour utiliser MediSecours comme visiteur, patient ou médecin.',
-}
+import { useTranslation } from 'react-i18next'
 
 const visitorSteps = [
   {
     icon: HeartPulse,
-    title: 'Consulter les premiers soins',
-    description:
-      'Recherchez une situation, ouvrez la fiche correspondante et suivez les gestes indiqués dans l’ordre. Consultez aussi les actions à éviter et le niveau d’urgence.',
-    links: [{ href: '/premiers-soins', label: 'Voir les premiers soins' }],
+    titleKey: 'visitor.guide.v1.title',
+    descriptionKey: 'visitor.guide.v1.desc',
+    links: [{ href: '/premiers-soins', labelKey: 'visitor.guide.v1.link' }],
   },
   {
     icon: Search,
-    title: 'S’orienter à partir des symptômes',
-    description:
-      'Décrivez les signes observés pour obtenir une orientation et identifier le niveau de prise en charge adapté. Cette fonction ne remplace pas un diagnostic médical.',
-    links: [{ href: '/maladies', label: 'Commencer l’orientation' }],
+    titleKey: 'visitor.guide.v2.title',
+    descriptionKey: 'visitor.guide.v2.desc',
+    links: [{ href: '/maladies', labelKey: 'visitor.guide.v2.link' }],
   },
   {
     icon: MapPin,
-    title: 'Trouver un centre de santé',
-    description:
-      'Recherchez les établissements disponibles, filtrez-les selon votre besoin et utilisez leur localisation pour préparer votre déplacement.',
-    links: [{ href: '/centres', label: 'Trouver un centre' }],
+    titleKey: 'visitor.guide.v3.title',
+    descriptionKey: 'visitor.guide.v3.desc',
+    links: [{ href: '/centres', labelKey: 'visitor.guide.v3.link' }],
   },
   {
     icon: Stethoscope,
-    title: 'Découvrir les médecins',
-    description:
-      'Consultez les profils professionnels, les spécialités et les disponibilités. Un compte patient sera demandé uniquement au moment d’envoyer une demande de consultation.',
-    links: [{ href: '/medecins', label: 'Voir les médecins' }],
+    titleKey: 'visitor.guide.v4.title',
+    descriptionKey: 'visitor.guide.v4.desc',
+    links: [{ href: '/medecins', labelKey: 'visitor.guide.v4.link' }],
   },
 ]
 
 const patientSteps = [
   {
     icon: UserRound,
-    title: 'Créer votre compte patient',
-    description:
-      'Renseignez votre identité, votre adresse e-mail et un mot de passe robuste. Les informations médicales facultatives peuvent être ajoutées maintenant ou plus tard depuis votre profil.',
-    links: [{ href: '/register', label: 'Créer un compte' }],
+    titleKey: 'visitor.guide.p1.title',
+    descriptionKey: 'visitor.guide.p1.desc',
+    links: [{ href: '/register', labelKey: 'visitor.guide.p1.link' }],
   },
   {
     icon: MailCheck,
-    title: 'Confirmer votre adresse e-mail',
-    description:
-      'Ouvrez le message reçu après l’inscription et cliquez sur le lien de confirmation. Vérifiez vos courriers indésirables si le message n’apparaît pas.',
+    titleKey: 'visitor.guide.p2.title',
+    descriptionKey: 'visitor.guide.p2.desc',
   },
   {
     icon: CalendarClock,
-    title: 'Demander et suivre une consultation',
-    description:
-      'Choisissez un médecin, décrivez votre besoin puis suivez l’état de la demande : en attente, en cours, terminée ou annulée.',
+    titleKey: 'visitor.guide.p3.title',
+    descriptionKey: 'visitor.guide.p3.desc',
     links: [
-      { href: '/medecins', label: 'Choisir un médecin' },
-      { href: '/patient/consultations', label: 'Mes consultations' },
+      { href: '/medecins', labelKey: 'visitor.guide.p3.link1' },
+      { href: '/patient/consultations', labelKey: 'visitor.guide.p3.link2' },
     ],
   },
   {
     icon: MessageCircle,
-    title: 'Échanger avec le médecin',
-    description:
-      'Lorsque la consultation est acceptée, utilisez la conversation associée pour envoyer vos messages et les documents utiles à la prise en charge.',
-    links: [{ href: '/messages', label: 'Ma messagerie' }],
+    titleKey: 'visitor.guide.p4.title',
+    descriptionKey: 'visitor.guide.p4.desc',
+    links: [{ href: '/messages', labelKey: 'visitor.guide.p4.link' }],
   },
   {
     icon: Bell,
-    title: 'Consulter les notifications et le suivi',
-    description:
-      'Les notifications vous signalent les nouveaux messages et les changements concernant vos consultations. Ouvrir l’élément concerné marque l’information comme consultée.',
-    links: [{ href: '/notifications', label: 'Mes notifications' }],
+    titleKey: 'visitor.guide.p5.title',
+    descriptionKey: 'visitor.guide.p5.desc',
+    links: [{ href: '/notifications', labelKey: 'visitor.guide.p5.link' }],
   },
   {
     icon: ShieldAlert,
-    title: 'Signaler un comportement',
-    description:
-      'Depuis le profil d’un médecin, utilisez le bouton de signalement, choisissez un motif et décrivez les faits avec précision. Vous pourrez retrouver le signalement et sa réponse dans votre profil.',
-    links: [{ href: '/profil', label: 'Voir mes signalements' }],
+    titleKey: 'visitor.guide.p6.title',
+    descriptionKey: 'visitor.guide.p6.desc',
+    links: [{ href: '/profil', labelKey: 'visitor.guide.p6.link' }],
   },
 ]
 
 const doctorSteps = [
   {
     icon: FileCheck2,
-    title: 'Créer un profil professionnel complet',
-    description:
-      'Choisissez le compte médecin, indiquez votre spécialité et votre numéro d’ordre, puis fournissez les justificatifs demandés.',
-    details: [
-      'CNI : photo lisible du recto et du verso.',
-      'Passeport : photo lisible de la page d’identité.',
-      'Photo récente du visage, de face, nette et sans filtre.',
+    titleKey: 'visitor.guide.d1.title',
+    descriptionKey: 'visitor.guide.d1.desc',
+    detailKeys: [
+      'visitor.guide.d1.detail1',
+      'visitor.guide.d1.detail2',
+      'visitor.guide.d1.detail3',
     ],
-    links: [{ href: '/register', label: 'Créer un compte médecin' }],
+    links: [{ href: '/register', labelKey: 'visitor.guide.d1.link' }],
   },
   {
     icon: UserCheck,
-    title: 'Attendre l’activation du profil',
-    description:
-      'Après la confirmation de votre adresse e-mail, votre profil passe par une vérification de conformité. Vous recevez un message lorsque l’accès professionnel est activé.',
+    titleKey: 'visitor.guide.d2.title',
+    descriptionKey: 'visitor.guide.d2.desc',
   },
   {
     icon: CalendarClock,
-    title: 'Traiter les demandes de consultation',
-    description:
-      'Consultez le motif transmis par le patient, puis acceptez ou refusez la demande. Les filtres permettent de retrouver rapidement les consultations selon leur état.',
-    links: [{ href: '/medecin/consultations', label: 'Mes consultations' }],
+    titleKey: 'visitor.guide.d3.title',
+    descriptionKey: 'visitor.guide.d3.desc',
+    links: [{ href: '/medecin/consultations', labelKey: 'visitor.guide.d3.link' }],
   },
   {
     icon: MessageCircle,
-    title: 'Conduire les échanges',
-    description:
-      'Utilisez la messagerie liée à la consultation pour recueillir les informations nécessaires et transmettre vos indications au patient.',
-    links: [{ href: '/medecin/messages', label: 'Messagerie médecin' }],
+    titleKey: 'visitor.guide.d4.title',
+    descriptionKey: 'visitor.guide.d4.desc',
+    links: [{ href: '/medecin/messages', labelKey: 'visitor.guide.d4.link' }],
   },
   {
     icon: ClipboardList,
-    title: 'Documenter la prise en charge',
-    description:
-      'Ajoutez les prescriptions et les rapports nécessaires. La rubrique Mes patients contient uniquement les personnes avec lesquelles une consultation a été réalisée.',
+    titleKey: 'visitor.guide.d5.title',
+    descriptionKey: 'visitor.guide.d5.desc',
     links: [
-      { href: '/medecin/rapports', label: 'Rapports' },
-      { href: '/medecin/patients', label: 'Mes patients' },
+      { href: '/medecin/rapports', labelKey: 'visitor.guide.d5.link1' },
+      { href: '/medecin/patients', labelKey: 'visitor.guide.d5.link2' },
     ],
   },
 ]
 
 const faq = [
   {
-    question: 'Faut-il un compte pour consulter les premiers soins ?',
-    answer:
-      'Non. Les premiers soins, l’orientation, les centres de santé et la liste des médecins sont accessibles sans inscription.',
+    questionKey: 'visitor.guide.faq1.q',
+    answerKey: 'visitor.guide.faq1.a',
   },
   {
-    question: 'Pourquoi mon compte médecin n’est-il pas accessible immédiatement ?',
-    answer:
-      'Les profils professionnels passent par une vérification de conformité avant leur activation afin de protéger les patients et les professionnels.',
+    questionKey: 'visitor.guide.faq2.q',
+    answerKey: 'visitor.guide.faq2.a',
   },
   {
-    question: 'Que faire si je ne reçois pas l’e-mail de confirmation ?',
-    answer:
-      'Vérifiez les courriers indésirables, confirmez que l’adresse saisie est correcte puis utilisez l’option de renvoi proposée sur la page de connexion.',
+    questionKey: 'visitor.guide.faq3.q',
+    answerKey: 'visitor.guide.faq3.a',
   },
   {
-    question: 'Que faire si j’oublie mon mot de passe ?',
-    answer:
-      'Utilisez le lien Mot de passe oublié sur la page de connexion et suivez les instructions reçues par e-mail.',
+    questionKey: 'visitor.guide.faq4.q',
+    answerKey: 'visitor.guide.faq4.a',
   },
   {
-    question: 'Comment signaler un médecin ?',
-    answer:
-      'Ouvrez sa fiche, sélectionnez Signaler, choisissez le motif et décrivez les faits. Le suivi de votre signalement apparaît ensuite dans votre profil.',
+    questionKey: 'visitor.guide.faq5.q',
+    answerKey: 'visitor.guide.faq5.a',
   },
   {
-    question: 'Que faire en cas de danger immédiat ?',
-    answer:
-      'Appelez les services d’urgence sans attendre une réponse dans la messagerie ou une consultation en ligne.',
+    questionKey: 'visitor.guide.faq6.q',
+    answerKey: 'visitor.guide.faq6.a',
   },
 ]
 
 const navigation = [
-  { href: '#visiteur', label: 'Visiteur' },
-  { href: '#patient', label: 'Patient' },
-  { href: '#medecin', label: 'Médecin' },
-  { href: '#questions', label: 'Questions fréquentes' },
+  { href: '#visiteur', labelKey: 'visitor.guide.navVisitor' },
+  { href: '#patient', labelKey: 'visitor.guide.navPatient' },
+  { href: '#medecin', labelKey: 'visitor.guide.navMedecin' },
+  { href: '#questions', labelKey: 'visitor.guide.navFaq' },
 ]
 
 export default function GuideUtilisationPage() {
+  const { t } = useTranslation()
   return (
     <main className="bg-white dark:bg-slate-950">
       <section className="border-b border-slate-200 bg-slate-950 py-16 text-white dark:border-white/10 sm:py-20">
         <div className="mx-auto max-w-6xl px-4 sm:px-6">
           <p className="text-xs font-bold uppercase tracking-[0.16em] text-emerald-300">
-            Guide d’utilisation
+            {t('visitor.guide.eyebrow')}
           </p>
           <h1 className="mt-3 max-w-4xl font-display text-4xl font-bold leading-tight sm:text-5xl">
-            Utiliser MediSecours, étape par étape.
+            {t('visitor.guide.title')}
           </h1>
           <p className="mt-4 max-w-3xl text-base leading-7 text-slate-300 sm:text-lg">
-            Retrouvez uniquement les informations nécessaires pour utiliser la plateforme comme visiteur, patient ou médecin.
+            {t('visitor.guide.description')}
           </p>
           <div className="mt-7 flex flex-wrap gap-3">
             {navigation.map((item) => (
@@ -208,7 +185,7 @@ export default function GuideUtilisationPage() {
                 href={item.href}
                 className="inline-flex min-h-11 items-center justify-center gap-2 border border-white/25 bg-white/10 px-5 text-sm font-bold text-white transition hover:bg-white/20"
               >
-                {item.label}
+                {t(item.labelKey)}
                 <ArrowRight className="h-4 w-4" />
               </a>
             ))}
@@ -221,10 +198,10 @@ export default function GuideUtilisationPage() {
           <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0 text-red-600 dark:text-red-300" />
           <div>
             <p className="text-sm font-bold text-red-950 dark:text-red-100">
-              En cas de danger vital, contactez d’abord les services d’urgence.
+              {t('visitor.guide.dangerTitle')}
             </p>
             <p className="mt-1 text-sm leading-6 text-red-800 dark:text-red-200">
-              N’attendez pas une réponse dans la messagerie et ne remplissez pas un formulaire avant d’appeler.
+              {t('visitor.guide.dangerDesc')}
             </p>
           </div>
         </div>
@@ -232,18 +209,18 @@ export default function GuideUtilisationPage() {
 
       <GuideSection
         id="visiteur"
-        kicker="Sans compte"
-        title="Découvrir la plateforme comme visiteur"
-        description="Ces services sont disponibles immédiatement, sans création de compte."
+        kicker={t('visitor.guide.visitorKicker')}
+        title={t('visitor.guide.visitorTitle')}
+        description={t('visitor.guide.visitorDesc')}
         steps={visitorSteps}
         color="blue"
       />
 
       <GuideSection
         id="patient"
-        kicker="Espace patient"
-        title="Demander une consultation et conserver son suivi"
-        description="Le compte patient permet de contacter un médecin et de retrouver ses échanges."
+        kicker={t('visitor.guide.patientKicker')}
+        title={t('visitor.guide.patientTitle')}
+        description={t('visitor.guide.patientDesc')}
         steps={patientSteps}
         color="violet"
         alternate
@@ -251,9 +228,9 @@ export default function GuideUtilisationPage() {
 
       <GuideSection
         id="medecin"
-        kicker="Espace médecin"
-        title="Prendre en charge les demandes et suivre ses patients"
-        description="Le compte médecin regroupe les consultations, les messages et les documents de suivi."
+        kicker={t('visitor.guide.medecinKicker')}
+        title={t('visitor.guide.medecinTitle')}
+        description={t('visitor.guide.medecinDesc')}
         steps={doctorSteps}
         color="emerald"
       />
@@ -261,19 +238,19 @@ export default function GuideUtilisationPage() {
       <section id="questions" className="scroll-mt-24 border-t border-slate-200 bg-slate-50 py-12 dark:border-white/10 dark:bg-slate-900 sm:py-16">
         <div className="mx-auto max-w-6xl px-4 sm:px-6">
           <p className="text-xs font-bold uppercase tracking-[0.16em] text-violet-700 dark:text-violet-300">
-            Aide
+            {t('visitor.guide.faqEyebrow')}
           </p>
           <h2 className="mt-2 font-display text-3xl font-bold text-slate-950 dark:text-white">
-            Questions fréquentes
+            {t('visitor.guide.faqTitle')}
           </h2>
           <div className="mt-7 grid gap-x-10 border-y border-slate-200 dark:border-white/10 md:grid-cols-2">
             {faq.map((item) => (
               <article
-                key={item.question}
+                key={item.questionKey}
                 className="border-b border-slate-200 py-5 last:border-b-0 dark:border-white/10 md:[&:nth-last-child(-n+2)]:border-b-0"
               >
-                <h3 className="text-sm font-bold text-slate-950 dark:text-white">{item.question}</h3>
-                <p className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300">{item.answer}</p>
+                <h3 className="text-sm font-bold text-slate-950 dark:text-white">{t(item.questionKey)}</h3>
+                <p className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300">{t(item.answerKey)}</p>
               </article>
             ))}
           </div>
@@ -283,10 +260,10 @@ export default function GuideUtilisationPage() {
               <Building2 className="mt-0.5 h-5 w-5 shrink-0 text-violet-600 dark:text-violet-300" />
               <div>
                 <p className="text-sm font-bold text-slate-950 dark:text-white">
-                  Vous avez terminé le guide.
+                  {t('visitor.guide.endTitle')}
                 </p>
                 <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
-                  Revenez à l’accueil pour choisir le service correspondant à votre situation.
+                  {t('visitor.guide.endDesc')}
                 </p>
               </div>
             </div>
@@ -294,7 +271,7 @@ export default function GuideUtilisationPage() {
               href="/"
               className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 bg-slate-950 px-5 text-sm font-bold text-white transition hover:bg-slate-800 dark:bg-emerald-600 dark:hover:bg-emerald-500"
             >
-              Revenir à l’accueil
+              {t('visitor.guide.backHome')}
               <ArrowRight className="h-4 w-4" />
             </Link>
           </div>
@@ -319,14 +296,15 @@ function GuideSection({
   description: string
   steps: Array<{
     icon: React.ComponentType<{ className?: string }>
-    title: string
-    description: string
-    details?: string[]
-    links?: Array<{ href: string; label: string }>
+    titleKey: string
+    descriptionKey: string
+    detailKeys?: string[]
+    links?: Array<{ href: string; labelKey: string }>
   }>
   color: 'blue' | 'violet' | 'emerald'
   alternate?: boolean
 }) {
+  const { t } = useTranslation()
   const tones = {
     blue: 'text-blue-700 dark:text-blue-300',
     violet: 'text-violet-700 dark:text-violet-300',
@@ -357,24 +335,26 @@ function GuideSection({
             {steps.map((step, index) => {
               const Icon = step.icon
               return (
-                <li key={step.title} className="grid gap-4 py-6 sm:grid-cols-[52px_minmax(0,1fr)]">
+                <li key={step.titleKey} className="grid gap-4 py-6 sm:grid-cols-[52px_minmax(0,1fr)]">
                   <span className={`flex h-11 w-11 items-center justify-center rounded-lg ${iconTones[color]}`}>
                     <Icon className="h-5 w-5" />
                   </span>
                   <div>
-                    <p className="text-[11px] font-bold uppercase text-slate-400">Étape {index + 1}</p>
+                    <p className="text-[11px] font-bold uppercase text-slate-400">
+                      {t('visitor.guide.stepPrefix', { number: index + 1 })}
+                    </p>
                     <h3 className="mt-1 font-display text-lg font-bold text-slate-950 dark:text-white">
-                      {step.title}
+                      {t(step.titleKey)}
                     </h3>
                     <p className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300">
-                      {step.description}
+                      {t(step.descriptionKey)}
                     </p>
-                    {step.details && (
+                    {step.detailKeys && (
                       <ul className="mt-3 space-y-2">
-                        {step.details.map((detail) => (
-                          <li key={detail} className="flex items-start gap-2 text-xs leading-5 text-slate-600 dark:text-slate-300">
+                        {step.detailKeys.map((detailKey) => (
+                          <li key={detailKey} className="flex items-start gap-2 text-xs leading-5 text-slate-600 dark:text-slate-300">
                             <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-600" />
-                            {detail}
+                            {t(detailKey)}
                           </li>
                         ))}
                       </ul>
@@ -387,7 +367,7 @@ function GuideSection({
                             href={link.href}
                             className={`inline-flex items-center gap-1.5 text-xs font-bold ${tones[color]} hover:opacity-75`}
                           >
-                            {link.label}
+                            {t(link.labelKey)}
                             <ArrowRight className="h-3.5 w-3.5" />
                           </Link>
                         ))}

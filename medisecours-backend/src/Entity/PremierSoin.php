@@ -53,6 +53,9 @@ class PremierSoin
     #[Groups(['premier_soin:read', 'premier_soin:write', 'maladie:read'])]
     private ?string $titre = null;
 
+    #[ORM\Column(length: 255, nullable: true)]
+    private ?string $titreEn = null;
+
     #[ORM\Column(type: Types::TEXT)]
     #[Assert\NotBlank(message: 'La description est obligatoire')]
     #[Assert\Length(min: 10, max: 10000, minMessage: 'La description doit contenir au moins {{ limit }} caractères', maxMessage: 'La description ne peut pas dépasser {{ limit }} caractères')]
@@ -60,9 +63,15 @@ class PremierSoin
     private ?string $description = null;
 
     #[ORM\Column(type: Types::TEXT, nullable: true)]
+    private ?string $descriptionEn = null;
+
+    #[ORM\Column(type: Types::TEXT, nullable: true)]
     #[Assert\Length(max: 10000, maxMessage: 'Les symptômes ne peuvent pas dépasser {{ limit }} caractères')]
     #[Groups(['premier_soin:read', 'premier_soin:write', 'maladie:read'])]
     private ?string $symptomes = null;
+
+    #[ORM\Column(type: Types::TEXT, nullable: true)]
+    private ?string $symptomesEn = null;
 
     #[ORM\Column(length: 50)]
     #[Assert\NotBlank(message: 'Le niveau d\'urgence est obligatoire')]
@@ -94,6 +103,18 @@ class PremierSoin
         return $this;
     }
 
+    public function getTitreEn(): ?string
+    {
+        return $this->titreEn;
+    }
+
+    public function setTitreEn(?string $titreEn): static
+    {
+        $this->titreEn = $titreEn;
+
+        return $this;
+    }
+
     public function getDescription(): ?string
     {
         return $this->description;
@@ -106,6 +127,18 @@ class PremierSoin
         return $this;
     }
 
+    public function getDescriptionEn(): ?string
+    {
+        return $this->descriptionEn;
+    }
+
+    public function setDescriptionEn(?string $descriptionEn): static
+    {
+        $this->descriptionEn = $descriptionEn;
+
+        return $this;
+    }
+
     public function getSymptomes(): ?string
     {
         return $this->symptomes;
@@ -114,6 +147,18 @@ class PremierSoin
     public function setSymptomes(?string $symptomes): static // Modifié : accepte la chaîne ou null
     {
         $this->symptomes = $symptomes;
+
+        return $this;
+    }
+
+    public function getSymptomesEn(): ?string
+    {
+        return $this->symptomesEn;
+    }
+
+    public function setSymptomesEn(?string $symptomesEn): static
+    {
+        $this->symptomesEn = $symptomesEn;
 
         return $this;
     }

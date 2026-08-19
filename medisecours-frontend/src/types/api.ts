@@ -214,14 +214,49 @@ export interface Avis {
 /* Prescription                                                       */
 /* ------------------------------------------------------------------ */
 
+export type StatutPrescription =
+  | 'BROUILLON'
+  | 'SIGNEE'
+  | 'TRANSMISE'
+  | 'ANNULEE'
+  | 'EXPIREE'
+  | 'REMPLACEE'
+
+export interface PrescriptionMedicament {
+  nom: string
+  posologie: string
+  duree: string
+  forme?: string
+  dosage?: number | null
+  unite?: string
+  voieAdministration?: string
+  frequence?: string
+  momentPrise?: string
+  dureeJours?: number | null
+  quantite?: number | null
+  instructions?: string | null
+  siBesoin?: boolean
+}
+
 export interface Prescription {
   id: number
+  reference: string
+  statut: StatutPrescription
+  version: number
   consultation?: Relation<Consultation> | null
-  medicament: string
-  posologie?: string | null
-  duree?: string | null
-  instructions?: string | null
+  medecin?: Relation<Medecin> | null
+  patient?: Relation<Patient> | null
+  diagnostic: string
+  medicaments: PrescriptionMedicament[]
+  recommandations?: string | null
   createdAt?: string
+  updatedAt?: string
+  signedAt?: string | null
+  sentAt?: string | null
+  expiresAt?: string | null
+  cancelledAt?: string | null
+  cancelReason?: string | null
+  supersededBy?: Relation<Prescription> | null
   '@id'?: Iri
   '@type'?: string
 }

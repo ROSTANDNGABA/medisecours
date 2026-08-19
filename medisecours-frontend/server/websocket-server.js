@@ -30,6 +30,7 @@ const ALLOWED_EVENTS = new Set([
   'consultation_accepted',
   'consultation_closed',
   'profile_photo_changed',
+  'language_changed',
   'user_online',
   'user_offline',
 ])
@@ -139,6 +140,17 @@ wss.on('connection', (ws, req) => {
 
     if (msg.type === 'ping') {
       ws.send(JSON.stringify({ type: 'pong' }))
+      return
+    }
+
+    if (msg.type === 'language_change') {
+      const locale = typeof msg.locale === 'string' ? msg.locale : ''
+      if (!['fr', 'en'].includes(locale) || !ws.userId) {
+        ws.send(JSON.stringify({ type: 'error', message: 'Unsupported locale' }))
+        return
+      }
+
+      sendToTargets('language_changed', { locale }, [ws.userId])
       return
     }
 

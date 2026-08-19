@@ -2,27 +2,46 @@
 
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
+import { useTranslation } from 'react-i18next'
 import {
-  HeartPulse, LayoutDashboard, Users, CalendarClock, FileText, MessageCircle,
-  BarChart3, Bell, Settings, Plus, LogOut, HelpCircle,
+  HeartPulse, LayoutDashboard, Users, CalendarClock, MessageCircle,
+  BarChart3, Bell, Settings, LogOut, Pill, ClipboardCheck,
+  ChevronRight, CircleHelp, Stethoscope,
 } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 import Avatar from '../ui/Avatar'
 import { useNotification } from '../../contexts/NotificationContext'
 
-const NAV = [
-  { href: '/medecin', label: 'Overview', icon: LayoutDashboard, exact: true },
-  { href: '/medecin/patients', label: 'Mes Patients', icon: Users },
-  { href: '/medecin/consultations', label: 'Consultations', icon: CalendarClock, badge: 'consultations' },
-  { href: '/medecin/avis', label: 'Avis', icon: MessageCircle },
-  { href: '/medecin/messages', label: 'Messages', icon: MessageCircle, badge: 'unread' },
-]
-
-const NAV_BOTTOM = [
-  { href: '/medecin/rapports', label: 'Rapports', icon: BarChart3 },
-  { href: '/medecin/notifications', label: 'Notifications', icon: Bell, badge: 'notifications' },
-  { href: '/medecin/profil', label: 'Profil', icon: Settings },
-  { href: '/guide-utilisation', label: 'Guide', icon: HelpCircle },
+const NAV_GROUPS = [
+  {
+    labelKey: 'medecin.sidebar.workspace',
+    items: [
+      { href: '/medecin', labelKey: 'medecin.sidebar.overview', icon: LayoutDashboard, exact: true },
+    ],
+  },
+  {
+    labelKey: 'medecin.sidebar.medicalTracking',
+    items: [
+      { href: '/medecin/patients', labelKey: 'medecin.sidebar.myPatients', icon: Users },
+      { href: '/medecin/consultations', labelKey: 'medecin.sidebar.consultations', icon: CalendarClock, badge: 'consultations' },
+      { href: '/medecin/rapports', labelKey: 'medecin.sidebar.reports', icon: BarChart3 },
+    ],
+  },
+  {
+    labelKey: 'medecin.sidebar.communication',
+    items: [
+      { href: '/medecin/messages', labelKey: 'medecin.sidebar.messages', icon: MessageCircle, badge: 'unread' },
+      { href: '/medecin/notifications', labelKey: 'medecin.sidebar.notifications', icon: Bell, badge: 'notifications' },
+    ],
+  },
+  {
+    labelKey: 'medecin.sidebar.resources',
+    items: [
+      { href: '/medecin/prescriptions', labelKey: 'medecin.sidebar.prescriptions', icon: ClipboardCheck },
+      { href: '/medecin/pharmacy', labelKey: 'medecin.sidebar.pharmacy', icon: Pill },
+      { href: '/medecin/avis', labelKey: 'medecin.sidebar.patientReviews', icon: MessageCircle },
+    ],
+  },
 ]
 
 export default function MedecinSidebar({ setMobileOpen }: { setMobileOpen: (open: boolean) => void }) {
@@ -30,6 +49,7 @@ export default function MedecinSidebar({ setMobileOpen }: { setMobileOpen: (open
   const router = useRouter()
   const { user, logout } = useAuth()
   const { unreadCount, pendingConsultationCount, notificationCount } = useNotification()
+  const { t } = useTranslation()
 
   const estSurLaPageMessages = pathname.startsWith('/medecin/messages')
 
@@ -47,21 +67,21 @@ export default function MedecinSidebar({ setMobileOpen }: { setMobileOpen: (open
   const renderBadge = (badgeType: string | undefined) => {
     if (badgeType === 'unread' && displayUnread > 0) {
       return (
-        <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-red-500 px-1.5 text-[10px] font-bold text-white">
+        <span className="dashboard-sidebar-badge dashboard-sidebar-badge-danger">
           {displayUnread > 99 ? '99+' : displayUnread}
         </span>
       )
     }
     if (badgeType === 'consultations' && pendingConsultationCount > 0) {
       return (
-        <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-amber-500 px-1.5 text-[10px] font-bold text-white shadow-sm">
+        <span className="dashboard-sidebar-badge dashboard-sidebar-badge-warning">
           {pendingConsultationCount > 99 ? '99+' : pendingConsultationCount}
         </span>
       )
     }
     if (badgeType === 'notifications' && notificationCount > 0) {
       return (
-        <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-red-500 px-1.5 text-[10px] font-bold text-white">
+        <span className="dashboard-sidebar-badge dashboard-sidebar-badge-danger">
           {notificationCount > 99 ? '99+' : notificationCount}
         </span>
       )
@@ -70,96 +90,102 @@ export default function MedecinSidebar({ setMobileOpen }: { setMobileOpen: (open
   }
 
   return (
-    <div className="dashboard-panel flex h-full flex-col border-r shadow-none">
-      <div className="flex items-center gap-2.5 px-5 py-6">
-        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#1D4E89]">
-          <HeartPulse className="h-5 w-5 text-white" />
+    <aside className="dashboard-sidebar flex h-full flex-col">
+      <div className="dashboard-sidebar-brand">
+        <div className="dashboard-sidebar-mark">
+          <HeartPulse className="h-[18px] w-[18px]" strokeWidth={2.2} />
         </div>
-        <p className="font-display text-base font-extrabold text-[#1D4E89]">MediSecours+</p>
+        <div className="min-w-0">
+          <p className="dashboard-sidebar-wordmark">MediSecours<span>+</span></p>
+          <p className="dashboard-sidebar-caption">{t('medecin.sidebar.professionalSpace')}</p>
+        </div>
       </div>
 
-      <nav className="flex-1 space-y-1 px-3">
-        {NAV.map(({ href, label, icon: Icon, exact, badge }) => {
-          const active = isActive(href, exact ?? false)
-          return (
-            <Link
-              key={href}
-              href={href}
-              onClick={() => setMobileOpen?.(false)}
-              className={`flex items-center justify-between gap-3 rounded-full px-4 py-2.5 text-sm font-medium transition ${
-                active
-                  ? 'bg-[#3B6EF8] text-white'
-                  : 'text-[#6B7280] hover:bg-[#F3F4F6] hover:text-[#374151]'
-              }`}
-            >
-              <span className="flex items-center gap-3">
-                <Icon className={`h-4 w-4 ${active ? 'text-white' : ''}`} />
-                {label}
-              </span>
-              {renderBadge(badge)}
-            </Link>
-          )
-        })}
+      <div className="dashboard-sidebar-status">
+        <span className="dashboard-sidebar-status-dot" />
+        <span>{t('medecin.sidebar.operational')}</span>
+        <Stethoscope className="ml-auto h-3.5 w-3.5" />
+      </div>
 
-        <div className="my-3 border-t border-gray-200" />
-
-        {NAV_BOTTOM.map(({ href, label, icon: Icon, badge }) => {
-          const active = isActive(href, false)
-          return (
-            <Link
-              key={href}
-              href={href}
-              onClick={() => setMobileOpen?.(false)}
-              className={`flex items-center justify-between gap-3 rounded-full px-4 py-2.5 text-sm font-medium transition ${
-                active
-                  ? 'bg-[#3B6EF8] text-white'
-                  : 'text-[#6B7280] hover:bg-[#F3F4F6] hover:text-[#374151]'
-              }`}
-            >
-              <span className="flex items-center gap-3">
-                <Icon className="h-4 w-4" />
-                {label}
-              </span>
-              {renderBadge(badge)}
-            </Link>
-          )
-        })}
+      <nav className="dashboard-sidebar-nav flex-1">
+        {NAV_GROUPS.map((group) => (
+          <div key={group.labelKey} className="dashboard-sidebar-group">
+            <p className="dashboard-sidebar-section-label">{t(group.labelKey)}</p>
+            <div className="space-y-1">
+              {group.items.map(({ href, labelKey, icon: Icon, exact, badge }) => {
+                const active = isActive(href, exact ?? false)
+                return (
+                  <Link
+                    key={href}
+                    href={href}
+                    onClick={() => setMobileOpen?.(false)}
+                    aria-current={active ? 'page' : undefined}
+                    className={`dashboard-sidebar-link ${active ? 'dashboard-sidebar-link-active' : ''}`}
+                  >
+                    <span className="dashboard-sidebar-link-icon">
+                      <Icon className="h-[17px] w-[17px]" strokeWidth={active ? 2.4 : 2} />
+                    </span>
+                    <span className="min-w-0 flex-1 truncate">{t(labelKey)}</span>
+                    {renderBadge(badge)}
+                    {active && <ChevronRight className="h-3.5 w-3.5 shrink-0" />}
+                  </Link>
+                )
+              })}
+            </div>
+          </div>
+        ))}
       </nav>
 
-      <div className="px-4 pb-4">
-        <div className="rounded-xl bg-[#EBF0FF] p-4">
-          <p className="mb-3 text-xs font-medium leading-relaxed text-[#374151]">
-            Gérer vos patients et dossiers médicaux
-          </p>
-          <Link
-            href="/medecin/patients"
-            onClick={() => setMobileOpen?.(false)}
-            className="inline-flex items-center gap-1.5 rounded-full bg-[#3B6EF8] px-4 py-2 text-xs font-semibold text-white transition hover:bg-[#2D5CD8]"
-          >
-            <Plus className="h-3.5 w-3.5" />
-            Nouveau dossier
-          </Link>
+      <div className="dashboard-sidebar-help">
+        <div className="flex items-start gap-3">
+          <div className="dashboard-sidebar-help-icon">
+            <CircleHelp className="h-4 w-4" />
+          </div>
+          <div className="min-w-0">
+            <p className="dashboard-sidebar-help-title">{t('medecin.sidebar.needHelp')}</p>
+            <p className="dashboard-sidebar-help-copy">
+              {t('medecin.sidebar.helpCopy')}
+            </p>
+            <Link
+              href="/medecin/guide-utilisation"
+              onClick={() => setMobileOpen?.(false)}
+              className="dashboard-sidebar-help-link"
+            >
+              {t('medecin.sidebar.openGuide')} <ChevronRight className="h-3.5 w-3.5" />
+            </Link>
+          </div>
         </div>
       </div>
 
-      <div className="border-t border-gray-100 px-4 py-4">
-        <div className="mb-3 flex items-center gap-3">
+      <div className="dashboard-sidebar-account">
+        <div className="dashboard-sidebar-account-row">
           <Avatar name={`${user?.prenom || ''} ${user?.nom || ''}`} size="md" />
           <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-semibold text-[#0F2C52]">
+            <p className="truncate text-sm font-semibold">
               Dr {user?.prenom} {user?.nom}
             </p>
-            <p className="truncate text-xs text-[#6B7280]">Médecin</p>
+            <p className="dashboard-sidebar-account-role">
+              {user?.specialite || t('medecin.sidebar.doctorRole')}
+            </p>
           </div>
+          <Link
+            href="/medecin/profil"
+            onClick={() => setMobileOpen?.(false)}
+            className="dashboard-sidebar-account-settings"
+            aria-label={t('medecin.sidebar.profileTitle')}
+            title={t('medecin.sidebar.profileTitle')}
+          >
+            <Settings className="h-4 w-4" />
+          </Link>
         </div>
         <button
           onClick={() => { logout(); router.push('/') }}
-          className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium text-[#6B7280] transition hover:bg-red-50 hover:text-red-500"
+          className="dashboard-sidebar-logout"
         >
           <LogOut className="h-4 w-4" />
-          Déconnexion
+          {t('medecin.sidebar.logout')}
         </button>
       </div>
-    </div>
+    </aside>
   )
 }

@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import useSWR from 'swr'
 import {
   Archive,
@@ -74,14 +75,15 @@ const statusStyle: Record<ProtocolStatus, string> = {
   RETIRE: 'bg-rose-100 text-rose-800',
 }
 
-const statusLabel: Record<ProtocolStatus, string> = {
-  BROUILLON: 'Brouillon',
-  EN_REVUE: 'À compléter',
-  PUBLIE: 'Visible',
-  RETIRE: 'Retiré',
+const statusLabelKey: Record<ProtocolStatus, string> = {
+  BROUILLON: 'admin.protocoles.statusBrouillon',
+  EN_REVUE: 'admin.protocoles.statusACompleter',
+  PUBLIE: 'admin.protocoles.statusVisible',
+  RETIRE: 'admin.protocoles.statusRetire',
 }
 
 export default function AdminProtocolsPage() {
+  const { t, i18n } = useTranslation()
   const [selectedId, setSelectedId] = useState<number | null>(null)
   const [filter, setFilter] = useState<StatusFilter>('TOUS')
   const [query, setQuery] = useState('')
@@ -146,8 +148,8 @@ export default function AdminProtocolsPage() {
         typeof requestError === 'object' &&
         requestError !== null &&
         'response' in requestError
-          ? ((requestError as { response?: { data?: { error?: string } } }).response?.data?.error ?? 'Action refusée.')
-          : 'Action refusée.'
+          ? ((requestError as { response?: { data?: { error?: string } } }).response?.data?.error ?? t('admin.protocoles.actionRefusee'))
+          : t('admin.protocoles.actionRefusee')
       setFeedback({ type: 'error', message })
     } finally {
       setBusyAction(null)
@@ -157,10 +159,10 @@ export default function AdminProtocolsPage() {
   const changeStatus = (status: ProtocolStatus) => {
     if (!selected) return
     const messages: Record<ProtocolStatus, string> = {
-      BROUILLON: 'La fiche est enregistrée comme brouillon.',
-      EN_REVUE: 'La fiche est marquée comme à compléter.',
-      PUBLIE: 'La fiche est maintenant visible dans le catalogue.',
-      RETIRE: 'La fiche a été retirée du catalogue public.',
+      BROUILLON: t('admin.protocoles.toastStatusBrouillon'),
+      EN_REVUE: t('admin.protocoles.toastStatusEnRevue'),
+      PUBLIE: t('admin.protocoles.toastStatusPublie'),
+      RETIRE: t('admin.protocoles.toastStatusRetire'),
     }
     void runAction(
       `status-${status}`,
@@ -174,7 +176,7 @@ export default function AdminProtocolsPage() {
     void runAction(
       'next-version',
       () => createNextProtocolVersion(selected.id),
-      'Une nouvelle version a été créée en brouillon.',
+      t('admin.protocoles.toastNextVersion'),
     )
   }
 
@@ -182,13 +184,13 @@ export default function AdminProtocolsPage() {
     return (
       <div className="flex min-h-[420px] items-center justify-center text-[#526052]">
         <Loader2 className="mr-3 h-5 w-5 animate-spin" />
-        Chargement des protocoles
+        {t('admin.protocoles.loading')}
       </div>
     )
   }
 
   if (error) {
-    return <div className="border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800">Impossible de charger les protocoles.</div>
+    return <div className="border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800">{t('admin.protocoles.loadError')}</div>
   }
 
   const counts = data?.counts ?? { total: 0, visible: 0, draft: 0, retired: 0 }
@@ -199,18 +201,18 @@ export default function AdminProtocolsPage() {
     <div className="space-y-5">
       <div className="flex flex-col gap-3 border-b border-[#dfe5db] pb-5 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <p className="text-xs font-bold uppercase text-[#718071]">Gestion des contenus</p>
-          <h1 className="mt-1 text-2xl font-bold text-[#172216]">Protocoles de premiers secours</h1>
+          <p className="text-xs font-bold uppercase text-[#718071]">{t('admin.protocoles.eyebrow')}</p>
+          <h1 className="mt-1 text-2xl font-bold text-[#172216]">{t('admin.protocoles.title')}</h1>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-[#5f6d5f]">
-            Organisez les fiches, leurs versions et leur visibilité dans le catalogue.
+            {t('admin.protocoles.description')}
           </p>
         </div>
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           {[
-            ['Total', counts.total],
-            ['Visibles', counts.visible],
-            ['Brouillons', counts.draft],
-            ['Retirés', counts.retired],
+            [t('admin.protocoles.statTotal'), counts.total],
+            [t('admin.protocoles.statVisibles'), counts.visible],
+            [t('admin.protocoles.statBrouillons'), counts.draft],
+            [t('admin.protocoles.statRetires'), counts.retired],
           ].map(([label, value]) => (
             <div key={label} className="min-w-[105px] border border-[#dde4da] bg-white px-3 py-2">
               <p className="text-[11px] font-medium text-[#778276]">{label}</p>
@@ -225,14 +227,14 @@ export default function AdminProtocolsPage() {
           <div className="border-b border-[#e5e9e2] p-3">
             <label className="flex items-center gap-2 border border-[#dfe5dc] bg-[#f8faf7] px-3">
               <Search className="h-4 w-4 text-[#778276]" />
-              <span className="sr-only">Rechercher un protocole</span>
+              <span className="sr-only">{t('admin.protocoles.srSearch')}</span>
               <input
                 value={query}
                 onChange={(event) => {
                   setQuery(event.target.value)
                   setPage(1)
                 }}
-                placeholder="Rechercher un protocole"
+                placeholder={t('admin.protocoles.searchPlaceholder')}
                 className="h-10 min-w-0 flex-1 bg-transparent text-sm outline-none"
               />
             </label>
@@ -249,7 +251,7 @@ export default function AdminProtocolsPage() {
                     filter === value ? 'bg-[#15271a] text-white' : 'bg-[#edf1eb] text-[#566356]'
                   }`}
                 >
-                  {value === 'TOUS' ? 'Tous' : statusLabel[value]}
+                  {value === 'TOUS' ? t('admin.protocoles.filterTous') : t(statusLabelKey[value])}
                 </button>
               ))}
             </div>
@@ -275,21 +277,21 @@ export default function AdminProtocolsPage() {
                     : <Eye className="h-5 w-5 shrink-0 text-emerald-600" />}
                 </div>
                 <span className={`mt-3 inline-block px-2 py-1 text-[10px] font-bold ${statusStyle[protocol.statut]}`}>
-                  {statusLabel[protocol.statut]}
+                  {t(statusLabelKey[protocol.statut])}
                 </span>
               </button>
             ))}
           </div>
 
           {totalPages > 1 && (
-            <nav className="flex items-center justify-between gap-2 border-t border-[#e5e9e2] p-3" aria-label="Pagination">
+            <nav className="flex items-center justify-between gap-2 border-t border-[#e5e9e2] p-3" aria-label={t('admin.protocoles.pagination')}>
               <button
                 type="button"
                 onClick={() => setPage((current) => Math.max(1, current - 1))}
                 disabled={effectivePage <= 1}
                 className="min-h-10 border border-[#d5ddd2] bg-white px-3 text-xs font-bold disabled:opacity-40"
               >
-                Précédent
+                {t('admin.protocoles.precedent')}
               </button>
               <span className="text-xs font-semibold text-[#667365]">{effectivePage} / {totalPages}</span>
               <button
@@ -298,7 +300,7 @@ export default function AdminProtocolsPage() {
                 disabled={effectivePage >= totalPages}
                 className="min-h-10 border border-[#d5ddd2] bg-white px-3 text-xs font-bold disabled:opacity-40"
               >
-                Suivant
+                {t('admin.protocoles.suivant')}
               </button>
             </nav>
           )}
@@ -314,16 +316,16 @@ export default function AdminProtocolsPage() {
                     <h2 className="text-xl font-bold text-[#172216]">{selected.titre}</h2>
                   </div>
                   <p className="mt-1 text-xs text-[#778276]">
-                    {selected.slug} · version {selected.version} · {selected.population}
+                    {selected.slug} · {t('admin.protocoles.versionInfo', { version: selected.version })} · {selected.population}
                   </p>
                 </div>
                 <span className={`w-fit px-3 py-1.5 text-xs font-bold ${statusStyle[selected.statut]}`}>
-                  {statusLabel[selected.statut]}
+                  {t(statusLabelKey[selected.statut])}
                 </span>
               </div>
 
               <label className="mt-5 block text-sm font-semibold text-[#344134]">
-                Références documentaires
+                {t('admin.protocoles.refDoc')}
                 <textarea
                   value={source}
                   onChange={(event) => setSource(event.target.value)}
@@ -341,27 +343,27 @@ export default function AdminProtocolsPage() {
               <div className="mt-4 flex flex-wrap gap-2">
                 <ActionButton
                   icon={Eye}
-                  label="Rendre visible"
+                  label={t('admin.protocoles.rendreVisible')}
                   busy={busyAction === 'status-PUBLIE'}
                   onClick={() => changeStatus('PUBLIE')}
                   tone="success"
                 />
                 <ActionButton
                   icon={ClipboardList}
-                  label="Mettre en brouillon"
+                  label={t('admin.protocoles.mettreBrouillon')}
                   busy={busyAction === 'status-BROUILLON'}
                   onClick={() => changeStatus('BROUILLON')}
                 />
                 <ActionButton
                   icon={Archive}
-                  label="Retirer"
+                  label={t('admin.protocoles.retirer')}
                   busy={busyAction === 'status-RETIRE'}
                   onClick={() => changeStatus('RETIRE')}
                   tone="danger"
                 />
                 <ActionButton
                   icon={History}
-                  label="Créer une version"
+                  label={t('admin.protocoles.creerVersion')}
                   busy={busyAction === 'next-version'}
                   onClick={createNextVersion}
                 />
@@ -371,7 +373,7 @@ export default function AdminProtocolsPage() {
             <section className="border border-[#dde4da] bg-white p-5">
               <div className="flex items-center gap-2">
                 <BookOpenCheck className="h-5 w-5 text-[#416f49]" />
-                <h3 className="font-bold text-[#172216]">Étapes de la fiche</h3>
+                <h3 className="font-bold text-[#172216]">{t('admin.protocoles.etapesTitle')}</h3>
               </div>
               <div className="mt-4 divide-y divide-[#e8ece5] border border-[#e0e6dd]">
                 {selected.etapes.map((step) => (
@@ -389,14 +391,14 @@ export default function AdminProtocolsPage() {
             <section className="border border-[#dde4da] bg-white p-5">
               <div className="flex items-center gap-2">
                 <History className="h-5 w-5 text-[#416f49]" />
-                <h3 className="font-bold text-[#172216]">Versions</h3>
+                <h3 className="font-bold text-[#172216]">{t('admin.protocoles.versionsTitle')}</h3>
               </div>
               <div className="mt-4 divide-y divide-[#e8ece5]">
                 {versions.map((version) => (
                   <div key={`${version.id}-${version.version}`} className="flex items-center justify-between gap-3 py-3">
                     <div>
-                      <p className="text-sm font-semibold text-[#253225]">Version {version.version}</p>
-                      <p className="mt-0.5 text-xs text-[#778276]">{statusLabel[version.statut]}</p>
+                      <p className="text-sm font-semibold text-[#253225]">{t('admin.protocoles.versionLabel', { version: version.version })}</p>
+                      <p className="mt-0.5 text-xs text-[#778276]">{t(statusLabelKey[version.statut])}</p>
                     </div>
                     <span className={`px-2 py-1 text-[10px] font-bold ${statusStyle[version.statut]}`}>
                       {version.version}
@@ -409,27 +411,27 @@ export default function AdminProtocolsPage() {
             <section className="border border-[#dde4da] bg-white p-5">
               <div className="flex items-center gap-2">
                 <ExternalLink className="h-5 w-5 text-[#416f49]" />
-                <h3 className="font-bold text-[#172216]">Utilisation du catalogue</h3>
+                <h3 className="font-bold text-[#172216]">{t('admin.protocoles.utilisationTitle')}</h3>
               </div>
               <div className="mt-4 grid gap-4 md:grid-cols-2">
                 <div>
-                  <p className="text-xs font-bold uppercase text-[#778276]">Fiches consultées</p>
+                  <p className="text-xs font-bold uppercase text-[#778276]">{t('admin.protocoles.fichesConsultees')}</p>
                   <div className="mt-2 space-y-2">
                     {(observability?.consultations ?? []).slice(0, 6).map((row) => (
                       <div key={`${row.slug}-${row.version}`} className="flex items-center justify-between gap-2 text-sm">
                         <span className="min-w-0 truncate text-[#354235]">{row.slug}</span>
-                        <span className="shrink-0 font-bold text-[#253225]">{row.vues} vues</span>
+                        <span className="shrink-0 font-bold text-[#253225]">{t('admin.protocoles.vuesCount', { count: row.vues })}</span>
                       </div>
                     ))}
                   </div>
                 </div>
                 <div>
-                  <p className="text-xs font-bold uppercase text-[#778276]">Recherches</p>
+                  <p className="text-xs font-bold uppercase text-[#778276]">{t('admin.protocoles.recherches')}</p>
                   <div className="mt-2 space-y-2">
                     {(observability?.recherches ?? []).slice(0, 6).map((row) => (
                       <div key={row.jour} className="flex items-center justify-between gap-2 text-sm">
-                        <span className="text-[#354235]">{new Date(row.jour).toLocaleDateString('fr-FR')}</span>
-                        <span className="shrink-0 text-[#253225]">{row.total} requêtes</span>
+                        <span className="text-[#354235]">{new Date(row.jour).toLocaleDateString(i18n.language?.startsWith('en') ? 'en-US' : 'fr-FR')}</span>
+                        <span className="shrink-0 text-[#253225]">{t('admin.protocoles.requetesCount', { count: row.total })}</span>
                       </div>
                     ))}
                   </div>

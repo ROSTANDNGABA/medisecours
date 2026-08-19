@@ -20,6 +20,7 @@ import {
   Wind,
 } from 'lucide-react'
 import api from '@/api/axios'
+import { useTranslation } from 'react-i18next'
 import { emergencyCallHref, EMERGENCY_NUMBER, EMERGENCY_NUMBER_LABEL } from '@/config/firstAid'
 import { readOfflineProtocols, writeOfflineProtocols } from '@/lib/firstAidOffline'
 import { useOnlineStatus } from '@/hooks/useOnlineStatus'
@@ -50,11 +51,11 @@ const urgencyStyle: Record<FirstAidUrgency, string> = {
 }
 
 const CAMEROON_PRIORITY_LABELS = [
-  'Fièvre et paludisme',
-  'Respiration',
-  'Diarrhée et déshydratation',
-  'Accidents et traumatismes',
-  'Malaises et convulsions',
+  'visitor.firstAid.priority1',
+  'visitor.firstAid.priority2',
+  'visitor.firstAid.priority3',
+  'visitor.firstAid.priority4',
+  'visitor.firstAid.priority5',
 ]
 
 function protocolIcon(slug: string) {
@@ -80,6 +81,7 @@ function formatVariant(value: string): string {
 }
 
 export default function FirstAidPage() {
+  const { t } = useTranslation()
   const hydrated = useSyncExternalStore(subscribeHydration, () => true, () => false)
   const online = useOnlineStatus()
   const [query, setQuery] = useState('')
@@ -237,11 +239,13 @@ export default function FirstAidPage() {
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.16em] text-emerald-700 dark:text-emerald-300">
-              Bibliothèque de premiers secours
+              {t('visitor.firstAid.eyebrow')}
             </p>
-            <h1 className="mt-2 font-display text-3xl font-bold text-slate-950 dark:text-white">Premiers soins</h1>
+            <h1 className="mt-2 font-display text-3xl font-bold text-slate-950 dark:text-white">
+              {t('visitor.firstAid.title')}
+            </h1>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600 dark:text-slate-300">
-              Recherchez une situation observable. En présence d&apos;un danger immédiat, contactez les urgences ou rendez-vous dans le centre de santé le plus proche.
+              {t('visitor.firstAid.intro')}
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -250,14 +254,14 @@ export default function FirstAidPage() {
               className="inline-flex h-11 items-center justify-center gap-2 bg-red-600 px-4 text-sm font-bold text-white transition hover:bg-red-500"
             >
               <PhoneCall className="h-4 w-4" aria-hidden="true" />
-              {EMERGENCY_NUMBER_LABEL} : {EMERGENCY_NUMBER}
+              {t('visitor.firstAid.callEmergency', { label: EMERGENCY_NUMBER_LABEL, number: EMERGENCY_NUMBER })}
             </a>
             <Link
               href="/maladies"
               className="inline-flex h-11 items-center justify-center gap-2 bg-slate-950 px-4 text-sm font-bold text-white transition hover:bg-slate-800 dark:bg-emerald-600 dark:hover:bg-emerald-500"
             >
               <Siren className="h-4 w-4" aria-hidden="true" />
-              Orientation par symptômes
+              {t('visitor.firstAid.orientationButton')}
             </Link>
           </div>
         </div>
@@ -266,18 +270,18 @@ export default function FirstAidPage() {
       <section className="mt-6 grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto]">
         <label className="flex h-12 items-center gap-3 border border-slate-300 bg-white px-4 dark:border-white/10 dark:bg-slate-900">
           <Search className="h-5 w-5 text-slate-400" aria-hidden="true" />
-          <span className="sr-only">Rechercher un premier soin</span>
+          <span className="sr-only">{t('visitor.firstAid.searchSrOnly')}</span>
           <input
             value={query}
             onChange={(event) => {
               setQuery(event.target.value)
               setPage(1)
             }}
-            placeholder="Ex. brûlure, étouffement, convulsion, plaie..."
+            placeholder={t('visitor.firstAid.searchPlaceholder')}
             className="min-w-0 flex-1 bg-transparent text-sm text-slate-900 outline-none placeholder:text-slate-400 dark:text-white"
           />
         </label>
-        <div className="flex flex-wrap gap-1.5" role="group" aria-label="Filtrer par niveau d'urgence">
+        <div className="flex flex-wrap gap-1.5" role="group" aria-label={t('visitor.firstAid.filterUrgencyAria')}>
           {(['TOUS', 'CRITIQUE', 'ELEVE', 'MOYEN', 'FAIBLE'] as const).map((value) => (
             <button
               key={value}
@@ -293,14 +297,14 @@ export default function FirstAidPage() {
                   : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-white/10 dark:bg-slate-900 dark:text-slate-300'
               }`}
             >
-              {value === 'TOUS' ? 'Tous' : value}
+              {value === 'TOUS' ? t('visitor.firstAid.allUrgencies') : value}
             </button>
           ))}
         </div>
       </section>
 
       {visibleCategories.length > 0 && (
-        <section aria-label="Filtrer par catégorie" className="mt-4 flex flex-wrap gap-1.5">
+        <section aria-label={t('visitor.firstAid.filterCategoryAria')} className="mt-4 flex flex-wrap gap-1.5">
           <button
             type="button"
             aria-pressed={category === CATEGORY_SLUG}
@@ -314,7 +318,7 @@ export default function FirstAidPage() {
                 : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-white/10 dark:bg-slate-900 dark:text-slate-300'
             }`}
           >
-            Toutes
+            {t('visitor.firstAid.allCategories')}
           </button>
           {visibleCategories.map((item) => (
             <button
@@ -343,27 +347,25 @@ export default function FirstAidPage() {
           className="mt-5 flex gap-3 border border-slate-200 bg-slate-50 p-4 text-sm leading-6 text-slate-700 dark:border-white/10 dark:bg-slate-900 dark:text-slate-200"
         >
           <WifiOff className="mt-0.5 h-5 w-5 shrink-0" aria-hidden="true" />
-          <p className="min-w-0 break-words">
-            Vous êtes hors connexion : les fiches affichées proviennent du cache local et peuvent ne pas être à jour.
-          </p>
+          <p className="min-w-0 break-words">{t('visitor.firstAid.offlineNotice')}</p>
         </div>
       )}
 
       {!debouncedQuery && category === CATEGORY_SLUG && urgency === 'TOUS' && (
         <section className="mt-5 border border-emerald-200 bg-emerald-50 p-4 dark:border-emerald-500/20 dark:bg-emerald-500/10">
           <p className="text-sm font-bold text-emerald-950 dark:text-emerald-100">
-            Les situations courantes au Cameroun sont affichées en premier
+            {t('visitor.firstAid.cameroonBannerTitle')}
           </p>
           <p className="mt-1 text-xs leading-5 text-emerald-800 dark:text-emerald-200">
-            Le classement combine la fréquence observée dans le pays et le niveau d&apos;urgence. Il ne remplace pas l&apos;évaluation de la situation présente.
+            {t('visitor.firstAid.cameroonBannerDesc')}
           </p>
           <div className="mt-3 flex flex-wrap gap-1.5">
-            {CAMEROON_PRIORITY_LABELS.map((label) => (
+            {CAMEROON_PRIORITY_LABELS.map((key) => (
               <span
-                key={label}
+                key={key}
                 className="border border-emerald-200 bg-white px-2.5 py-1 text-[11px] font-bold text-emerald-800 dark:border-emerald-400/20 dark:bg-slate-950/40 dark:text-emerald-200"
               >
-                {label}
+                {t(key)}
               </span>
             ))}
           </div>
@@ -373,28 +375,26 @@ export default function FirstAidPage() {
       {(!hydrated || (isLoading && protocols.length === 0)) ? (
         <div role="status" className="flex min-h-[360px] items-center justify-center text-sm text-slate-500">
           <Loader2 className="mr-3 h-5 w-5 animate-spin" aria-hidden="true" />
-          Chargement des protocoles
+          {t('visitor.firstAid.loading')}
         </div>
       ) : error && protocols.length === 0 && !showOffline ? (
         <div role="alert" className="mt-6 border border-red-200 bg-red-50 p-4 text-sm text-red-800">
-          Les protocoles sont temporairement indisponibles. Vérifiez votre connexion puis réessayez.
+          {t('visitor.firstAid.errorNotice')}
         </div>
       ) : visible.length === 0 ? (
         <div className="mt-6 border border-slate-200 bg-white px-5 py-10 text-center dark:border-white/10 dark:bg-slate-900">
           <ShieldAlert className="mx-auto h-8 w-8 text-slate-400" aria-hidden="true" />
-          <h2 className="mt-3 font-bold text-slate-900 dark:text-white">Aucun protocole disponible</h2>
-          <p className="mt-2 text-sm text-slate-500">
-            Modifiez la recherche ou utilisez l&apos;orientation guidée par symptômes.
-          </p>
+          <h2 className="mt-3 font-bold text-slate-900 dark:text-white">{t('visitor.firstAid.emptyTitle')}</h2>
+          <p className="mt-2 text-sm text-slate-500">{t('visitor.firstAid.emptyDesc')}</p>
         </div>
       ) : (
         <section className="mt-6">
           <div className="mb-3 flex items-center justify-between">
             <h2 className="text-sm font-bold text-slate-900 dark:text-white">
-              {debouncedQuery ? visible.length : displayedTotal} protocoles disponibles
+              {t('visitor.firstAid.resultsCount', { count: debouncedQuery ? visible.length : displayedTotal })}
             </h2>
             <p className="text-xs text-slate-500">
-              {debouncedQuery ? 'Classés par pertinence' : 'Fréquence au Cameroun, puis urgence'}
+              {debouncedQuery ? t('visitor.firstAid.relevanceSort') : t('visitor.firstAid.cameroonSort')}
             </p>
           </div>
           {suggestions.length > 0 && (
@@ -422,20 +422,20 @@ export default function FirstAidPage() {
                       </span>
                     </div>
                     <p className="mt-2 line-clamp-2 text-sm leading-6 text-slate-600 dark:text-slate-300">
-                      {protocol.etapes[0]?.instruction ?? 'Consultez la fiche détaillée.'}
+                      {protocol.etapes[0]?.instruction ?? t('visitor.firstAid.openSheet')}
                     </p>
                     <div className="mt-3 flex flex-wrap items-center justify-between gap-3 text-xs">
                       <span className="inline-flex items-center gap-1.5 text-slate-500">
                         <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" aria-hidden="true" />
-                        Version {protocol.version}
+                        {t('visitor.firstAid.version', { version: protocol.version })}
                       </span>
                       {protocol.variantKey && protocol.variantKey !== 'STANDARD' && (
                         <span className="bg-slate-100 px-2 py-1 font-bold text-slate-600 dark:bg-white/10 dark:text-slate-200">
-                          Contexte : {formatVariant(protocol.variantKey)}
+                          {t('visitor.firstAid.context', { variant: formatVariant(protocol.variantKey) })}
                         </span>
                       )}
                       <span className="inline-flex items-center gap-1 font-bold text-emerald-700 transition group-hover:translate-x-0.5 dark:text-emerald-300">
-                        Ouvrir <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+                        {t('visitor.firstAid.open')} <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
                       </span>
                     </div>
                   </div>
@@ -446,7 +446,7 @@ export default function FirstAidPage() {
           {!debouncedQuery && (paginatedData?.totalPages ?? 1) > 1 && (
             <nav
               className="mt-6 flex flex-wrap items-center justify-center gap-2"
-              aria-label="Pagination des protocoles"
+              aria-label={t('visitor.firstAid.paginationAria')}
             >
               <button
                 type="button"
@@ -454,10 +454,13 @@ export default function FirstAidPage() {
                 disabled={page <= 1}
                 className="min-h-11 border border-slate-300 bg-white px-4 text-sm font-bold text-slate-700 disabled:cursor-not-allowed disabled:opacity-40 dark:border-white/10 dark:bg-slate-900 dark:text-white"
               >
-                Précédent
+                {t('visitor.firstAid.previous')}
               </button>
               <span className="px-3 text-sm font-semibold text-slate-600 dark:text-slate-300">
-                Page {paginatedData?.page ?? page} sur {paginatedData?.totalPages ?? 1}
+                {t('visitor.firstAid.pageOf', {
+                  page: paginatedData?.page ?? page,
+                  total: paginatedData?.totalPages ?? 1,
+                })}
               </span>
               <button
                 type="button"
@@ -465,7 +468,7 @@ export default function FirstAidPage() {
                 disabled={page >= (paginatedData?.totalPages ?? 1)}
                 className="min-h-11 border border-slate-300 bg-white px-4 text-sm font-bold text-slate-700 disabled:cursor-not-allowed disabled:opacity-40 dark:border-white/10 dark:bg-slate-900 dark:text-white"
               >
-                Suivant
+                {t('visitor.firstAid.next')}
               </button>
             </nav>
           )}
