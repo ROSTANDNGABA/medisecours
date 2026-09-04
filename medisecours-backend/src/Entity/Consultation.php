@@ -3,6 +3,7 @@
 namespace App\Entity;
 
 use ApiPlatform\Doctrine\Orm\Filter\SearchFilter;
+use ApiPlatform\Doctrine\Orm\Filter\OrderFilter;
 use ApiPlatform\Metadata\ApiFilter;
 use ApiPlatform\Metadata\ApiResource;
 use ApiPlatform\Metadata\Delete;
@@ -19,6 +20,7 @@ use Symfony\Component\Validator\Constraints as Assert;
 
 #[ORM\Entity(repositoryClass: ConsultationRepository::class)]
 #[ApiFilter(SearchFilter::class, properties: ['statut' => 'exact'])]
+#[ApiFilter(OrderFilter::class, properties: ['createdAt', 'id'])]
 #[ApiResource(
     operations: [
         new GetCollection(),
@@ -29,6 +31,7 @@ use Symfony\Component\Validator\Constraints as Assert;
     ],
     normalizationContext: ['groups' => ['consultation:read']],
     denormalizationContext: ['groups' => ['consultation:write']],
+    order: ['createdAt' => 'DESC', 'id' => 'DESC'],
     paginationEnabled: true,
     paginationItemsPerPage: 30,
     paginationMaximumItemsPerPage: 100

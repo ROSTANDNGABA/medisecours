@@ -31,4 +31,37 @@ class ConsultationRepository extends ServiceEntityRepository
             ->getQuery()
             ->getSingleScalarResult() > 0;
     }
+
+    /**
+     * @return array{total: int, pending: int, inProgress: int, finished: int, cancelled: int}
+     */
+    public function countByStatusForPatient(Patient $patient): array
+    {
+        $rows = $this->createQueryBuilder('c')
+            ->select('c.statut AS status, COUNT(c.id) AS total')
+            ->where('c.patient = :patient')
+            ->setParameter('patient', $patient)
+            ->groupBy('c.statut')
+            ->getQuery()
+            ->getArrayResult();
+
+        $counts = [
+            Consultation::STATUT_OUVERTE => 0,
+            Consultation::STATUT_EN_COURS => 0,
+            Consultation::STATUT_TERMINEE => 0,
+            Consultation::STATUT_ANNULEE => 0,
+        ];
+
+        foreach ($rows as $row) {
+            $counts[$row['status']] = (int) $row['total'];
+        }
+
+        return [
+            'total' => array_sum($counts),
+            'pending' => $counts[Consultation::STATUT_OUVERTE],
+            'inProgress' => $counts[Consultation::STATUT_EN_COURS],
+            'finished' => $counts[Consultation::STATUT_TERMINEE],
+            'cancelled' => $counts[Consultation::STATUT_ANNULEE],
+        ];
+    }
 }
